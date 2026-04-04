@@ -541,7 +541,7 @@ public class MainWindow : Window, IDisposable
         switch (phase)
         {
             case GamePhase.Betting:
-                var canDeal = players.Count > 0;
+                var canDeal = players.Count > 0 && players.All(p => !string.IsNullOrWhiteSpace(p.Bet));
                 if (!canDeal) ImGui.BeginDisabled();
                 if (ImGui.Button("Start Deal →"))
                     phase = GamePhase.Deal;
