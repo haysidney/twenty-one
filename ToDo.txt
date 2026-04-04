@@ -1,0 +1,5 @@
+- Investigate mapping RaptureShellModule->ChatType int values to the existing channel
+  command strings (/p, /say, /fc, /ls1, etc.) and use ChangeChatChannel for ALL channel
+  switching (narration and hit rolls), rather than sending channel switch commands via
+  ProcessChatBoxEntry. This would be cleaner and avoid any side effects of sending bare
+  channel commands through the chat box.
