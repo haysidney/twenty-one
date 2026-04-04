@@ -31,6 +31,7 @@ internal record struct UndoEntry(UndoAction Action, bool IsDealer, int PlayerInd
 
 public class MainWindow : Window, IDisposable
 {
+    private readonly Configuration config;
     private readonly List<PlayerRow> players = [];
     private string newPlayerName = string.Empty;
     private readonly Hand dealerHand = new();
@@ -49,14 +50,16 @@ public class MainWindow : Window, IDisposable
     private string narrationPrefix = "/p ";
     private bool narrationPanelOpen = true;
 
-    public MainWindow()
+    public MainWindow(Configuration config)
         : base("Twenty One##TwentyOneMain")
     {
+        this.config = config;
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(640, 320),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
+        LoadState();
     }
 
     public void Dispose() { }
@@ -236,6 +239,60 @@ public class MainWindow : Window, IDisposable
         undoStack.Clear();
         phase = GamePhase.Betting;
         activePlayerIndex = -1;
+        SaveState();
+    }
+
+    // ── Persistence ──────────────────────────────────────────────────────────
+
+    private void SaveState()
+    {
+        var gs = config.GameState;
+        gs.Players = players.ConvertAll(p => new SavedPlayer
+        {
+            Name = p.Name,
+            Bet  = p.Bet,
+            Hands = p.Hands.ConvertAll(h => new SavedHand { Cards = [..h.Cards], State = h.State }),
+        });
+        gs.DealerHand        = new SavedHand { Cards = [..dealerHand.Cards], State = dealerHand.State };
+        gs.Phase             = phase;
+        gs.ActivePlayerIndex = activePlayerIndex;
+        gs.BjPayout          = bjPayout;
+        gs.NarrationLog      = [..narrationLog];
+        gs.NarrationUsePrefix = narrationUsePrefix;
+        gs.NarrationPrefix   = narrationPrefix;
+        gs.NarrationPanelOpen = narrationPanelOpen;
+        config.Save();
+    }
+
+    private void LoadState()
+    {
+        var gs = config.GameState;
+        players.Clear();
+        foreach (var sp in gs.Players)
+        {
+            var pr = new PlayerRow { Name = sp.Name, Bet = sp.Bet };
+            pr.Hands.Clear();
+            foreach (var sh in sp.Hands)
+            {
+                var h = new Hand();
+                h.Cards.AddRange(sh.Cards);
+                h.State = sh.State;
+                pr.Hands.Add(h);
+            }
+            if (pr.Hands.Count == 0) pr.Hands.Add(new Hand());
+            players.Add(pr);
+        }
+        dealerHand.Cards.Clear();
+        dealerHand.Cards.AddRange(gs.DealerHand.Cards);
+        dealerHand.State      = gs.DealerHand.State;
+        phase                 = gs.Phase;
+        activePlayerIndex     = gs.ActivePlayerIndex;
+        bjPayout              = gs.BjPayout;
+        narrationLog.Clear();
+        narrationLog.AddRange(gs.NarrationLog);
+        narrationUsePrefix    = gs.NarrationUsePrefix;
+        narrationPrefix       = gs.NarrationPrefix;
+        narrationPanelOpen    = gs.NarrationPanelOpen;
     }
 
     // ── Payout ────────────────────────────────────────────────────────────────
@@ -316,6 +373,7 @@ public class MainWindow : Window, IDisposable
             else
                 Narrate($"Dealer draws {CardLabel(card)} → {cards} = {score}");
         }
+        SaveState();
     }
 
     private void AddPlayerCard(int pi, int hi, int card)
@@ -331,6 +389,7 @@ public class MainWindow : Window, IDisposable
         // Auto-advance when the active player's hand is resolved
         if (phase == GamePhase.PlayerTurns && pi == activePlayerIndex && hand.State != HandState.Playing)
             AdvancePlayerTurn();
+        SaveState();
     }
 
     private void StandPlayer(int pi, int hi)
@@ -348,6 +407,7 @@ public class MainWindow : Window, IDisposable
 
         if (phase == GamePhase.PlayerTurns && pi == activePlayerIndex)
             AdvancePlayerTurn();
+        SaveState();
     }
 
     private void Undo()
@@ -374,6 +434,7 @@ public class MainWindow : Window, IDisposable
             if (hand.Cards.Count > 0) hand.Cards.RemoveAt(hand.Cards.Count - 1);
             UpdateHandState(hand);
         }
+        SaveState();
     }
 
     // ── ImGui helpers ─────────────────────────────────────────────────────────
@@ -529,9 +590,14 @@ public class MainWindow : Window, IDisposable
                     {
                         if (renamingBuffer.Length > 0) p.Name = renamingBuffer;
                         renamingIndex = -1;
+                        SaveState();
                     }
                     if (!ImGui.IsItemActive() && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                    {
+                        if (renamingBuffer.Length > 0) p.Name = renamingBuffer;
                         renamingIndex = -1;
+                        SaveState();
+                    }
                 }
                 else
                 {
@@ -548,7 +614,12 @@ public class MainWindow : Window, IDisposable
                 ImGui.SetNextItemWidth(-1);
                 if (phase != GamePhase.Betting) ImGui.BeginDisabled();
                 var bet = p.Bet;
-                if (ImGui.InputText($"##bet{i}", ref bet, 16)) p.Bet = bet;
+                if (ImGui.InputText($"##bet{i}", ref bet, 16, ImGuiInputTextFlags.EnterReturnsTrue))
+                {
+                    p.Bet = bet;
+                    SaveState();
+                }
+                else if (bet != p.Bet) p.Bet = bet; // keep in sync while typing without saving
                 if (phase != GamePhase.Betting) ImGui.EndDisabled();
 
                 // Cards
@@ -615,7 +686,7 @@ public class MainWindow : Window, IDisposable
                 if (!canStand) ImGui.EndDisabled();
             }
 
-            if (removeAt >= 0) players.RemoveAt(removeAt);
+            if (removeAt >= 0) { players.RemoveAt(removeAt); SaveState(); }
             ImGui.EndTable();
         }
 
@@ -633,6 +704,7 @@ public class MainWindow : Window, IDisposable
                 players.Add(new PlayerRow { Name = newPlayerName });
                 newPlayerName = string.Empty;
                 focusNextFrame = "##newName";
+                SaveState();
             }
             if (!canAdd) ImGui.EndDisabled();
             ImGui.Spacing();
@@ -667,12 +739,18 @@ public class MainWindow : Window, IDisposable
                 var bjIdx = (int)bjPayout;
                 ImGui.SetNextItemWidth(60);
                 if (ImGui.Combo("BJ pays##bjpayout", ref bjIdx, bjOptions, bjOptions.Length))
+                {
                     bjPayout = (BlackjackPayout)bjIdx;
+                    SaveState();
+                }
                 ImGui.SameLine();
                 var canDeal = players.Count > 0 && players.All(p => !string.IsNullOrWhiteSpace(p.Bet));
                 if (!canDeal) ImGui.BeginDisabled();
                 if (ImGui.Button("Start Deal →"))
+                {
                     phase = GamePhase.Deal;
+                    SaveState();
+                }
                 if (!canDeal) ImGui.EndDisabled();
                 break;
 
@@ -685,6 +763,7 @@ public class MainWindow : Window, IDisposable
                 {
                     NarrateDealSummary();
                     EnterPlayerTurns();
+                    SaveState();
                 }
                 if (!dealDone) ImGui.EndDisabled();
                 if (!dealDone && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
@@ -705,6 +784,7 @@ public class MainWindow : Window, IDisposable
                 {
                     NarratePayouts();
                     phase = GamePhase.Payout;
+                    SaveState();
                 }
                 if (!canPayout) ImGui.EndDisabled();
                 if (!canPayout && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
@@ -763,7 +843,7 @@ public class MainWindow : Window, IDisposable
                 ImGui.SetClipboardText(sb.ToString());
             }
             ImGui.SameLine();
-            if (ImGui.Button("Clear")) narrationLog.Clear();
+            if (ImGui.Button("Clear")) { narrationLog.Clear(); SaveState(); }
             if (narrationLog.Count == 0) ImGui.EndDisabled();
 
             // Scrollable log — fills remaining window height
