@@ -338,9 +338,11 @@ public class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
-        // During Deal: dealer gets exactly 1 card; DealerTurn: draws remaining cards
+        // During Deal: dealer gets exactly 1 card; DealerTurn: draws until should stand/bust
+        var dealerShouldStop = DealerRecommendation(dealerHand) == "STAND"
+                            || HandValue(dealerHand.Cards) > 21;
         var dealerInputActive = (phase == GamePhase.Deal && dealerHand.Cards.Count < 1)
-                             || phase == GamePhase.DealerTurn;
+                             || (phase == GamePhase.DealerTurn && !dealerShouldStop);
 
         // ── Dealer section ────────────────────────────────────────────────────
         ImGui.Text("-- Dealer --");
