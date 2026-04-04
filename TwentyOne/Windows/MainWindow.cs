@@ -7,6 +7,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Shell;
 
 namespace TwentyOne.Windows;
 
@@ -163,13 +164,19 @@ public class MainWindow : Window, IDisposable
         uiModule->ProcessChatBoxEntry(&str);
     }
 
-    private void SendHitRoll()
+    private unsafe void SendHitRoll()
     {
         if (!config.GameState.ChatEnabled) return;
         var channel = config.GameState.ChatChannel;
         var isPublic = channel is "/say" or "/yell" or "/shout";
-        var cmd = isPublic ? $"{channel} /random 13" : $"{channel} /dice 13";
-        SendChatMessage(cmd);
+
+        var shell = RaptureShellModule.Instance();
+        if (shell == null) return;
+
+        var savedChatType = shell->ChatType;
+        SendChatMessage(channel);
+        SendChatMessage(isPublic ? "/random 13" : "/dice 13");
+        shell->ChangeChatChannel(savedChatType, 0, null, true);
     }
 
     private void NarratePlayerAction(int pi, int hi, int card)
