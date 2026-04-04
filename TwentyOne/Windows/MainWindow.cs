@@ -16,7 +16,6 @@ public class PlayerRow
     public string CardInput { get; set; } = string.Empty;
 }
 
-// Represents a single card-add action that can be undone
 internal record struct UndoEntry(bool IsDealer, int PlayerIndex);
 
 public class MainWindow : Window, IDisposable
@@ -28,6 +27,8 @@ public class MainWindow : Window, IDisposable
     private int renamingIndex = -1;
     private string renamingBuffer = string.Empty;
     private readonly Stack<UndoEntry> undoStack = new();
+    // Input ID that should be focused on the next frame
+    private string? focusNextFrame;
 
     public MainWindow()
         : base("Twenty One##TwentyOneMain")
@@ -41,7 +42,6 @@ public class MainWindow : Window, IDisposable
 
     public void Dispose() { }
 
-    // Returns display string for a card value (1=A, 11=J, 12=Q, 13=K)
     private static string CardLabel(int card) => card switch
     {
         1 => "A",
@@ -51,7 +51,6 @@ public class MainWindow : Window, IDisposable
         _ => card.ToString()
     };
 
-    // Builds hand display string: "A 7 K"
     private static string HandString(List<int> cards)
     {
         if (cards.Count == 0) return string.Empty;
@@ -64,7 +63,7 @@ public class MainWindow : Window, IDisposable
         return sb.ToString();
     }
 
-    // Blackjack hand value: aces are 11, reduced to 1 as needed to avoid bust
+    // Returns the best blackjack value (aces as 11, reduced to avoid bust)
     private static int HandValue(List<int> cards)
     {
         var total = 0;
@@ -79,7 +78,20 @@ public class MainWindow : Window, IDisposable
         return total;
     }
 
-    // Tries to parse a card input string into a valid card (1–13). Returns 0 on failure.
+    // Returns score display string. Shows "low/high" when both are valid (e.g. "3/13").
+    private static string ScoreString(List<int> cards)
+    {
+        if (cards.Count == 0) return string.Empty;
+        var high = HandValue(cards);
+        // low = treat every ace as 1
+        var low = 0;
+        foreach (var c in cards)
+            low += c == 1 ? 1 : c >= 10 ? 10 : c;
+        if (low != high && high <= 21)
+            return $"{low}/{high}";
+        return high.ToString();
+    }
+
     private static int ParseCard(string input)
     {
         if (int.TryParse(input.Trim(), out var n) && n >= 1 && n <= 13)
@@ -114,13 +126,18 @@ public class MainWindow : Window, IDisposable
         }
     }
 
-    // Draws the card history label + small input. Returns card to add (0 = none).
-    private static int DrawCardEntry(string inputId, string handStr, ref string inputBuf)
+    // Draws hand history label + small card input. Returns added card (0 = none).
+    private int DrawCardEntry(string inputId, string handStr, ref string inputBuf)
     {
         if (handStr.Length > 0)
         {
             ImGui.Text(handStr);
             ImGui.SameLine();
+        }
+        if (focusNextFrame == inputId)
+        {
+            ImGui.SetKeyboardFocusHere();
+            focusNextFrame = null;
         }
         ImGui.SetNextItemWidth(32);
         var submitted = ImGui.InputText(inputId, ref inputBuf, 3,
@@ -128,12 +145,12 @@ public class MainWindow : Window, IDisposable
         if (submitted)
         {
             var card = ParseCard(inputBuf);
+            inputBuf = string.Empty;
             if (card > 0)
             {
-                inputBuf = string.Empty;
+                focusNextFrame = inputId;
                 return card;
             }
-            inputBuf = string.Empty;
         }
         return 0;
     }
@@ -145,8 +162,8 @@ public class MainWindow : Window, IDisposable
         ImGui.Separator();
 
         var dealerHandStr = HandString(dealerCards);
+        var dealerScoreStr = ScoreString(dealerCards);
         var dealerValue = HandValue(dealerCards);
-        var dealerScoreStr = dealerCards.Count > 0 ? dealerValue.ToString() : string.Empty;
 
         var dealerCard = DrawCardEntry("##dealerCardInput", dealerHandStr, ref dealerCardInput);
         if (dealerCard > 0) AddDealerCard(dealerCard);
@@ -154,9 +171,18 @@ public class MainWindow : Window, IDisposable
         if (dealerScoreStr.Length > 0)
         {
             ImGui.SameLine();
-            ImGui.Text($"= {dealerScoreStr}");
-            if (dealerValue > 21) { ImGui.SameLine(); ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), "BUST"); }
-            else if (dealerValue == 21) { ImGui.SameLine(); ImGui.TextColored(new Vector4(0.3f, 1, 0.3f, 1), "21!"); }
+            if (dealerValue > 21)
+            {
+                ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), $"= {dealerScoreStr} BUST");
+            }
+            else if (dealerValue == 21)
+            {
+                ImGui.TextColored(new Vector4(0.3f, 1, 0.3f, 1), $"= {dealerScoreStr} 21!");
+            }
+            else
+            {
+                ImGui.Text($"= {dealerScoreStr}");
+            }
         }
 
         ImGui.Spacing();
@@ -169,7 +195,7 @@ public class MainWindow : Window, IDisposable
             ImGui.TableSetupColumn("Name"u8, ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Bet"u8, ImGuiTableColumnFlags.WidthFixed, 70);
             ImGui.TableSetupColumn("Cards"u8, ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Score"u8, ImGuiTableColumnFlags.WidthFixed, 45);
+            ImGui.TableSetupColumn("Score"u8, ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Status"u8, ImGuiTableColumnFlags.WidthFixed, 70);
             ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableHeadersRow();
@@ -223,13 +249,14 @@ public class MainWindow : Window, IDisposable
                 ImGui.TableSetColumnIndex(3);
                 if (p.Cards.Count > 0)
                 {
+                    var scoreStr = ScoreString(p.Cards);
                     var val = HandValue(p.Cards);
                     if (val > 21)
-                        ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), val.ToString());
+                        ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), scoreStr);
                     else if (val == 21)
                         ImGui.TextColored(new Vector4(0.3f, 1, 0.3f, 1), "21!");
                     else
-                        ImGui.Text(val.ToString());
+                        ImGui.Text(scoreStr);
                 }
 
                 // Status
