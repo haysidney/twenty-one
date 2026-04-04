@@ -656,11 +656,17 @@ public class MainWindow : Window, IDisposable
                 break;
 
             case GamePhase.DealerTurn:
+                var allBJ = players.Count > 0 && players.TrueForAll(p => p.Hands[0].State == HandState.Blackjack);
+                var canPayout = allBJ || (dealerShouldStop && dealerHand.Cards.Count > 0);
+                if (!canPayout) ImGui.BeginDisabled();
                 if (ImGui.Button("Go to Payout →"))
                 {
                     NarratePayouts();
                     phase = GamePhase.Payout;
                 }
+                if (!canPayout) ImGui.EndDisabled();
+                if (!canPayout && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip("Dealer must finish their hand first."u8);
                 break;
 
             case GamePhase.Payout:
