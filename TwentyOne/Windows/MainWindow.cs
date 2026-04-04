@@ -286,14 +286,15 @@ public class MainWindow : Window, IDisposable
         // Add player row
         ImGui.Spacing();
         ImGui.SetNextItemWidth(200);
-        ImGui.InputText("##newName"u8, ref newPlayerName, 64);
+        var nameSubmitted = ImGui.InputText("##newName"u8, ref newPlayerName, 64, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         var canAdd = newPlayerName.Length > 0;
         if (!canAdd) ImGui.BeginDisabled();
-        if (ImGui.Button("Add Player"))
+        if (ImGui.Button("Add Player") || (nameSubmitted && canAdd))
         {
             players.Add(new PlayerRow { Name = newPlayerName });
             newPlayerName = string.Empty;
+            focusNextFrame = "##newName";
         }
         if (!canAdd) ImGui.EndDisabled();
 
@@ -305,7 +306,6 @@ public class MainWindow : Window, IDisposable
         {
             foreach (var p in players)
             {
-                p.Bet = string.Empty;
                 p.Cards.Clear();
                 p.Status = string.Empty;
                 p.CardInput = string.Empty;
