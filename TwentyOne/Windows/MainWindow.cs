@@ -485,8 +485,8 @@ public class MainWindow : Window, IDisposable
 
                 ImGui.SameLine();
 
-                var canStand = phase is GamePhase.Deal or GamePhase.PlayerTurns
-                    && (phase != GamePhase.PlayerTurns || i == activePlayerIndex)
+                var canStand = phase == GamePhase.PlayerTurns
+                    && i == activePlayerIndex
                     && hand.State == HandState.Playing;
                 if (!canStand) ImGui.BeginDisabled();
                 if (ImGui.SmallButton($"S##{i}")) StandPlayer(i, 0);
