@@ -163,6 +163,15 @@ public class MainWindow : Window, IDisposable
         uiModule->ProcessChatBoxEntry(&str);
     }
 
+    private void SendHitRoll()
+    {
+        if (!config.GameState.ChatEnabled) return;
+        var channel = config.GameState.ChatChannel;
+        var isPublic = channel is "/say" or "/yell" or "/shout";
+        var cmd = isPublic ? $"{channel} /random 13" : $"{channel} /dice 13";
+        SendChatMessage(cmd);
+    }
+
     private void NarratePlayerAction(int pi, int hi, int card)
     {
         var p = players[pi];
@@ -548,6 +557,12 @@ public class MainWindow : Window, IDisposable
         var dealerCard = DrawCardEntry("##dealerCardInput", dealerHand, dealerInputActive);
         if (dealerCard > 0) AddDealerCard(dealerCard);
 
+        if (dealerInputActive && config.GameState.ChatEnabled)
+        {
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Hit##dealer")) SendHitRoll();
+        }
+
         if (dealerHand.Cards.Count > 0)
         {
             ImGui.SameLine();
@@ -585,7 +600,7 @@ public class MainWindow : Window, IDisposable
             ImGui.TableSetupColumn("Cards"u8,   ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Score"u8,   ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Status"u8,  ImGuiTableColumnFlags.WidthFixed, 100);
-            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 100);
             ImGui.TableHeadersRow();
 
             int removeAt = -1;
@@ -705,6 +720,15 @@ public class MainWindow : Window, IDisposable
                 if (!canStand) ImGui.BeginDisabled();
                 if (ImGui.SmallButton($"S##{i}")) StandPlayer(i, 0);
                 if (!canStand) ImGui.EndDisabled();
+
+                if (config.GameState.ChatEnabled)
+                {
+                    ImGui.SameLine();
+                    var canHit = canStand;
+                    if (!canHit) ImGui.BeginDisabled();
+                    if (ImGui.SmallButton($"H##{i}")) SendHitRoll();
+                    if (!canHit) ImGui.EndDisabled();
+                }
             }
 
             if (removeAt >= 0) { players.RemoveAt(removeAt); SaveState(); }
