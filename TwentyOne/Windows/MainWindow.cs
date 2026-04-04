@@ -41,6 +41,12 @@ public class MainWindow : Window, IDisposable
     private GamePhase phase = GamePhase.Betting;
     private int activePlayerIndex = -1;
 
+    // ── Narration ─────────────────────────────────────────────────────────────
+    private readonly List<string> narrationLog = [];
+    private bool narrationUsePrefix = false;
+    private string narrationPrefix = "/p ";
+    private bool narrationPanelOpen = true;
+
     public MainWindow()
         : base("Twenty One##TwentyOneMain")
     {
@@ -132,6 +138,63 @@ public class MainWindow : Window, IDisposable
         return (val < 17 || (val == 17 && IsSoft(hand.Cards))) ? "HIT" : "STAND";
     }
 
+    // ── Narration helpers ─────────────────────────────────────────────────────
+
+    private void Narrate(string text) => narrationLog.Add(text);
+
+    private void NarratePlayerAction(int pi, int hi, int card)
+    {
+        var p = players[pi];
+        var hand = p.Hands[hi];
+        var name = p.Name;
+        var cards = HandString(hand.Cards);
+        var score = ScoreString(hand.Cards);
+        switch (hand.State)
+        {
+            case HandState.Bust:
+                Narrate($"{name} busts! {cards} = {score}");
+                break;
+            case HandState.Blackjack:
+                Narrate($"{name} — Blackjack! {cards}");
+                break;
+            default:
+                Narrate($"{name} hits → {CardLabel(card)} | {cards} = {score}");
+                break;
+        }
+    }
+
+    private void NarrateDealSummary()
+    {
+        var sb = new StringBuilder("Deal — ");
+        for (var i = 0; i < players.Count; i++)
+        {
+            if (i > 0) sb.Append(", ");
+            var p = players[i];
+            var hand = p.Hands[0];
+            sb.Append(p.Name).Append(": ").Append(HandString(hand.Cards))
+              .Append(" (").Append(ScoreString(hand.Cards)).Append(')');
+            if (hand.State == HandState.Blackjack) sb.Append(" BJ!");
+        }
+        sb.Append(" | Dealer shows ").Append(HandString(dealerHand.Cards));
+        Narrate(sb.ToString());
+    }
+
+    private void NarratePayouts()
+    {
+        var dealerScore = HandValue(dealerHand.Cards);
+        var dealerBust = dealerHand.Cards.Count > 0 && dealerScore > 21;
+        var dealerBJ = dealerHand.Cards.Count == 2 && dealerScore == 21;
+        var dealerStr = dealerBust ? $"Dealer busts ({dealerScore})" : $"Dealer {ScoreString(dealerHand.Cards)}";
+        Narrate(dealerStr);
+        foreach (var p in players)
+        {
+            var (label, _) = GetPayoutDisplay(p);
+            if (label.Length == 0) continue;
+            var bet = string.IsNullOrWhiteSpace(p.Bet) ? string.Empty : $" (bet: {p.Bet})";
+            Narrate($"{p.Name}: {label}{bet}");
+        }
+    }
+
     // ── Phase state machine ───────────────────────────────────────────────────
 
     // Advances to the next Playing player; transitions to DealerTurn if none remain.
@@ -210,6 +273,19 @@ public class MainWindow : Window, IDisposable
         dealerHand.Cards.Add(card);
         UpdateHandState(dealerHand);
         undoStack.Push(new UndoEntry(UndoAction.AddCard, IsDealer: true, -1, -1));
+
+        if (phase == GamePhase.DealerTurn)
+        {
+            var cards = HandString(dealerHand.Cards);
+            var score = ScoreString(dealerHand.Cards);
+            var val = HandValue(dealerHand.Cards);
+            if (val > 21)
+                Narrate($"Dealer draws {CardLabel(card)} → {cards} = {score} — Bust!");
+            else if (dealerHand.Cards.Count == 2 && val == 21)
+                Narrate($"Dealer draws {CardLabel(card)} → {cards} — Blackjack!");
+            else
+                Narrate($"Dealer draws {CardLabel(card)} → {cards} = {score}");
+        }
     }
 
     private void AddPlayerCard(int pi, int hi, int card)
@@ -218,6 +294,9 @@ public class MainWindow : Window, IDisposable
         hand.Cards.Add(card);
         UpdateHandState(hand);
         undoStack.Push(new UndoEntry(UndoAction.AddCard, IsDealer: false, pi, hi));
+
+        if (phase == GamePhase.PlayerTurns)
+            NarratePlayerAction(pi, hi, card);
 
         // Auto-advance when the active player's hand is resolved
         if (phase == GamePhase.PlayerTurns && pi == activePlayerIndex && hand.State != HandState.Playing)
@@ -230,6 +309,12 @@ public class MainWindow : Window, IDisposable
         if (hand.State != HandState.Playing) return;
         hand.State = HandState.Stand;
         undoStack.Push(new UndoEntry(UndoAction.Stand, IsDealer: false, pi, hi));
+
+        if (phase == GamePhase.PlayerTurns)
+        {
+            var p = players[pi];
+            Narrate($"{p.Name} stands. {HandString(hand.Cards)} = {ScoreString(hand.Cards)}");
+        }
 
         if (phase == GamePhase.PlayerTurns && pi == activePlayerIndex)
             AdvancePlayerTurn();
@@ -554,7 +639,10 @@ public class MainWindow : Window, IDisposable
                     && players.TrueForAll(p => p.Hands[0].Cards.Count >= 2);
                 if (!dealDone) ImGui.BeginDisabled();
                 if (ImGui.Button("Begin Player Turns →"))
+                {
+                    NarrateDealSummary();
                     EnterPlayerTurns();
+                }
                 if (!dealDone) ImGui.EndDisabled();
                 if (!dealDone && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                     ImGui.SetTooltip("Dealer needs 1 card; each player needs 2 cards."u8);
@@ -567,7 +655,10 @@ public class MainWindow : Window, IDisposable
 
             case GamePhase.DealerTurn:
                 if (ImGui.Button("Go to Payout →"))
+                {
+                    NarratePayouts();
                     phase = GamePhase.Payout;
+                }
                 break;
 
             case GamePhase.Payout:
@@ -590,6 +681,61 @@ public class MainWindow : Window, IDisposable
                 if (ImGui.Button("Abort Round"))
                     NewRound();
             }
+        }
+
+        // ── Narration panel ───────────────────────────────────────────────────
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
+        if (ImGui.CollapsingHeader("Chat Narration", ref narrationPanelOpen, ImGuiTreeNodeFlags.DefaultOpen))
+        {
+            // Prefix controls
+            ImGui.Checkbox("Add prefix", ref narrationUsePrefix);
+            if (narrationUsePrefix)
+            {
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth(100);
+                ImGui.InputText("##narPrefix", ref narrationPrefix, 32);
+            }
+
+            // Copy All / Clear
+            ImGui.SameLine();
+            if (narrationLog.Count == 0) ImGui.BeginDisabled();
+            if (ImGui.Button("Copy All"))
+            {
+                var sb = new StringBuilder();
+                foreach (var line in narrationLog)
+                {
+                    if (sb.Length > 0) sb.Append('\n');
+                    sb.Append(narrationUsePrefix ? narrationPrefix + line : line);
+                }
+                ImGui.SetClipboardText(sb.ToString());
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Clear")) narrationLog.Clear();
+            if (narrationLog.Count == 0) ImGui.EndDisabled();
+
+            // Scrollable log
+            ImGui.Spacing();
+            var childHeight = Math.Min(narrationLog.Count * ImGui.GetTextLineHeightWithSpacing() + 8, 180);
+            if (ImGui.BeginChild("##narLog", new Vector2(0, childHeight), true))
+            {
+                for (var ni = narrationLog.Count - 1; ni >= 0; ni--)
+                {
+                    var line = narrationLog[ni];
+                    var display = narrationUsePrefix ? narrationPrefix + line : line;
+                    ImGui.PushID(ni);
+                    if (ImGui.SmallButton("C"))
+                        ImGui.SetClipboardText(display);
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip("Copy to clipboard"u8);
+                    ImGui.PopID();
+                    ImGui.SameLine();
+                    ImGui.TextUnformatted(display);
+                }
+            }
+            ImGui.EndChild();
         }
     }
 }
