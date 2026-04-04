@@ -146,7 +146,12 @@ public class MainWindow : Window, IDisposable
 
     // ── Narration helpers ─────────────────────────────────────────────────────
 
-    private void Narrate(string text) => narrationLog.Add(text);
+    private void Narrate(string text)
+    {
+        narrationLog.Add(text);
+        if (config.GameState.ChatEnabled)
+            Plugin.CommandManager.ProcessCommand(config.GameState.ChatChannel + " " + text);
+    }
 
     private void NarratePlayerAction(int pi, int hi, int card)
     {
@@ -258,10 +263,11 @@ public class MainWindow : Window, IDisposable
         gs.Phase             = phase;
         gs.ActivePlayerIndex = activePlayerIndex;
         gs.BjPayout          = config.GameState.BjPayout;
-        gs.NarrationLog      = [..narrationLog];
+        gs.NarrationLog       = [..narrationLog];
         gs.NarrationUsePrefix = narrationUsePrefix;
-        gs.NarrationPrefix   = narrationPrefix;
+        gs.NarrationPrefix    = narrationPrefix;
         gs.NarrationPanelOpen = narrationPanelOpen;
+        // ChatEnabled and ChatChannel are config-only settings, not game state
         config.Save();
     }
 
