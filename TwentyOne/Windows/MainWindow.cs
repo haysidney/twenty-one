@@ -473,7 +473,7 @@ public class MainWindow : Window, IDisposable
             ImGui.TableSetupColumn("Cards"u8,   ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Score"u8,   ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Status"u8,  ImGuiTableColumnFlags.WidthFixed, 75);
-            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 55);
+            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 80);
             ImGui.TableHeadersRow();
 
             int removeAt = -1;
@@ -527,12 +527,14 @@ public class MainWindow : Window, IDisposable
                 var addedCard = DrawCardEntry($"##card{i}", hand, cardInputActive);
                 if (addedCard > 0) AddPlayerCard(i, 0, addedCard);
 
-                // Score
+                // Score — stood hands with a soft value show the high number only
                 ImGui.TableSetColumnIndex(3);
                 if (hand.Cards.Count > 0)
                 {
                     var val = HandValue(hand.Cards);
-                    var scoreStr = ScoreString(hand.Cards);
+                    var scoreStr = hand.State == HandState.Stand
+                        ? val.ToString()
+                        : ScoreString(hand.Cards);
                     if (val > 21)
                         ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f), scoreStr);
                     else if (val == 21)
@@ -716,10 +718,9 @@ public class MainWindow : Window, IDisposable
             if (ImGui.Button("Clear")) narrationLog.Clear();
             if (narrationLog.Count == 0) ImGui.EndDisabled();
 
-            // Scrollable log
+            // Scrollable log — fills remaining window height
             ImGui.Spacing();
-            var childHeight = Math.Min(narrationLog.Count * ImGui.GetTextLineHeightWithSpacing() + 8, 180);
-            if (ImGui.BeginChild("##narLog", new Vector2(0, childHeight), true))
+            if (ImGui.BeginChild("##narLog", new Vector2(0, 0), true))
             {
                 for (var ni = narrationLog.Count - 1; ni >= 0; ni--)
                 {
