@@ -5,6 +5,8 @@ using System.Numerics;
 using System.Text;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using FFXIVClientStructs.FFXIV.Client.System.String;
+using FFXIVClientStructs.FFXIV.Client.UI;
 
 namespace TwentyOne.Windows;
 
@@ -150,7 +152,15 @@ public class MainWindow : Window, IDisposable
     {
         narrationLog.Add(text);
         if (config.GameState.ChatEnabled)
-            Plugin.CommandManager.ProcessCommand(config.GameState.ChatChannel + " " + text);
+            SendChatMessage(config.GameState.ChatChannel + " " + text);
+    }
+
+    private static unsafe void SendChatMessage(string message)
+    {
+        var uiModule = UIModule.Instance();
+        if (uiModule == null) return;
+        using var str = new Utf8String(message);
+        uiModule->ProcessChatBoxEntry(&str);
     }
 
     private void NarratePlayerAction(int pi, int hi, int card)
