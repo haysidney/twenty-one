@@ -7,27 +7,34 @@ using Dalamud.Interface.Windowing;
 
 namespace TwentyOne.Windows;
 
+public enum HandState { Playing, Stand, Bust, Blackjack }
+
+public class Hand
+{
+    public List<int> Cards { get; } = [];
+    public HandState State { get; set; } = HandState.Playing;
+    public string CardInput { get; set; } = string.Empty;
+}
+
 public class PlayerRow
 {
     public string Name { get; set; } = string.Empty;
     public string Bet { get; set; } = string.Empty;
-    public List<int> Cards { get; } = [];
-    public string Status { get; set; } = string.Empty;
-    public string CardInput { get; set; } = string.Empty;
+    // Index 0 is the primary hand; future hands are splits
+    public List<Hand> Hands { get; } = [new Hand()];
 }
 
-internal record struct UndoEntry(bool IsDealer, int PlayerIndex);
+internal enum UndoAction { AddCard, Stand }
+internal record struct UndoEntry(UndoAction Action, bool IsDealer, int PlayerIndex, int HandIndex);
 
 public class MainWindow : Window, IDisposable
 {
     private readonly List<PlayerRow> players = [];
     private string newPlayerName = string.Empty;
-    private readonly List<int> dealerCards = [];
-    private string dealerCardInput = string.Empty;
+    private readonly Hand dealerHand = new();
     private int renamingIndex = -1;
     private string renamingBuffer = string.Empty;
     private readonly Stack<UndoEntry> undoStack = new();
-    // Input ID that should be focused on the next frame
     private string? focusNextFrame;
 
     public MainWindow()
@@ -41,6 +48,8 @@ public class MainWindow : Window, IDisposable
     }
 
     public void Dispose() { }
+
+    // ── Card helpers ──────────────────────────────────────────────────────────
 
     private static string CardLabel(int card) => card switch
     {
@@ -63,7 +72,7 @@ public class MainWindow : Window, IDisposable
         return sb.ToString();
     }
 
-    // Returns the best blackjack value (aces as 11, reduced to avoid bust)
+    // Best blackjack value: aces start at 11, reduced to 1 to avoid bust
     private static int HandValue(List<int> cards)
     {
         var total = 0;
@@ -78,37 +87,75 @@ public class MainWindow : Window, IDisposable
         return total;
     }
 
-    // Returns score display string. Shows "low/high" when both are valid (e.g. "3/13").
+    // True when an ace is still counting as 11 (soft hand)
+    private static bool IsSoft(List<int> cards)
+    {
+        var high = HandValue(cards);
+        var low = 0;
+        foreach (var c in cards) low += c == 1 ? 1 : c >= 10 ? 10 : c;
+        return low != high;
+    }
+
+    // Score display: "3/13" when soft, single value otherwise
     private static string ScoreString(List<int> cards)
     {
         if (cards.Count == 0) return string.Empty;
         var high = HandValue(cards);
-        // low = treat every ace as 1
         var low = 0;
-        foreach (var c in cards)
-            low += c == 1 ? 1 : c >= 10 ? 10 : c;
-        if (low != high && high <= 21)
-            return $"{low}/{high}";
-        return high.ToString();
+        foreach (var c in cards) low += c == 1 ? 1 : c >= 10 ? 10 : c;
+        return (low != high && high <= 21) ? $"{low}/{high}" : high.ToString();
     }
 
     private static int ParseCard(string input)
     {
-        if (int.TryParse(input.Trim(), out var n) && n >= 1 && n <= 13)
-            return n;
+        if (int.TryParse(input.Trim(), out var n) && n >= 1 && n <= 13) return n;
         return 0;
     }
 
-    private void AddDealerCard(int card)
+    // ── Hand state classification ─────────────────────────────────────────────
+
+    // Re-evaluates state after a card is added. Never clears a Stand.
+    private static void UpdateHandState(Hand hand)
     {
-        dealerCards.Add(card);
-        undoStack.Push(new UndoEntry(IsDealer: true, PlayerIndex: -1));
+        if (hand.State == HandState.Stand) return;
+        var val = HandValue(hand.Cards);
+        hand.State = val > 21 ? HandState.Bust
+            : hand.Cards.Count == 2 && val == 21 ? HandState.Blackjack
+            : HandState.Playing;
     }
 
-    private void AddPlayerCard(int playerIndex, int card)
+    // Dealer must hit soft 17 or below; stand on hard 17+
+    private static string DealerRecommendation(Hand hand)
     {
-        players[playerIndex].Cards.Add(card);
-        undoStack.Push(new UndoEntry(IsDealer: false, PlayerIndex: playerIndex));
+        if (hand.Cards.Count == 0) return string.Empty;
+        var val = HandValue(hand.Cards);
+        if (val > 21) return string.Empty;
+        return (val < 17 || (val == 17 && IsSoft(hand.Cards))) ? "HIT" : "STAND";
+    }
+
+    // ── Undo / mutating actions ───────────────────────────────────────────────
+
+    private void AddDealerCard(int card)
+    {
+        dealerHand.Cards.Add(card);
+        UpdateHandState(dealerHand);
+        undoStack.Push(new UndoEntry(UndoAction.AddCard, IsDealer: true, -1, -1));
+    }
+
+    private void AddPlayerCard(int pi, int hi, int card)
+    {
+        var hand = players[pi].Hands[hi];
+        hand.Cards.Add(card);
+        UpdateHandState(hand);
+        undoStack.Push(new UndoEntry(UndoAction.AddCard, IsDealer: false, pi, hi));
+    }
+
+    private void StandPlayer(int pi, int hi)
+    {
+        var hand = players[pi].Hands[hi];
+        if (hand.State != HandState.Playing) return;
+        hand.State = HandState.Stand;
+        undoStack.Push(new UndoEntry(UndoAction.Stand, IsDealer: false, pi, hi));
     }
 
     private void Undo()
@@ -116,36 +163,49 @@ public class MainWindow : Window, IDisposable
         if (!undoStack.TryPop(out var entry)) return;
         if (entry.IsDealer)
         {
-            if (dealerCards.Count > 0) dealerCards.RemoveAt(dealerCards.Count - 1);
+            if (dealerHand.Cards.Count > 0) dealerHand.Cards.RemoveAt(dealerHand.Cards.Count - 1);
+            UpdateHandState(dealerHand);
+        }
+        else if (entry.Action == UndoAction.Stand)
+        {
+            players[entry.PlayerIndex].Hands[entry.HandIndex].State = HandState.Playing;
         }
         else
         {
-            var idx = entry.PlayerIndex;
-            if (idx >= 0 && idx < players.Count && players[idx].Cards.Count > 0)
-                players[idx].Cards.RemoveAt(players[idx].Cards.Count - 1);
+            var hand = players[entry.PlayerIndex].Hands[entry.HandIndex];
+            if (hand.Cards.Count > 0) hand.Cards.RemoveAt(hand.Cards.Count - 1);
+            UpdateHandState(hand);
         }
     }
 
-    // Draws hand history label + small card input. Returns added card (0 = none).
-    private int DrawCardEntry(string inputId, string handStr, ref string inputBuf)
+    // ── ImGui helpers ─────────────────────────────────────────────────────────
+
+    private int DrawCardEntry(string inputId, Hand hand)
     {
+        var handStr = HandString(hand.Cards);
         if (handStr.Length > 0)
         {
             ImGui.Text(handStr);
             ImGui.SameLine();
         }
+        var active = hand.State == HandState.Playing;
+        if (!active) ImGui.BeginDisabled();
         if (focusNextFrame == inputId)
         {
             ImGui.SetKeyboardFocusHere();
             focusNextFrame = null;
         }
         ImGui.SetNextItemWidth(32);
-        var submitted = ImGui.InputText(inputId, ref inputBuf, 3,
+        var buf = hand.CardInput;
+        var submitted = ImGui.InputText(inputId, ref buf, 3,
             ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.CharsDecimal);
-        if (submitted)
+        hand.CardInput = buf;
+        if (!active) ImGui.EndDisabled();
+
+        if (submitted && active)
         {
-            var card = ParseCard(inputBuf);
-            inputBuf = string.Empty;
+            var card = ParseCard(hand.CardInput);
+            hand.CardInput = string.Empty;
             if (card > 0)
             {
                 focusNextFrame = inputId;
@@ -155,33 +215,58 @@ public class MainWindow : Window, IDisposable
         return 0;
     }
 
+    private static void DrawHandStateLabel(Hand hand)
+    {
+        switch (hand.State)
+        {
+            case HandState.Bust:
+                ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), "Bust");
+                break;
+            case HandState.Blackjack:
+                ImGui.TextColored(new Vector4(1f, 0.85f, 0f, 1f), "Blackjack");
+                break;
+            case HandState.Stand:
+                ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1f), "Stand");
+                break;
+            case HandState.Playing:
+                if (hand.Cards.Count > 0)
+                    ImGui.TextColored(new Vector4(0.4f, 0.9f, 0.4f, 1f), "Playing");
+                break;
+        }
+    }
+
+    // ── Draw ──────────────────────────────────────────────────────────────────
+
     public override void Draw()
     {
         // Dealer section
         ImGui.Text("-- Dealer --");
         ImGui.Separator();
 
-        var dealerHandStr = HandString(dealerCards);
-        var dealerScoreStr = ScoreString(dealerCards);
-        var dealerValue = HandValue(dealerCards);
-
-        var dealerCard = DrawCardEntry("##dealerCardInput", dealerHandStr, ref dealerCardInput);
+        var dealerCard = DrawCardEntry("##dealerCardInput", dealerHand);
         if (dealerCard > 0) AddDealerCard(dealerCard);
 
-        if (dealerScoreStr.Length > 0)
+        if (dealerHand.Cards.Count > 0)
         {
             ImGui.SameLine();
-            if (dealerValue > 21)
-            {
-                ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), $"= {dealerScoreStr} BUST");
-            }
-            else if (dealerValue == 21)
-            {
-                ImGui.TextColored(new Vector4(0.3f, 1, 0.3f, 1), $"= {dealerScoreStr} 21!");
-            }
+            var val = HandValue(dealerHand.Cards);
+            var scoreStr = ScoreString(dealerHand.Cards);
+            if (val > 21)
+                ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), $"= {scoreStr}  BUST");
+            else if (val == 21 && dealerHand.Cards.Count == 2)
+                ImGui.TextColored(new Vector4(1f, 0.85f, 0f, 1f), $"= {scoreStr}  Blackjack");
             else
             {
-                ImGui.Text($"= {dealerScoreStr}");
+                ImGui.Text($"= {scoreStr}");
+                var rec = DealerRecommendation(dealerHand);
+                if (rec.Length > 0)
+                {
+                    ImGui.SameLine();
+                    var color = rec == "HIT"
+                        ? new Vector4(0.4f, 0.9f, 0.4f, 1f)
+                        : new Vector4(0.6f, 0.6f, 0.6f, 1f);
+                    ImGui.TextColored(color, $"→ {rec}");
+                }
             }
         }
 
@@ -196,7 +281,7 @@ public class MainWindow : Window, IDisposable
             ImGui.TableSetupColumn("Bet"u8, ImGuiTableColumnFlags.WidthFixed, 70);
             ImGui.TableSetupColumn("Cards"u8, ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Score"u8, ImGuiTableColumnFlags.WidthFixed, 55);
-            ImGui.TableSetupColumn("Status"u8, ImGuiTableColumnFlags.WidthFixed, 70);
+            ImGui.TableSetupColumn("Status"u8, ImGuiTableColumnFlags.WidthFixed, 75);
             ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableHeadersRow();
 
@@ -204,6 +289,7 @@ public class MainWindow : Window, IDisposable
             for (var i = 0; i < players.Count; i++)
             {
                 var p = players[i];
+                var hand = p.Hands[0]; // primary hand; splits will add rows later
                 ImGui.TableNextRow();
 
                 // Name
@@ -214,11 +300,10 @@ public class MainWindow : Window, IDisposable
                     if (ImGui.InputText($"##rename{i}", ref renamingBuffer, 64,
                             ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll))
                     {
-                        if (renamingBuffer.Length > 0)
-                            p.Name = renamingBuffer;
+                        if (renamingBuffer.Length > 0) p.Name = renamingBuffer;
                         renamingIndex = -1;
                     }
-                    if (!ImGui.IsItemActive() && renamingIndex == i && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                    if (!ImGui.IsItemActive() && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
                         renamingIndex = -1;
                 }
                 else
@@ -239,46 +324,43 @@ public class MainWindow : Window, IDisposable
 
                 // Cards: history label + small input
                 ImGui.TableSetColumnIndex(2);
-                var handStr = HandString(p.Cards);
-                var cardInput = p.CardInput;
-                var addedCard = DrawCardEntry($"##card{i}", handStr, ref cardInput);
-                p.CardInput = cardInput;
-                if (addedCard > 0) AddPlayerCard(i, addedCard);
+                var addedCard = DrawCardEntry($"##card{i}", hand);
+                if (addedCard > 0) AddPlayerCard(i, 0, addedCard);
 
                 // Score (auto)
                 ImGui.TableSetColumnIndex(3);
-                if (p.Cards.Count > 0)
+                if (hand.Cards.Count > 0)
                 {
-                    var scoreStr = ScoreString(p.Cards);
-                    var val = HandValue(p.Cards);
+                    var val = HandValue(hand.Cards);
+                    var scoreStr = ScoreString(hand.Cards);
                     if (val > 21)
-                        ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), scoreStr);
+                        ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), scoreStr);
                     else if (val == 21)
-                        ImGui.TextColored(new Vector4(0.3f, 1, 0.3f, 1), "21!");
+                        ImGui.TextColored(new Vector4(1f, 0.85f, 0f, 1f), scoreStr);
                     else
                         ImGui.Text(scoreStr);
                 }
 
-                // Status
+                // Status label
                 ImGui.TableSetColumnIndex(4);
-                ImGui.SetNextItemWidth(-1);
-                var status = p.Status;
-                if (ImGui.InputText($"##status{i}", ref status, 16)) p.Status = status;
+                DrawHandStateLabel(hand);
 
-                // Actions
+                // Actions: X (remove), R (rename), S (stand)
                 ImGui.TableSetColumnIndex(5);
-                if (ImGui.SmallButton($"X##{i}"))
-                    removeAt = i;
+                if (ImGui.SmallButton($"X##{i}")) removeAt = i;
                 ImGui.SameLine();
                 if (ImGui.SmallButton($"R##{i}"))
                 {
                     renamingIndex = i;
                     renamingBuffer = p.Name;
                 }
+                ImGui.SameLine();
+                if (hand.State != HandState.Playing) ImGui.BeginDisabled();
+                if (ImGui.SmallButton($"S##{i}")) StandPlayer(i, 0);
+                if (hand.State != HandState.Playing) ImGui.EndDisabled();
             }
 
-            if (removeAt >= 0)
-                players.RemoveAt(removeAt);
+            if (removeAt >= 0) players.RemoveAt(removeAt);
 
             ImGui.EndTable();
         }
@@ -306,23 +388,22 @@ public class MainWindow : Window, IDisposable
         {
             foreach (var p in players)
             {
-                p.Cards.Clear();
-                p.Status = string.Empty;
-                p.CardInput = string.Empty;
+                p.Hands.Clear();
+                p.Hands.Add(new Hand());
             }
-            dealerCards.Clear();
-            dealerCardInput = string.Empty;
+            dealerHand.Cards.Clear();
+            dealerHand.State = HandState.Playing;
+            dealerHand.CardInput = string.Empty;
             undoStack.Clear();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Clears bets, cards, scores, and statuses. Player names are kept."u8);
+            ImGui.SetTooltip("Clears cards and statuses. Player names and bets are kept."u8);
 
         ImGui.SameLine();
 
         var canUndo = undoStack.Count > 0;
         if (!canUndo) ImGui.BeginDisabled();
-        if (ImGui.Button("Undo"))
-            Undo();
+        if (ImGui.Button("Undo")) Undo();
         if (!canUndo) ImGui.EndDisabled();
     }
 }
