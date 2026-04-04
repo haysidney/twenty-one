@@ -32,6 +32,7 @@ internal record struct UndoEntry(UndoAction Action, bool IsDealer, int PlayerInd
 public class MainWindow : Window, IDisposable
 {
     private readonly Configuration config;
+    private readonly ConfigWindow configWindow;
     private readonly List<PlayerRow> players = [];
     private string newPlayerName = string.Empty;
     private readonly Hand dealerHand = new();
@@ -42,7 +43,6 @@ public class MainWindow : Window, IDisposable
 
     private GamePhase phase = GamePhase.Betting;
     private int activePlayerIndex = -1;
-    private BlackjackPayout bjPayout = BlackjackPayout.ThreeToTwo;
 
     // ── Narration ─────────────────────────────────────────────────────────────
     private readonly List<string> narrationLog = [];
@@ -50,10 +50,11 @@ public class MainWindow : Window, IDisposable
     private string narrationPrefix = "/p ";
     private bool narrationPanelOpen = true;
 
-    public MainWindow(Configuration config)
+    public MainWindow(Configuration config, ConfigWindow configWindow)
         : base("Twenty One##TwentyOneMain")
     {
         this.config = config;
+        this.configWindow = configWindow;
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(640, 320),
@@ -256,7 +257,7 @@ public class MainWindow : Window, IDisposable
         gs.DealerHand        = new SavedHand { Cards = [..dealerHand.Cards], State = dealerHand.State };
         gs.Phase             = phase;
         gs.ActivePlayerIndex = activePlayerIndex;
-        gs.BjPayout          = bjPayout;
+        gs.BjPayout          = config.GameState.BjPayout;
         gs.NarrationLog      = [..narrationLog];
         gs.NarrationUsePrefix = narrationUsePrefix;
         gs.NarrationPrefix   = narrationPrefix;
@@ -287,7 +288,7 @@ public class MainWindow : Window, IDisposable
         dealerHand.State      = gs.DealerHand.State;
         phase                 = gs.Phase;
         activePlayerIndex     = gs.ActivePlayerIndex;
-        bjPayout              = gs.BjPayout;
+        config.GameState.BjPayout = gs.BjPayout;
         narrationLog.Clear();
         narrationLog.AddRange(gs.NarrationLog);
         narrationUsePrefix    = gs.NarrationUsePrefix;
@@ -326,7 +327,7 @@ public class MainWindow : Window, IDisposable
         return ("Push", grey);
     }
 
-    private decimal BjMultiplier() => bjPayout switch
+    private decimal BjMultiplier() => config.GameState.BjPayout switch
     {
         BlackjackPayout.SixToFive => 1.2m,
         BlackjackPayout.EvenMoney => 1.0m,
@@ -514,6 +515,10 @@ public class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
+        if (ImGui.SmallButton("Config"))
+            configWindow.Toggle();
+        ImGui.Separator();
+
         // During Deal: dealer gets exactly 1 card; DealerTurn: draws until should stand/bust
         var dealerShouldStop = DealerRecommendation(dealerHand) == "STAND"
                             || HandValue(dealerHand.Cards) > 21;
@@ -735,15 +740,6 @@ public class MainWindow : Window, IDisposable
         switch (phase)
         {
             case GamePhase.Betting:
-                var bjOptions = new[] { "3:2", "6:5", "1:1" };
-                var bjIdx = (int)bjPayout;
-                ImGui.SetNextItemWidth(60);
-                if (ImGui.Combo("BJ pays##bjpayout", ref bjIdx, bjOptions, bjOptions.Length))
-                {
-                    bjPayout = (BlackjackPayout)bjIdx;
-                    SaveState();
-                }
-                ImGui.SameLine();
                 var canDeal = players.Count > 0 && players.All(p => !string.IsNullOrWhiteSpace(p.Bet));
                 if (!canDeal) ImGui.BeginDisabled();
                 if (ImGui.Button("Start Deal →"))
