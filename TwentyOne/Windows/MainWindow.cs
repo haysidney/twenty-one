@@ -651,8 +651,9 @@ public class MainWindow : Window, IDisposable
                 break;
 
             case GamePhase.PlayerTurns:
-                if (ImGui.Button("Skip Turn →"))
-                    AdvancePlayerTurn();
+                ImGui.BeginDisabled();
+                ImGui.Button("Go to Payout →");
+                ImGui.EndDisabled();
                 break;
 
             case GamePhase.DealerTurn:
