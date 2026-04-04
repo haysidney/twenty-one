@@ -10,6 +10,7 @@ namespace TwentyOne.Windows;
 
 public enum HandState { Playing, Stand, Bust, Blackjack }
 public enum GamePhase { Betting, Deal, PlayerTurns, DealerTurn, Payout }
+public enum BlackjackPayout { ThreeToTwo, SixToFive, EvenMoney }
 
 public class Hand
 {
@@ -40,6 +41,7 @@ public class MainWindow : Window, IDisposable
 
     private GamePhase phase = GamePhase.Betting;
     private int activePlayerIndex = -1;
+    private BlackjackPayout bjPayout = BlackjackPayout.ThreeToTwo;
 
     // ── Narration ─────────────────────────────────────────────────────────────
     private readonly List<string> narrationLog = [];
@@ -183,15 +185,16 @@ public class MainWindow : Window, IDisposable
     {
         var dealerScore = HandValue(dealerHand.Cards);
         var dealerBust = dealerHand.Cards.Count > 0 && dealerScore > 21;
-        var dealerBJ = dealerHand.Cards.Count == 2 && dealerScore == 21;
         var dealerStr = dealerBust ? $"Dealer busts ({dealerScore})" : $"Dealer {ScoreString(dealerHand.Cards)}";
         Narrate(dealerStr);
         foreach (var p in players)
         {
             var (label, _) = GetPayoutDisplay(p);
             if (label.Length == 0) continue;
+            var amount = PayoutAmountString(p);
             var bet = string.IsNullOrWhiteSpace(p.Bet) ? string.Empty : $" (bet: {p.Bet})";
-            Narrate($"{p.Name}: {label}{bet}");
+            var amountStr = amount.Length > 0 ? $" {amount}" : string.Empty;
+            Narrate($"{p.Name}: {label}{bet}{amountStr}");
         }
     }
 
@@ -264,6 +267,33 @@ public class MainWindow : Window, IDisposable
         if (pv > dealerVal) return ("Win", green);
         if (pv < dealerVal) return ("Lose", red);
         return ("Push", grey);
+    }
+
+    private decimal BjMultiplier() => bjPayout switch
+    {
+        BlackjackPayout.SixToFive => 1.2m,
+        BlackjackPayout.EvenMoney => 1.0m,
+        _                         => 1.5m,
+    };
+
+    private static decimal ParseBet(string bet) =>
+        decimal.TryParse(bet.Trim(), out var v) && v > 0 ? v : 0;
+
+    // Returns the net amount won/lost as a signed string, or empty if no valid bet.
+    private string PayoutAmountString(PlayerRow player)
+    {
+        var bet = ParseBet(player.Bet);
+        if (bet <= 0) return string.Empty;
+        var (label, _) = GetPayoutDisplay(player);
+        var delta = label switch
+        {
+            "Win"    => bet,
+            "BJ Win" => Math.Round(bet * BjMultiplier(), 2),
+            "Lose"   => -bet,
+            _        => 0m,
+        };
+        if (delta == 0) return string.Empty;
+        return delta > 0 ? $"+{delta:G}" : $"{delta:G}";
     }
 
     // ── Mutating actions ──────────────────────────────────────────────────────
@@ -472,7 +502,7 @@ public class MainWindow : Window, IDisposable
             ImGui.TableSetupColumn("Bet"u8,     ImGuiTableColumnFlags.WidthFixed, 70);
             ImGui.TableSetupColumn("Cards"u8,   ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Score"u8,   ImGuiTableColumnFlags.WidthFixed, 55);
-            ImGui.TableSetupColumn("Status"u8,  ImGuiTableColumnFlags.WidthFixed, 75);
+            ImGui.TableSetupColumn("Status"u8,  ImGuiTableColumnFlags.WidthFixed, 100);
             ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 80);
             ImGui.TableHeadersRow();
 
@@ -548,7 +578,12 @@ public class MainWindow : Window, IDisposable
                 if (phase == GamePhase.Payout)
                 {
                     var (label, color) = GetPayoutDisplay(p);
-                    if (label.Length > 0) ImGui.TextColored(color, label);
+                    if (label.Length > 0)
+                    {
+                        var amount = PayoutAmountString(p);
+                        var display = amount.Length > 0 ? $"{label} {amount}" : label;
+                        ImGui.TextColored(color, display);
+                    }
                 }
                 else
                 {
@@ -628,6 +663,12 @@ public class MainWindow : Window, IDisposable
         switch (phase)
         {
             case GamePhase.Betting:
+                var bjOptions = new[] { "3:2", "6:5", "1:1" };
+                var bjIdx = (int)bjPayout;
+                ImGui.SetNextItemWidth(60);
+                if (ImGui.Combo("BJ pays##bjpayout", ref bjIdx, bjOptions, bjOptions.Length))
+                    bjPayout = (BlackjackPayout)bjIdx;
+                ImGui.SameLine();
                 var canDeal = players.Count > 0 && players.All(p => !string.IsNullOrWhiteSpace(p.Bet));
                 if (!canDeal) ImGui.BeginDisabled();
                 if (ImGui.Button("Start Deal →"))
