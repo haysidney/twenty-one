@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Text;
 using Dalamud.Bindings.ImGui;
@@ -265,10 +266,13 @@ public class MainWindow : Window, IDisposable
     // Whether card input is active for a given player hand in the current phase.
     private bool PlayerInputActive(int pi, int hi)
     {
+        var hand = players[pi].Hands[hi];
         return phase switch
         {
-            GamePhase.Deal => players[pi].Hands[hi].State == HandState.Playing,
-            GamePhase.PlayerTurns => pi == activePlayerIndex && hi == 0 && players[pi].Hands[0].State == HandState.Playing,
+            // During Deal: accept up to 2 cards per player
+            GamePhase.Deal        => hand.State == HandState.Playing && hand.Cards.Count < 2,
+            // During PlayerTurns: only the active player, only if still Playing
+            GamePhase.PlayerTurns => pi == activePlayerIndex && hi == 0 && hand.State == HandState.Playing,
             _ => false
         };
     }
@@ -334,7 +338,9 @@ public class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
-        var dealerInputActive = phase == GamePhase.Deal || phase == GamePhase.DealerTurn;
+        // During Deal: dealer gets exactly 1 card; DealerTurn: draws remaining cards
+        var dealerInputActive = (phase == GamePhase.Deal && dealerHand.Cards.Count < 1)
+                             || phase == GamePhase.DealerTurn;
 
         // ── Dealer section ────────────────────────────────────────────────────
         ImGui.Text("-- Dealer --");
@@ -513,13 +519,16 @@ public class MainWindow : Window, IDisposable
         ImGui.Spacing();
 
         // Phase label
+        var dealProgress = phase == GamePhase.Deal
+            ? $"  (dealer: {dealerHand.Cards.Count}/1  players: {(players.Count > 0 ? players.Min(p => p.Hands[0].Cards.Count) : 0)}-{(players.Count > 0 ? players.Max(p => p.Hands[0].Cards.Count) : 0)}/2)"
+            : string.Empty;
         var phaseLabel = phase switch
         {
             GamePhase.Betting     => "Phase: Betting",
-            GamePhase.Deal        => "Phase: Deal",
+            GamePhase.Deal        => $"Phase: Deal{dealProgress}",
             GamePhase.PlayerTurns => activePlayerIndex >= 0 && activePlayerIndex < players.Count
-                ? $"Phase: Player Turns  ({players[activePlayerIndex].Name}'s turn)"
-                : "Phase: Player Turns",
+                ? $"Phase: Player Actions  ({players[activePlayerIndex].Name}'s turn — Hit, Stand, Double, Split)"
+                : "Phase: Player Actions",
             GamePhase.DealerTurn  => "Phase: Dealer Turn",
             GamePhase.Payout      => "Phase: Payout",
             _                     => string.Empty
@@ -538,8 +547,15 @@ public class MainWindow : Window, IDisposable
                 break;
 
             case GamePhase.Deal:
-                if (ImGui.Button("Begin Play →"))
+                var dealDone = dealerHand.Cards.Count >= 1
+                    && players.Count > 0
+                    && players.TrueForAll(p => p.Hands[0].Cards.Count >= 2);
+                if (!dealDone) ImGui.BeginDisabled();
+                if (ImGui.Button("Begin Player Turns →"))
                     EnterPlayerTurns();
+                if (!dealDone) ImGui.EndDisabled();
+                if (!dealDone && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip("Dealer needs 1 card; each player needs 2 cards."u8);
                 break;
 
             case GamePhase.PlayerTurns:
