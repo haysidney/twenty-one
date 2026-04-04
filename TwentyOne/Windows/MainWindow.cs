@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Text;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 
@@ -10,31 +11,132 @@ public class PlayerRow
 {
     public string Name { get; set; } = string.Empty;
     public string Bet { get; set; } = string.Empty;
-    public string Cards { get; set; } = string.Empty;
-    public string Score { get; set; } = string.Empty;
+    public List<int> Cards { get; } = [];
     public string Status { get; set; } = string.Empty;
+    public string CardInput { get; set; } = string.Empty;
 }
+
+// Represents a single card-add action that can be undone
+internal record struct UndoEntry(bool IsDealer, int PlayerIndex);
 
 public class MainWindow : Window, IDisposable
 {
     private readonly List<PlayerRow> players = [];
     private string newPlayerName = string.Empty;
-    private string dealerCards = string.Empty;
-    private string dealerScore = string.Empty;
+    private readonly List<int> dealerCards = [];
+    private string dealerCardInput = string.Empty;
     private int renamingIndex = -1;
     private string renamingBuffer = string.Empty;
+    private readonly Stack<UndoEntry> undoStack = new();
 
     public MainWindow()
         : base("Twenty One##TwentyOneMain")
     {
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(600, 300),
+            MinimumSize = new Vector2(620, 300),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
     }
 
     public void Dispose() { }
+
+    // Returns display string for a card value (1=A, 11=J, 12=Q, 13=K)
+    private static string CardLabel(int card) => card switch
+    {
+        1 => "A",
+        11 => "J",
+        12 => "Q",
+        13 => "K",
+        _ => card.ToString()
+    };
+
+    // Builds hand display string: "A 7 K"
+    private static string HandString(List<int> cards)
+    {
+        if (cards.Count == 0) return string.Empty;
+        var sb = new StringBuilder();
+        foreach (var c in cards)
+        {
+            if (sb.Length > 0) sb.Append(' ');
+            sb.Append(CardLabel(c));
+        }
+        return sb.ToString();
+    }
+
+    // Blackjack hand value: aces are 11, reduced to 1 as needed to avoid bust
+    private static int HandValue(List<int> cards)
+    {
+        var total = 0;
+        var aces = 0;
+        foreach (var c in cards)
+        {
+            if (c == 1) { aces++; total += 11; }
+            else if (c >= 10) total += 10;
+            else total += c;
+        }
+        while (total > 21 && aces > 0) { total -= 10; aces--; }
+        return total;
+    }
+
+    // Tries to parse a card input string into a valid card (1–13). Returns 0 on failure.
+    private static int ParseCard(string input)
+    {
+        if (int.TryParse(input.Trim(), out var n) && n >= 1 && n <= 13)
+            return n;
+        return 0;
+    }
+
+    private void AddDealerCard(int card)
+    {
+        dealerCards.Add(card);
+        undoStack.Push(new UndoEntry(IsDealer: true, PlayerIndex: -1));
+    }
+
+    private void AddPlayerCard(int playerIndex, int card)
+    {
+        players[playerIndex].Cards.Add(card);
+        undoStack.Push(new UndoEntry(IsDealer: false, PlayerIndex: playerIndex));
+    }
+
+    private void Undo()
+    {
+        if (!undoStack.TryPop(out var entry)) return;
+        if (entry.IsDealer)
+        {
+            if (dealerCards.Count > 0) dealerCards.RemoveAt(dealerCards.Count - 1);
+        }
+        else
+        {
+            var idx = entry.PlayerIndex;
+            if (idx >= 0 && idx < players.Count && players[idx].Cards.Count > 0)
+                players[idx].Cards.RemoveAt(players[idx].Cards.Count - 1);
+        }
+    }
+
+    // Draws the card history label + small input. Returns card to add (0 = none).
+    private static int DrawCardEntry(string inputId, string handStr, ref string inputBuf)
+    {
+        if (handStr.Length > 0)
+        {
+            ImGui.Text(handStr);
+            ImGui.SameLine();
+        }
+        ImGui.SetNextItemWidth(32);
+        var submitted = ImGui.InputText(inputId, ref inputBuf, 3,
+            ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.CharsDecimal);
+        if (submitted)
+        {
+            var card = ParseCard(inputBuf);
+            if (card > 0)
+            {
+                inputBuf = string.Empty;
+                return card;
+            }
+            inputBuf = string.Empty;
+        }
+        return 0;
+    }
 
     public override void Draw()
     {
@@ -42,30 +144,34 @@ public class MainWindow : Window, IDisposable
         ImGui.Text("-- Dealer --");
         ImGui.Separator();
 
-        ImGui.Text("Cards:");
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(200);
-        ImGui.InputText("##dealerCards"u8, ref dealerCards, 64);
-        ImGui.SameLine();
-        ImGui.Text("Score:");
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(60);
-        ImGui.InputText("##dealerScore"u8, ref dealerScore, 8);
+        var dealerHandStr = HandString(dealerCards);
+        var dealerValue = HandValue(dealerCards);
+        var dealerScoreStr = dealerCards.Count > 0 ? dealerValue.ToString() : string.Empty;
+
+        var dealerCard = DrawCardEntry("##dealerCardInput", dealerHandStr, ref dealerCardInput);
+        if (dealerCard > 0) AddDealerCard(dealerCard);
+
+        if (dealerScoreStr.Length > 0)
+        {
+            ImGui.SameLine();
+            ImGui.Text($"= {dealerScoreStr}");
+            if (dealerValue > 21) { ImGui.SameLine(); ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), "BUST"); }
+            else if (dealerValue == 21) { ImGui.SameLine(); ImGui.TextColored(new Vector4(0.3f, 1, 0.3f, 1), "21!"); }
+        }
 
         ImGui.Spacing();
         ImGui.Text("-- Players --");
         ImGui.Separator();
 
-        // Player table
         var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit;
         if (ImGui.BeginTable("##players"u8, 6, tableFlags))
         {
             ImGui.TableSetupColumn("Name"u8, ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Bet"u8, ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Bet"u8, ImGuiTableColumnFlags.WidthFixed, 70);
             ImGui.TableSetupColumn("Cards"u8, ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Score"u8, ImGuiTableColumnFlags.WidthFixed, 50);
-            ImGui.TableSetupColumn("Status"u8, ImGuiTableColumnFlags.WidthFixed, 80);
-            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 60);
+            ImGui.TableSetupColumn("Score"u8, ImGuiTableColumnFlags.WidthFixed, 45);
+            ImGui.TableSetupColumn("Status"u8, ImGuiTableColumnFlags.WidthFixed, 70);
+            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableHeadersRow();
 
             int removeAt = -1;
@@ -105,17 +211,26 @@ public class MainWindow : Window, IDisposable
                 var bet = p.Bet;
                 if (ImGui.InputText($"##bet{i}", ref bet, 16)) p.Bet = bet;
 
-                // Cards
+                // Cards: history label + small input
                 ImGui.TableSetColumnIndex(2);
-                ImGui.SetNextItemWidth(-1);
-                var cards = p.Cards;
-                if (ImGui.InputText($"##cards{i}", ref cards, 64)) p.Cards = cards;
+                var handStr = HandString(p.Cards);
+                var cardInput = p.CardInput;
+                var addedCard = DrawCardEntry($"##card{i}", handStr, ref cardInput);
+                p.CardInput = cardInput;
+                if (addedCard > 0) AddPlayerCard(i, addedCard);
 
-                // Score
+                // Score (auto)
                 ImGui.TableSetColumnIndex(3);
-                ImGui.SetNextItemWidth(-1);
-                var score = p.Score;
-                if (ImGui.InputText($"##score{i}", ref score, 8)) p.Score = score;
+                if (p.Cards.Count > 0)
+                {
+                    var val = HandValue(p.Cards);
+                    if (val > 21)
+                        ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), val.ToString());
+                    else if (val == 21)
+                        ImGui.TextColored(new Vector4(0.3f, 1, 0.3f, 1), "21!");
+                    else
+                        ImGui.Text(val.ToString());
+                }
 
                 // Status
                 ImGui.TableSetColumnIndex(4);
@@ -164,14 +279,23 @@ public class MainWindow : Window, IDisposable
             foreach (var p in players)
             {
                 p.Bet = string.Empty;
-                p.Cards = string.Empty;
-                p.Score = string.Empty;
+                p.Cards.Clear();
                 p.Status = string.Empty;
+                p.CardInput = string.Empty;
             }
-            dealerCards = string.Empty;
-            dealerScore = string.Empty;
+            dealerCards.Clear();
+            dealerCardInput = string.Empty;
+            undoStack.Clear();
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Clears bets, cards, scores, and statuses. Player names are kept."u8);
+
+        ImGui.SameLine();
+
+        var canUndo = undoStack.Count > 0;
+        if (!canUndo) ImGui.BeginDisabled();
+        if (ImGui.Button("Undo"))
+            Undo();
+        if (!canUndo) ImGui.EndDisabled();
     }
 }
