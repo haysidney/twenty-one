@@ -20,7 +20,7 @@ public class Player
 {
     public string Name { get; set; } = string.Empty;
     public string Bet { get; set; } = string.Empty;
-    public List<Hand> Hands { get; set; } = [new Hand()];
+    public List<Hand> Hands { get; set; } = [];
 }
 
 [Serializable]
