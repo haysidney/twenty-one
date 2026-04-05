@@ -69,15 +69,17 @@ public class ConfigWindow : Window, IDisposable
 
             var pub = config.PublicChatCooldownMs;
             ImGui.SetNextItemWidth(100);
-            if (ImGui.InputInt("Public cooldown (ms)##pubCooldown", ref pub, 100))
+            if (ImGui.InputInt("Time between public channel messages (ms)##pubCooldown", ref pub, 100))
             {
                 config.PublicChatCooldownMs = Math.Clamp(pub, 100, 10000);
                 config.Save();
             }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Public channels: /say, /yell, /shout");
 
             var priv = config.PrivateChatCooldownMs;
             ImGui.SetNextItemWidth(100);
-            if (ImGui.InputInt("Private cooldown (ms)##privCooldown", ref priv, 100))
+            if (ImGui.InputInt("Time between private channel messages (ms)##privCooldown", ref priv, 100))
             {
                 config.PrivateChatCooldownMs = Math.Clamp(priv, 100, 10000);
                 config.Save();
