@@ -67,19 +67,19 @@ public class ConfigWindow : Window, IDisposable
                 config.Save();
             }
 
-            var pub = config.PublicChatCooldownMs / 1000;
-            ImGui.SetNextItemWidth(120);
-            if (ImGui.SliderInt("Public cooldown (s)##pubCooldown", ref pub, 1, 10))
+            var pub = config.PublicChatCooldownMs;
+            ImGui.SetNextItemWidth(80);
+            if (ImGui.InputInt("Public cooldown (ms)##pubCooldown", ref pub, 100))
             {
-                config.PublicChatCooldownMs = pub * 1000;
+                config.PublicChatCooldownMs = Math.Clamp(pub, 100, 10000);
                 config.Save();
             }
 
-            var priv = config.PrivateChatCooldownMs / 1000;
-            ImGui.SetNextItemWidth(120);
-            if (ImGui.SliderInt("Private cooldown (s)##privCooldown", ref priv, 1, 10))
+            var priv = config.PrivateChatCooldownMs;
+            ImGui.SetNextItemWidth(80);
+            if (ImGui.InputInt("Private cooldown (ms)##privCooldown", ref priv, 100))
             {
-                config.PrivateChatCooldownMs = priv * 1000;
+                config.PrivateChatCooldownMs = Math.Clamp(priv, 100, 10000);
                 config.Save();
             }
         }
