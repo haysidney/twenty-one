@@ -16,6 +16,7 @@ public class Configuration : IPluginConfiguration
     // Snapshots pushed before each Apply; cleared on NewRound. Persisted so undo
     // survives plugin restarts within the same round.
     public List<GameState> UndoStack { get; set; } = [];
+    public List<GameState> RedoStack { get; set; } = [];
 
     // ── Narration ──────────────────────────────────────────────────────────────
     // Kept separate from GameState so it is never rolled back by undo.

@@ -78,6 +78,7 @@ public partial class MainWindow : Window, IDisposable
             // reference is safe; future Apply calls create entirely new objects.
             config.UndoStack.Add(config.GameState);
         }
+        config.RedoStack.Clear();
 
         var (newState, effects) = GameEngine.Apply(config.GameState, action);
         config.GameState = newState;
@@ -98,8 +99,18 @@ public partial class MainWindow : Window, IDisposable
     private void Undo()
     {
         if (config.UndoStack.Count == 0) return;
+        config.RedoStack.Add(config.GameState);
         config.GameState = config.UndoStack[^1];
         config.UndoStack.RemoveAt(config.UndoStack.Count - 1);
+        config.Save();
+    }
+
+    private void Redo()
+    {
+        if (config.RedoStack.Count == 0) return;
+        config.UndoStack.Add(config.GameState);
+        config.GameState = config.RedoStack[^1];
+        config.RedoStack.RemoveAt(config.RedoStack.Count - 1);
         config.Save();
     }
 
@@ -518,6 +529,12 @@ public partial class MainWindow : Window, IDisposable
             if (!canUndo) ImGui.BeginDisabled();
             if (ImGui.Button("Undo")) Undo();
             if (!canUndo) ImGui.EndDisabled();
+
+            ImGui.SameLine();
+            var canRedo = config.RedoStack.Count > 0;
+            if (!canRedo) ImGui.BeginDisabled();
+            if (ImGui.Button("Redo")) Redo();
+            if (!canRedo) ImGui.EndDisabled();
 
             if (Phase != GamePhase.Betting)
             {
