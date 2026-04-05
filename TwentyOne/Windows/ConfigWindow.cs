@@ -14,7 +14,8 @@ public class ConfigWindow : Window, IDisposable
         : base("Twenty One — Settings##TwentyOneConfig")
     {
         this.config = config;
-        Flags = ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoCollapse;
+        SizeConstraints = new WindowSizeConstraints { MinimumSize = new Vector2(400, 200), MaximumSize = new Vector2(float.MaxValue, float.MaxValue) };
+        Flags = ImGuiWindowFlags.NoCollapse;
     }
 
     public void Dispose() { }
