@@ -20,6 +20,8 @@ public class ConfigWindow : Window, IDisposable
 
     public void Dispose() { }
 
+    private static readonly NarrationTemplates Defaults = new();
+
     private static readonly string[] ChatChannels =
     [
         "/say", "/yell", "/shout", "/p", "/a", "/fc",
@@ -96,21 +98,22 @@ public class ConfigWindow : Window, IDisposable
 
         // ── Dealer ────────────────────────────────────────────────────────────
         ImGui.TextDisabled("Dealer (dealer turn)");
-        if (ImGui.BeginTable("##ntDealer", 2, flags))
+        if (ImGui.BeginTable("##ntDealer", 3, flags))
         {
             ImGui.TableSetupColumn("##ntDealerLabel", ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableSetupColumn("##ntDealerValue", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("##ntDealerReset", ImGuiTableColumnFlags.WidthFixed, 26);
 
             var v0 = t.DealerHit;
-            NtRow("Hit##ntDH",        "{card}  {cards}  {score}", ref v0);
+            NtRow("Hit##ntDH",        "{card}  {cards}  {score}", Defaults.DealerHit,  ctrlHeld, ref v0);
             if (v0 != t.DealerHit)   { t.DealerHit  = v0; config.Save(); }
 
             var v1 = t.DealerBust;
-            NtRow("Bust##ntDB",       "{card}  {cards}  {score}", ref v1);
+            NtRow("Bust##ntDB",       "{card}  {cards}  {score}", Defaults.DealerBust, ctrlHeld, ref v1);
             if (v1 != t.DealerBust)  { t.DealerBust = v1; config.Save(); }
 
             var v2 = t.DealerBJ;
-            NtRow("Blackjack##ntDBJ", "{card}  {cards}",          ref v2);
+            NtRow("Blackjack##ntDBJ", "{card}  {cards}",          Defaults.DealerBJ,   ctrlHeld, ref v2);
             if (v2 != t.DealerBJ)   { t.DealerBJ   = v2; config.Save(); }
 
             ImGui.EndTable();
@@ -120,25 +123,26 @@ public class ConfigWindow : Window, IDisposable
 
         // ── Players ───────────────────────────────────────────────────────────
         ImGui.TextDisabled("Players (player turns)");
-        if (ImGui.BeginTable("##ntPlayers", 2, flags))
+        if (ImGui.BeginTable("##ntPlayers", 3, flags))
         {
             ImGui.TableSetupColumn("##ntPlayersLabel", ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableSetupColumn("##ntPlayersValue", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("##ntPlayersReset", ImGuiTableColumnFlags.WidthFixed, 26);
 
             var v0 = t.PlayerHit;
-            NtRow("Hit##ntPH",        "{name}  {card}  {cards}  {score}", ref v0);
+            NtRow("Hit##ntPH",        "{name}  {card}  {cards}  {score}", Defaults.PlayerHit,   ctrlHeld, ref v0);
             if (v0 != t.PlayerHit)   { t.PlayerHit   = v0; config.Save(); }
 
             var v1 = t.PlayerBust;
-            NtRow("Bust##ntPB",       "{name}  {cards}  {score}",         ref v1);
+            NtRow("Bust##ntPB",       "{name}  {cards}  {score}",         Defaults.PlayerBust,  ctrlHeld, ref v1);
             if (v1 != t.PlayerBust)  { t.PlayerBust  = v1; config.Save(); }
 
             var v2 = t.PlayerBJ;
-            NtRow("Blackjack##ntPBJ", "{name}  {cards}",                  ref v2);
+            NtRow("Blackjack##ntPBJ", "{name}  {cards}",                  Defaults.PlayerBJ,    ctrlHeld, ref v2);
             if (v2 != t.PlayerBJ)   { t.PlayerBJ    = v2; config.Save(); }
 
             var v3 = t.PlayerStand;
-            NtRow("Stand##ntPS",      "{name}  {cards}  {score}",         ref v3);
+            NtRow("Stand##ntPS",      "{name}  {cards}  {score}",         Defaults.PlayerStand, ctrlHeld, ref v3);
             if (v3 != t.PlayerStand) { t.PlayerStand = v3; config.Save(); }
 
             ImGui.EndTable();
@@ -148,21 +152,22 @@ public class ConfigWindow : Window, IDisposable
 
         // ── Deal summary ──────────────────────────────────────────────────────
         ImGui.TextDisabled("Deal summary");
-        if (ImGui.BeginTable("##ntDeal", 2, flags))
+        if (ImGui.BeginTable("##ntDeal", 3, flags))
         {
             ImGui.TableSetupColumn("##ntDealLabel", ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableSetupColumn("##ntDealValue", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("##ntDealReset", ImGuiTableColumnFlags.WidthFixed, 26);
 
             var v0 = t.DealSummaryPrefix;
-            NtRow("Prefix##ntDP",     "(no variables)",                           ref v0);
+            NtRow("Prefix##ntDP",      "(no variables)",                  Defaults.DealSummaryPrefix, ctrlHeld, ref v0);
             if (v0 != t.DealSummaryPrefix) { t.DealSummaryPrefix = v0; config.Save(); }
 
             var v1 = t.DealSummaryPlayer;
-            NtRow("Per player##ntDPP", "{name}  {cards}  {score}  {bj}",          ref v1);
+            NtRow("Per player##ntDPP", "{name}  {cards}  {score}  {bj}", Defaults.DealSummaryPlayer, ctrlHeld, ref v1);
             if (v1 != t.DealSummaryPlayer) { t.DealSummaryPlayer = v1; config.Save(); }
 
             var v2 = t.DealSummaryDealer;
-            NtRow("Dealer##ntDD",     "{cards}",                                   ref v2);
+            NtRow("Dealer##ntDD",      "{cards}",                         Defaults.DealSummaryDealer, ctrlHeld, ref v2);
             if (v2 != t.DealSummaryDealer) { t.DealSummaryDealer = v2; config.Save(); }
 
             ImGui.EndTable();
@@ -172,33 +177,30 @@ public class ConfigWindow : Window, IDisposable
 
         // ── Payout ────────────────────────────────────────────────────────────
         ImGui.TextDisabled("Payout");
-        if (ImGui.BeginTable("##ntPayout", 2, flags))
+        if (ImGui.BeginTable("##ntPayout", 3, flags))
         {
             ImGui.TableSetupColumn("##ntPayoutLabel", ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableSetupColumn("##ntPayoutValue", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("##ntPayoutReset", ImGuiTableColumnFlags.WidthFixed, 26);
 
             var v0 = t.PayoutDealerBust;
-            NtRow("Dlr Bust##ntPDB",   "{score}",                                 ref v0);
+            NtRow("Dlr Bust##ntPDB",   "{score}",                            Defaults.PayoutDealerBust,   ctrlHeld, ref v0);
             if (v0 != t.PayoutDealerBust)   { t.PayoutDealerBust   = v0; config.Save(); }
 
             var v1 = t.PayoutDealerStands;
-            NtRow("Dlr Stands##ntPDS", "{score}",                                 ref v1);
+            NtRow("Dlr Stands##ntPDS", "{score}",                            Defaults.PayoutDealerStands, ctrlHeld, ref v1);
             if (v1 != t.PayoutDealerStands) { t.PayoutDealerStands = v1; config.Save(); }
 
             var v2 = t.PayoutPlayer;
-            NtRow("Player##ntPP",      "{name}  {result}  {bet}  {amount}",       ref v2);
+            NtRow("Player##ntPP",      "{name}  {result}  {bet}  {amount}", Defaults.PayoutPlayer,       ctrlHeld, ref v2);
             if (v2 != t.PayoutPlayer)       { t.PayoutPlayer       = v2; config.Save(); }
 
             ImGui.EndTable();
         }
     }
 
-    /// <summary>Draws one label+input row inside a 2-column table.</summary>
-    /// <param name="id">ImGui ID — the part before ## is shown as the label.</param>
-    /// <param name="hint">Tooltip text describing available variables.</param>
-    private static void NtRow(string id, string hint, ref string value)
+    private static void NtRow(string id, string hint, string defaultValue, bool ctrlHeld, ref string value)
     {
-        // Extract display label (everything before ##)
         var label = id.Contains("##") ? id[..id.IndexOf("##", StringComparison.Ordinal)] : id;
 
         ImGui.TableNextRow();
@@ -211,5 +213,13 @@ public class ConfigWindow : Window, IDisposable
         ImGui.TableSetColumnIndex(1);
         ImGui.SetNextItemWidth(-1);
         ImGui.InputText($"##{id}", ref value, 512);
+
+        ImGui.TableSetColumnIndex(2);
+        if (!ctrlHeld) ImGui.BeginDisabled();
+        if (ImGui.SmallButton($"↺##{id}R"))
+            value = defaultValue;
+        if (!ctrlHeld) ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
+            ImGui.SetTooltip("Hold Ctrl to reset this template to its default.");
     }
 }
