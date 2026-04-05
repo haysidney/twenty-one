@@ -596,7 +596,7 @@ public class MainWindow : Window, IDisposable
         ImGui.Text("-- Players --");
         ImGui.Separator();
 
-        var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit;
+        var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
         if (ImGui.BeginTable("##players"u8, 6, tableFlags))
         {
             ImGui.TableSetupColumn("Name"u8,    ImGuiTableColumnFlags.WidthStretch);
