@@ -235,7 +235,7 @@ public partial class MainWindow : Window, IDisposable
     public override void Draw()
     {
         // Drain chat queue at 1 message/second (vanilla FFXIV macro rate)
-        if (chatQueue.Count > 0 && (DateTime.UtcNow - lastChatSent).TotalMilliseconds >= 1000)
+        if (chatQueue.Count > 0 && (DateTime.UtcNow - lastChatSent).TotalMilliseconds >= 2000)
         {
             SendChatMessage(chatQueue.Dequeue());
             lastChatSent = DateTime.UtcNow;
