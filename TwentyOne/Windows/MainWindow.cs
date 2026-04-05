@@ -53,8 +53,8 @@ public partial class MainWindow : Window, IDisposable
     private GamePhase phase = GamePhase.Betting;
     private int activePlayerIndex = -1;
 
-    // pending hit: null = not waiting, IsDealer=true for dealer, otherwise PlayerIndex/HandIndex
-    private (bool IsDealer, int PlayerIndex, int HandIndex)? pendingHit;
+    // pending hit: null = not waiting; IsPublic=true means /random was sent (public channel), false means /dice
+    private (bool IsDealer, int PlayerIndex, int HandIndex, bool IsPublic)? pendingHit;
     // deferred roll: set by OnChatMessage, applied at the start of the next Draw() to avoid re-entering chat processing
     private (bool IsDealer, int PlayerIndex, int HandIndex, int Roll)? deferredRoll;
 
@@ -189,28 +189,32 @@ public partial class MainWindow : Window, IDisposable
         var shell = RaptureShellModule.Instance();
         if (shell == null) return;
 
-        pendingHit = (isDealer, playerIndex, handIndex);
+        pendingHit = (isDealer, playerIndex, handIndex, isPublic);
         var savedChatType = shell->ChatType;
         SendChatMessage(channel);
         SendChatMessage(isPublic ? "/random 13" : "/dice 13");
         shell->ChangeChatChannel(savedChatType, 0, null, true);
     }
 
-    // Matches "You roll a [icon] 7 (out of 13)."
+    // "You roll a [icon] 7 (out of 13)." — response to /random in public channels
     [GeneratedRegex(@"You roll a\D+(\d+) \(out of 13\)")]
+    private static partial Regex RandomRollRegex();
+
+    // "Random! (1-13)[icon] 7" — response to /dice in private channels
+    [GeneratedRegex(@"Random! \(1-13\)\D+(\d+)")]
     private static partial Regex DiceRollRegex();
 
     private void OnChatMessage(XivChatType type, int timestamp, ref SeString sender, ref SeString message, ref bool isHandled)
     {
         if (pendingHit == null) return;
 
+        var (isDealer, pi, hi, isPublic) = pendingHit.Value;
         var msgText = message.TextValue;
-        var match = DiceRollRegex().Match(msgText);
+        var match = (isPublic ? RandomRollRegex() : DiceRollRegex()).Match(msgText);
         if (!match.Success) return;
 
         if (!int.TryParse(match.Groups[1].Value, out var roll) || roll < 1 || roll > 13) return;
 
-        var (isDealer, pi, hi) = pendingHit.Value;
         pendingHit = null;
         // Defer to next Draw() — calling AddCard here would invoke Narrate → SendChatMessage
         // while the game is still processing this message, corrupting the chat output.
