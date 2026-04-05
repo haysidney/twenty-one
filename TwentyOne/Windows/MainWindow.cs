@@ -498,10 +498,21 @@ public partial class MainWindow : Window, IDisposable
         switch (Phase)
         {
             case GamePhase.Betting:
+                var effectiveBets = State.Players.Select((p, i) =>
+                    betEdits.TryGetValue(i, out var e) ? e : p.Bet);
                 var canDeal = State.Players.Count > 0
-                           && State.Players.All(p => !string.IsNullOrWhiteSpace(p.Bet));
+                           && effectiveBets.All(b => !string.IsNullOrWhiteSpace(b));
                 if (!canDeal) ImGui.BeginDisabled();
-                if (ImGui.Button("Start Deal →")) Apply(new StartDeal());
+                if (ImGui.Button("Start Deal →"))
+                {
+                    // Flush uncommitted bet edits before transitioning
+                    foreach (var (idx, val) in betEdits.ToList())
+                    {
+                        betEdits.Remove(idx);
+                        Apply(new SetPlayerBet(idx, val));
+                    }
+                    Apply(new StartDeal());
+                }
                 if (!canDeal) ImGui.EndDisabled();
                 break;
 
