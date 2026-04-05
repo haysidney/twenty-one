@@ -240,6 +240,22 @@ public partial class MainWindow : Window, IDisposable
 
         if (ImGui.SmallButton("Config"))
             configWindow.Toggle();
+
+        var canUndo = config.UndoStack.Count > 0;
+        var canRedo = config.RedoStack.Count > 0;
+        var undoW   = ImGui.CalcTextSize("Undo").X + ImGui.GetStyle().FramePadding.X * 2;
+        var redoW   = ImGui.CalcTextSize("Redo").X + ImGui.GetStyle().FramePadding.X * 2;
+        var spacing = ImGui.GetStyle().ItemSpacing.X;
+        ImGui.SameLine(ImGui.GetWindowWidth() - undoW - redoW - spacing * 2
+                       - ImGui.GetStyle().WindowPadding.X);
+        if (!canUndo) ImGui.BeginDisabled();
+        if (ImGui.SmallButton("Undo")) Undo();
+        if (!canUndo) ImGui.EndDisabled();
+        ImGui.SameLine();
+        if (!canRedo) ImGui.BeginDisabled();
+        if (ImGui.SmallButton("Redo")) Redo();
+        if (!canRedo) ImGui.EndDisabled();
+
         ImGui.Separator();
 
         var dealerShouldStop = GameEngine.DealerRecommendation(State.DealerHand) == "STAND"
@@ -522,25 +538,10 @@ public partial class MainWindow : Window, IDisposable
                 break;
         }
 
-        if (Phase != GamePhase.Payout)
+        if (Phase != GamePhase.Payout && Phase != GamePhase.Betting)
         {
             ImGui.SameLine();
-            var canUndo = config.UndoStack.Count > 0;
-            if (!canUndo) ImGui.BeginDisabled();
-            if (ImGui.Button("Undo")) Undo();
-            if (!canUndo) ImGui.EndDisabled();
-
-            ImGui.SameLine();
-            var canRedo = config.RedoStack.Count > 0;
-            if (!canRedo) ImGui.BeginDisabled();
-            if (ImGui.Button("Redo")) Redo();
-            if (!canRedo) ImGui.EndDisabled();
-
-            if (Phase != GamePhase.Betting)
-            {
-                ImGui.SameLine();
-                if (ImGui.Button("Abort Round")) Apply(new NewRound());
-            }
+            if (ImGui.Button("Abort Round")) Apply(new NewRound());
         }
 
         // ── Narration panel ───────────────────────────────────────────────────
