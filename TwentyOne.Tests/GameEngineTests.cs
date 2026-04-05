@@ -132,7 +132,7 @@ public class ApplyAddDealerCardTests
     {
         Phase      = GamePhase.DealerTurn,
         DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-        Players    = [new Player { Name = "Alice", Bet = "10", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
+        Players    = [new Player { Name = "Lorah", Bet = "10", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
     };
 
     [Fact]
@@ -182,8 +182,8 @@ public class ApplyAddPlayerCardTests
         ActivePlayerIndex = activeIndex,
         Players =
         [
-            new Player { Name = "Alice", Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] },
-            new Player { Name = "Bob",   Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
+            new Player { Name = "Lorah", Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] },
+            new Player { Name = "Bekki",   Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
         ],
     };
 
@@ -192,7 +192,7 @@ public class ApplyAddPlayerCardTests
     {
         var (_, effects) = GameEngine.Apply(ActivePlayerState(), new AddPlayerCard(0, 0, 3));
         Assert.Single(effects);
-        Assert.Contains("Alice hits", ((SendChat)effects[0]).Text);
+        Assert.Contains("Lorah hits", ((SendChat)effects[0]).Text);
     }
 
     [Fact]
@@ -204,13 +204,13 @@ public class ApplyAddPlayerCardTests
             ActivePlayerIndex = 0,
             Players =
             [
-                new Player { Name = "Alice", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
-                new Player { Name = "Bob",   Hands = [new Hand { Cards = [5, 6],  State = HandState.Playing }] },
+                new Player { Name = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
+                new Player { Name = "Bekki",   Hands = [new Hand { Cards = [5, 6],  State = HandState.Playing }] },
             ],
         };
         var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
         Assert.Contains("busts", ((SendChat)effects[0]).Text);
-        Assert.Equal(1, newState.ActivePlayerIndex); // advanced to Bob
+        Assert.Equal(1, newState.ActivePlayerIndex); // advanced to Bekki
         Assert.Equal(GamePhase.PlayerTurns, newState.Phase);
     }
 
@@ -255,7 +255,7 @@ public class ApplyAddPlayerCardTests
         {
             Phase             = GamePhase.Deal,
             ActivePlayerIndex = -1,
-            Players           = [new Player { Name = "Alice", Hands = [new Hand()] }],
+            Players           = [new Player { Name = "Lorah", Hands = [new Hand()] }],
         };
         var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 5));
         Assert.Empty(effects);
@@ -275,12 +275,12 @@ public class ApplyStandPlayerTests
             ActivePlayerIndex = 0,
             Players =
             [
-                new Player { Name = "Alice", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] },
-                new Player { Name = "Bob",   Hands = [new Hand { Cards = [9, 8],  State = HandState.Playing }] },
+                new Player { Name = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] },
+                new Player { Name = "Bekki",   Hands = [new Hand { Cards = [9, 8],  State = HandState.Playing }] },
             ],
         };
         var (newState, effects) = GameEngine.Apply(state, new StandPlayer(0, 0));
-        Assert.Contains("Alice stands", ((SendChat)effects[0]).Text);
+        Assert.Contains("Lorah stands", ((SendChat)effects[0]).Text);
         Assert.Equal(HandState.Stand, newState.Players[0].Hands[0].State);
         Assert.Equal(1, newState.ActivePlayerIndex);
     }
@@ -292,7 +292,7 @@ public class ApplyStandPlayerTests
         {
             Phase             = GamePhase.PlayerTurns,
             ActivePlayerIndex = 0,
-            Players           = [new Player { Name = "Alice", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] }],
+            Players           = [new Player { Name = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] }],
         };
         var (newState, _) = GameEngine.Apply(state, new StandPlayer(0, 0));
         Assert.Equal(GamePhase.DealerTurn, newState.Phase);
@@ -304,7 +304,7 @@ public class ApplyStandPlayerTests
         var state = new GameState
         {
             Phase   = GamePhase.PlayerTurns,
-            Players = [new Player { Name = "Alice", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] }],
+            Players = [new Player { Name = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] }],
         };
         var (newState, effects) = GameEngine.Apply(state, new StandPlayer(0, 0));
         Assert.Same(state, newState);
@@ -331,8 +331,8 @@ public class ApplyPhaseTransitionTests
             DealerHand = new Hand { Cards = [10], State = HandState.Playing },
             Players =
             [
-                new Player { Name = "Alice", Hands = [new Hand { Cards = [5, 8],  State = HandState.Playing }] },
-                new Player { Name = "Bob",   Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }] },
+                new Player { Name = "Lorah", Hands = [new Hand { Cards = [5, 8],  State = HandState.Playing }] },
+                new Player { Name = "Bekki",   Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }] },
             ],
         };
         var (newState, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
@@ -351,7 +351,7 @@ public class ApplyPhaseTransitionTests
             DealerHand = new Hand { Cards = [10], State = HandState.Playing },
             Players =
             [
-                new Player { Name = "Alice", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
+                new Player { Name = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
             ],
         };
         var (newState, _) = GameEngine.Apply(state, new BeginPlayerTurns());
@@ -366,13 +366,13 @@ public class ApplyPhaseTransitionTests
             Phase  = GamePhase.Payout,
             Players =
             [
-                new Player { Name = "Alice", Bet = "10", Hands = [new Hand { Cards = [5, 8], State = HandState.Stand }] },
+                new Player { Name = "Lorah", Bet = "10", Hands = [new Hand { Cards = [5, 8], State = HandState.Stand }] },
             ],
             DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
         };
         var (newState, _) = GameEngine.Apply(state, new NewRound());
         Assert.Equal(GamePhase.Betting, newState.Phase);
-        Assert.Equal("Alice", newState.Players[0].Name);
+        Assert.Equal("Lorah", newState.Players[0].Name);
         Assert.Equal("10", newState.Players[0].Bet);
         Assert.Empty(newState.Players[0].Hands[0].Cards);
         Assert.Empty(newState.DealerHand.Cards);
@@ -386,7 +386,7 @@ public class PayoutTests
     {
         Phase      = GamePhase.Payout,
         DealerHand = new Hand { Cards = [..dealerCards], State = dealerState },
-        Players    = [new Player { Name = "Alice", Bet = "100", Hands =
+        Players    = [new Player { Name = "Lorah", Bet = "100", Hands =
             [new Hand { Cards = [..playerCards], State = playerState }] }],
     };
 
@@ -443,7 +443,7 @@ public class PayoutTests
             Phase    = GamePhase.Payout,
             BjPayout = payout,
             DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    = [new Player { Name = "Alice", Bet = "100", Hands =
+            Players    = [new Player { Name = "Lorah", Bet = "100", Hands =
                 [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
         };
         Assert.Equal(expected, GameEngine.PayoutAmountString(state, 0));
@@ -465,9 +465,9 @@ public class RosterManagementTests
     [Fact]
     public void AddPlayer_AppendsPlayer()
     {
-        var (ns, _) = GameEngine.Apply(BettingState(), new AddPlayer("Alice"));
+        var (ns, _) = GameEngine.Apply(BettingState(), new AddPlayer("Lorah"));
         Assert.Single(ns.Players);
-        Assert.Equal("Alice", ns.Players[0].Name);
+        Assert.Equal("Lorah", ns.Players[0].Name);
     }
 
     [Fact]
@@ -476,11 +476,11 @@ public class RosterManagementTests
         var state = new GameState
         {
             Phase   = GamePhase.Betting,
-            Players = [new Player { Name = "Alice" }, new Player { Name = "Bob" }],
+            Players = [new Player { Name = "Lorah" }, new Player { Name = "Bekki" }],
         };
         var (ns, _) = GameEngine.Apply(state, new RemovePlayer(0));
         Assert.Single(ns.Players);
-        Assert.Equal("Bob", ns.Players[0].Name);
+        Assert.Equal("Bekki", ns.Players[0].Name);
     }
 
     [Fact]
@@ -489,7 +489,7 @@ public class RosterManagementTests
         var state = new GameState
         {
             Phase   = GamePhase.Betting,
-            Players = [new Player { Name = "Alice", Bet = "10" }],
+            Players = [new Player { Name = "Lorah", Bet = "10" }],
         };
         var (ns, _) = GameEngine.Apply(state, new SetPlayerBet(0, "50"));
         Assert.Equal("50", ns.Players[0].Bet);
@@ -500,10 +500,10 @@ public class RosterManagementTests
     {
         var state = new GameState
         {
-            Players = [new Player { Name = "Alice", Bet = "10" }],
+            Players = [new Player { Name = "Lorah", Bet = "10" }],
         };
-        var (ns, _) = GameEngine.Apply(state, new RenamePlayer(0, "Alicia"));
-        Assert.Equal("Alicia", ns.Players[0].Name);
+        var (ns, _) = GameEngine.Apply(state, new RenamePlayer(0, "Nolla"));
+        Assert.Equal("Nolla", ns.Players[0].Name);
         Assert.Equal("10", ns.Players[0].Bet); // bet preserved
     }
 }
@@ -519,7 +519,7 @@ public class ImmutabilityTests
             ActivePlayerIndex = 0,
             Players =
             [
-                new Player { Name = "Alice", Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] },
+                new Player { Name = "Lorah", Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] },
             ],
         };
         var originalCardCount = state.Players[0].Hands[0].Cards.Count;

@@ -60,7 +60,7 @@ All cards come from FFXIV chat rolls (`/random 13` or `/dice 13`). There are no 
 
 ## Testing
 
-Use only these player names in test cases: Lorah, Bekki, Nolla. When a test requires a winning player, that player must always be Lorah. Write tests for all new features.
+Use only these player names in test cases: Lorah, Bekki, Nolla. If more than 3 names are needed, invent new ones. When a test requires a winning player, that player must always be Lorah. Write tests for all new features.
 
 ## Design Decisions
 
