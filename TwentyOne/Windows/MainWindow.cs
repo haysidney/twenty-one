@@ -488,6 +488,7 @@ public class MainWindow : Window, IDisposable
         var handStr = HandString(hand.Cards);
         if (handStr.Length > 0)
         {
+            ImGui.AlignTextToFramePadding();
             ImGui.Text(handStr);
             ImGui.SameLine();
         }
