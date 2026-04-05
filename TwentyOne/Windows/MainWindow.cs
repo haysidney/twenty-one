@@ -3,8 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using System.Text.RegularExpressions;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.Text;
+using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.Windowing;
+using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Shell;
@@ -32,10 +36,12 @@ public class PlayerRow
 internal enum UndoAction { AddCard, Stand }
 internal record struct UndoEntry(UndoAction Action, bool IsDealer, int PlayerIndex, int HandIndex);
 
-public class MainWindow : Window, IDisposable
+public partial class MainWindow : Window, IDisposable
 {
     private readonly Configuration config;
     private readonly ConfigWindow configWindow;
+    private readonly IChatGui chatGui;
+    private readonly IClientState clientState;
     private readonly List<PlayerRow> players = [];
     private string newPlayerName = string.Empty;
     private readonly Hand dealerHand = new();
@@ -47,25 +53,34 @@ public class MainWindow : Window, IDisposable
     private GamePhase phase = GamePhase.Betting;
     private int activePlayerIndex = -1;
 
+    // pending hit: null = not waiting, IsDealer=true for dealer, otherwise PlayerIndex/HandIndex
+    private (bool IsDealer, int PlayerIndex, int HandIndex)? pendingHit;
+
     // ── Narration ─────────────────────────────────────────────────────────────
     private readonly List<string> narrationLog = [];
     private bool narrationUseChannelCommand = false;
     private bool narrationPanelOpen = true;
 
-    public MainWindow(Configuration config, ConfigWindow configWindow)
+    public MainWindow(Configuration config, ConfigWindow configWindow, IChatGui chatGui, IClientState clientState)
         : base("Twenty One##TwentyOneMain")
     {
         this.config = config;
         this.configWindow = configWindow;
+        this.chatGui = chatGui;
+        this.clientState = clientState;
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(640, 320),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
+        chatGui.ChatMessage += OnChatMessage;
         LoadState();
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        chatGui.ChatMessage -= OnChatMessage;
+    }
 
     // ── Card / hand helpers ───────────────────────────────────────────────────
 
@@ -163,7 +178,7 @@ public class MainWindow : Window, IDisposable
         uiModule->ProcessChatBoxEntry(&str);
     }
 
-    private unsafe void SendHitRoll()
+    private unsafe void SendHitRoll(bool isDealer, int playerIndex, int handIndex)
     {
         if (!config.GameState.ChatEnabled) return;
         var channel = config.GameState.ChatChannel;
@@ -172,10 +187,34 @@ public class MainWindow : Window, IDisposable
         var shell = RaptureShellModule.Instance();
         if (shell == null) return;
 
+        pendingHit = (isDealer, playerIndex, handIndex);
         var savedChatType = shell->ChatType;
         SendChatMessage(channel);
         SendChatMessage(isPublic ? "/random 13" : "/dice 13");
         shell->ChangeChatChannel(savedChatType, 0, null, true);
+    }
+
+    // Matches "You roll a [icon] 7 (out of 13)."
+    [GeneratedRegex(@"You roll a\D+(\d+) \(out of 13\)")]
+    private static partial Regex DiceRollRegex();
+
+    private void OnChatMessage(XivChatType type, int timestamp, ref SeString sender, ref SeString message, ref bool isHandled)
+    {
+        if (pendingHit == null) return;
+
+        var msgText = message.TextValue;
+        var match = DiceRollRegex().Match(msgText);
+        if (!match.Success) return;
+
+        if (!int.TryParse(match.Groups[1].Value, out var roll) || roll < 1 || roll > 13) return;
+
+        var (isDealer, pi, hi) = pendingHit.Value;
+        pendingHit = null;
+
+        if (isDealer)
+            AddDealerCard(roll);
+        else
+            AddPlayerCard(pi, hi, roll);
     }
 
     private void NarratePlayerAction(int pi, int hi, int card)
@@ -565,7 +604,7 @@ public class MainWindow : Window, IDisposable
         if (dealerInputActive && config.GameState.ChatEnabled)
         {
             ImGui.SameLine();
-            if (ImGui.SmallButton("Hit##dealer")) SendHitRoll();
+            if (ImGui.SmallButton("Hit##dealer")) SendHitRoll(isDealer: true, -1, -1);
         }
 
         if (dealerHand.Cards.Count > 0)
@@ -727,7 +766,7 @@ public class MainWindow : Window, IDisposable
                     ImGui.SameLine();
                     var canHit = canStand;
                     if (!canHit) ImGui.BeginDisabled();
-                    if (ImGui.SmallButton($"Hit##{i}")) SendHitRoll();
+                    if (ImGui.SmallButton($"Hit##{i}")) SendHitRoll(isDealer: false, i, 0);
                     if (!canHit) ImGui.EndDisabled();
                 }
 
