@@ -2,6 +2,8 @@
 
 This is a Final Fantasy XIV plugin that uses the Dalamud API (https://dalamud.dev/api/).
 
+The FFXIVClientStructs repo is cloned at `FFXIVClientStructs/` for reference. Consult it locally before going to the web for information about FFXIV client structures.
+
 It's a plugin meant for a dealer to use to run a blackjack game in a venue.
 
 ## Build
