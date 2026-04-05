@@ -102,7 +102,7 @@ public class ConfigWindow : Window, IDisposable
         {
             ImGui.TableSetupColumn("##ntDealerLabel", ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableSetupColumn("##ntDealerValue", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("##ntDealerReset", ImGuiTableColumnFlags.WidthFixed, 26);
+            ImGui.TableSetupColumn("##ntDealerReset", ImGuiTableColumnFlags.WidthFixed, 48);
 
             var v0 = t.DealerHit;
             NtRow("Hit##ntDH",        "{card}  {cards}  {score}", Defaults.DealerHit,  ctrlHeld, ref v0);
@@ -127,7 +127,7 @@ public class ConfigWindow : Window, IDisposable
         {
             ImGui.TableSetupColumn("##ntPlayersLabel", ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableSetupColumn("##ntPlayersValue", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("##ntPlayersReset", ImGuiTableColumnFlags.WidthFixed, 26);
+            ImGui.TableSetupColumn("##ntPlayersReset", ImGuiTableColumnFlags.WidthFixed, 48);
 
             var v0 = t.PlayerHit;
             NtRow("Hit##ntPH",        "{name}  {card}  {cards}  {score}", Defaults.PlayerHit,   ctrlHeld, ref v0);
@@ -156,7 +156,7 @@ public class ConfigWindow : Window, IDisposable
         {
             ImGui.TableSetupColumn("##ntDealLabel", ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableSetupColumn("##ntDealValue", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("##ntDealReset", ImGuiTableColumnFlags.WidthFixed, 26);
+            ImGui.TableSetupColumn("##ntDealReset", ImGuiTableColumnFlags.WidthFixed, 48);
 
             var v0 = t.DealSummaryPrefix;
             NtRow("Prefix##ntDP",      "(no variables)",                  Defaults.DealSummaryPrefix, ctrlHeld, ref v0);
@@ -181,7 +181,7 @@ public class ConfigWindow : Window, IDisposable
         {
             ImGui.TableSetupColumn("##ntPayoutLabel", ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableSetupColumn("##ntPayoutValue", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("##ntPayoutReset", ImGuiTableColumnFlags.WidthFixed, 26);
+            ImGui.TableSetupColumn("##ntPayoutReset", ImGuiTableColumnFlags.WidthFixed, 48);
 
             var v0 = t.PayoutDealerBust;
             NtRow("Dlr Bust##ntPDB",   "{score}",                            Defaults.PayoutDealerBust,   ctrlHeld, ref v0);
@@ -216,7 +216,7 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.TableSetColumnIndex(2);
         if (!ctrlHeld) ImGui.BeginDisabled();
-        if (ImGui.SmallButton($"↺##{id}R"))
+        if (ImGui.SmallButton($"Reset##{id}R"))
             value = defaultValue;
         if (!ctrlHeld) ImGui.EndDisabled();
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
