@@ -604,7 +604,7 @@ public class MainWindow : Window, IDisposable
             ImGui.TableSetupColumn("Cards"u8,   ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Score"u8,   ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Status"u8,  ImGuiTableColumnFlags.WidthFixed, 100);
-            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 100);
+            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 140);
             ImGui.TableHeadersRow();
 
             int removeAt = -1;
@@ -647,6 +647,16 @@ public class MainWindow : Window, IDisposable
                         renamingIndex = i;
                         renamingBuffer = p.Name;
                     }
+                    // Rename button — right-justified in the Name cell
+                    var renameLabel = $"\u270e##{i}rename";
+                    var renameW = ImGui.CalcTextSize("\u270e").X + ImGui.GetStyle().FramePadding.X * 2;
+                    ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - ImGui.GetScrollX());
+                    if (ImGui.SmallButton(renameLabel))
+                    {
+                        renamingIndex = i;
+                        renamingBuffer = p.Name;
+                    }
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Rename"u8);
                 }
 
                 // Bet — editable only in Betting phase
@@ -703,26 +713,11 @@ public class MainWindow : Window, IDisposable
 
                 // Actions
                 ImGui.TableSetColumnIndex(5);
-                var canRemove = phase == GamePhase.Betting;
-                if (!canRemove) ImGui.BeginDisabled();
-                if (ImGui.SmallButton($"X##{i}")) removeAt = i;
-                if (!canRemove) ImGui.EndDisabled();
-
-                ImGui.SameLine();
-
-                if (ImGui.SmallButton($"R##{i}"))
-                {
-                    renamingIndex = i;
-                    renamingBuffer = p.Name;
-                }
-
-                ImGui.SameLine();
-
                 var canStand = phase == GamePhase.PlayerTurns
                     && i == activePlayerIndex
                     && hand.State == HandState.Playing;
                 if (!canStand) ImGui.BeginDisabled();
-                if (ImGui.SmallButton($"S##{i}")) StandPlayer(i, 0);
+                if (ImGui.SmallButton($"Stand##{i}")) StandPlayer(i, 0);
                 if (!canStand) ImGui.EndDisabled();
 
                 if (config.GameState.ChatEnabled)
@@ -730,9 +725,20 @@ public class MainWindow : Window, IDisposable
                     ImGui.SameLine();
                     var canHit = canStand;
                     if (!canHit) ImGui.BeginDisabled();
-                    if (ImGui.SmallButton($"H##{i}")) SendHitRoll();
+                    if (ImGui.SmallButton($"Hit##{i}")) SendHitRoll();
                     if (!canHit) ImGui.EndDisabled();
                 }
+
+                ImGui.SameLine();
+
+                var canRemove = phase == GamePhase.Betting;
+                if (!canRemove) ImGui.BeginDisabled();
+                ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.7f, 0.15f, 0.15f, 1f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.25f, 0.25f, 1f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.5f, 0.05f, 0.05f, 1f));
+                if (ImGui.SmallButton($"X##{i}")) removeAt = i;
+                ImGui.PopStyleColor(3);
+                if (!canRemove) ImGui.EndDisabled();
             }
 
             if (removeAt >= 0) { players.RemoveAt(removeAt); SaveState(); }
@@ -889,7 +895,7 @@ public class MainWindow : Window, IDisposable
                     var line = narrationLog[ni];
                     var display = narrationUseChannelCommand ? config.GameState.ChatChannel + " " + line : line;
                     ImGui.PushID(ni);
-                    if (ImGui.SmallButton("C"))
+                    if (ImGui.SmallButton("Copy"))
                         ImGui.SetClipboardText(display);
                     if (ImGui.IsItemHovered())
                         ImGui.SetTooltip("Copy to clipboard"u8);
