@@ -8,6 +8,6 @@
     <Name>Twenty One</Name>
     <Author>HaySidney</Author>
     <Punchline>Run a Blackjack table in your FFXIV venue.</Punchline>
-    <Description>Facilitates Blackjack games via Party Chat. Type /twentyone to open the table.</Description>
+    <Description>Facilitates Blackjack games via Chat. Type /twentyone to open the table.</Description>
   </PropertyGroup>
 </Project>
