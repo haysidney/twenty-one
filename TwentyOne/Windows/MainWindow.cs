@@ -648,8 +648,8 @@ public class MainWindow : Window, IDisposable
                         renamingBuffer = p.Name;
                     }
                     // Rename button — right-justified in the Name cell
-                    var renameLabel = $"\u270e##{i}rename";
-                    var renameW = ImGui.CalcTextSize("\u270e").X + ImGui.GetStyle().FramePadding.X * 2;
+                    var renameLabel = $"Rename##{i}rename";
+                    var renameW = ImGui.CalcTextSize("Rename").X + ImGui.GetStyle().FramePadding.X * 2;
                     ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - ImGui.GetScrollX());
                     if (ImGui.SmallButton(renameLabel))
                     {
