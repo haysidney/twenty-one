@@ -1,5 +1,19 @@
 - Investigate mapping RaptureShellModule->ChatType int values to the existing channel
   command strings (/p, /say, /fc, /ls1, etc.) and use ChangeChatChannel for ALL channel
   switching (narration and hit rolls), rather than sending channel switch commands via
-  ProcessChatBoxEntry. This would be cleaner and avoid any side effects of sending bare
+  ProcessChatBoxEntry. This would be cleaner and avoid any unwanted sending bare
   channel commands through the chat box.
+
+- Make the players get dealt their cards in pairs.
+
+- Message before dealing a dealer's card.
+
+- Message before dealing a player's hand.
+
+- When chat is disabled, we should print each card drawn.
+
+- Add config options for public vs private chat cooldown. 1 to 10 seconds seems reasonable. Public channels (/say /yell /shout) are rate limited more than private ones, so a default of 2 seconds for public and 1 second for private seems reasonable.
+
+- Add a way to split a narrator template into multiple messages. Maybe a {} placeholder that represents a split between messages.
+
+- Add /tell as a channel?

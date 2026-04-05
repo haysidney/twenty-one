@@ -543,9 +543,12 @@ public partial class MainWindow : Window, IDisposable
                         Apply(new SetPlayerBet(idx, val));
                     }
                     Apply(new StartDeal());
-                    // Queue all initial cards: dealer 1, each player 2 (standard deal order)
-                    for (var i = 0; i < State.Players.Count; i++) autoDealQueue.Enqueue((false, i, 0));
-                    for (var i = 0; i < State.Players.Count; i++) autoDealQueue.Enqueue((false, i, 0));
+                    // Queue initial cards: dealer first, then each player gets both cards in a pair
+                    for (var i = 0; i < State.Players.Count; i++)
+                    {
+                        autoDealQueue.Enqueue((false, i, 0));
+                        autoDealQueue.Enqueue((false, i, 0));
+                    }
                     QueueHitRoll(isDealer: true, -1, -1);
                 }
                 if (!canDeal) ImGui.EndDisabled();
