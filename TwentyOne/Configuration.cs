@@ -30,7 +30,6 @@ public class GameState
     public BlackjackPayout BjPayout { get; set; } = BlackjackPayout.ThreeToTwo;
     public List<string> NarrationLog { get; set; } = [];
     public bool NarrationUsePrefix { get; set; } = false;
-    public string NarrationPrefix { get; set; } = "/p ";
     public bool NarrationPanelOpen { get; set; } = true;
     public bool ChatEnabled { get; set; } = false;
     public string ChatChannel { get; set; } = "/p";
