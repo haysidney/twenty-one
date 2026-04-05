@@ -68,7 +68,7 @@ public class ConfigWindow : Window, IDisposable
             }
 
             var pub = config.PublicChatCooldownMs;
-            ImGui.SetNextItemWidth(80);
+            ImGui.SetNextItemWidth(160);
             if (ImGui.InputInt("Public cooldown (ms)##pubCooldown", ref pub, 100))
             {
                 config.PublicChatCooldownMs = Math.Clamp(pub, 100, 10000);
@@ -76,7 +76,7 @@ public class ConfigWindow : Window, IDisposable
             }
 
             var priv = config.PrivateChatCooldownMs;
-            ImGui.SetNextItemWidth(80);
+            ImGui.SetNextItemWidth(160);
             if (ImGui.InputInt("Private cooldown (ms)##privCooldown", ref priv, 100))
             {
                 config.PrivateChatCooldownMs = Math.Clamp(priv, 100, 10000);
