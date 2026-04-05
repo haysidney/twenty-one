@@ -336,8 +336,9 @@ public class ApplyPhaseTransitionTests
             ],
         };
         var (newState, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
-        Assert.Single(effects);
+        Assert.Equal(2, effects.Count);
         Assert.Contains("Deal —", ((SendChat)effects[0]).Text);
+        Assert.Contains("Lorah's turn", ((SendChat)effects[1]).Text);
         Assert.Equal(0, newState.ActivePlayerIndex);
         Assert.Equal(GamePhase.PlayerTurns, newState.Phase);
     }

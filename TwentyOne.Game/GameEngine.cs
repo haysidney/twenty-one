@@ -183,6 +183,13 @@ public static class GameEngine
             BjPayout          = bjPayout          ?? s.BjPayout,
         };
 
+    public static string ValidActionsString(Hand hand)
+    {
+        if (hand.State != HandState.Playing) return string.Empty;
+        // Future: append ", Split" or ", Double" when those actions are supported.
+        return "Hit or Stand";
+    }
+
     /// <summary>
     /// Searches for the next Playing hand starting after <paramref name="fromIndex"/>.
     /// Returns the new active index and phase (transitions to DealerTurn if none found).
@@ -212,6 +219,17 @@ public static class GameEngine
         var t       = templates ?? new NarrationTemplates();
         var effects = new List<SideEffect>();
         void Narrate(string text) { if (!string.IsNullOrWhiteSpace(text)) effects.Add(new SendChat(text)); }
+        void NarratePlayerTurn(int pi, List<Player> players, Hand dealerHand)
+        {
+            if (pi < 0 || pi >= players.Count) return;
+            var hand = players[pi].Hands[0];
+            var actions = ValidActionsString(hand);
+            Narrate(NarrationTemplates.Fmt(t.PlayerTurnStart,
+                ("name",        players[pi].Name),
+                ("dealerCards", HandString(dealerHand.Cards)),
+                ("dealerScore", ScoreString(dealerHand.Cards)),
+                ("actions",     actions)));
+        }
 
         switch (action)
         {
@@ -274,6 +292,8 @@ public static class GameEngine
                     if (pi == state.ActivePlayerIndex && newHand.State != HandState.Playing)
                     {
                         (newActive, newPhase) = AdvanceFrom(state.ActivePlayerIndex, newPlayers);
+                        if (newPhase == GamePhase.PlayerTurns)
+                            NarratePlayerTurn(newActive, newPlayers, state.DealerHand);
                     }
                 }
 
@@ -305,6 +325,8 @@ public static class GameEngine
                     if (pi == state.ActivePlayerIndex)
                     {
                         (newActive, newPhase) = AdvanceFrom(state.ActivePlayerIndex, newPlayers);
+                        if (newPhase == GamePhase.PlayerTurns)
+                            NarratePlayerTurn(newActive, newPlayers, state.DealerHand);
                     }
                 }
 
@@ -336,6 +358,8 @@ public static class GameEngine
                 Narrate(sb.ToString());
 
                 var (nextActive, nextPhase) = AdvanceFrom(-1, state.Players);
+                if (nextPhase == GamePhase.PlayerTurns)
+                    NarratePlayerTurn(nextActive, state.Players, state.DealerHand);
                 return (With(state, phase: nextPhase, activePlayerIndex: nextActive), effects);
             }
 
