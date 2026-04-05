@@ -115,6 +115,13 @@ public partial class MainWindow : Window, IDisposable
 
     private unsafe void SendHitRoll(bool isDealer, int playerIndex, int handIndex)
     {
+        if (!config.ChatEnabled)
+        {
+            var simRoll = Random.Shared.Next(1, 14);
+            deferredRoll = (isDealer, playerIndex, handIndex, simRoll);
+            return;
+        }
+
         var channel  = config.ChatChannel;
         var isPublic = channel is "/say" or "/yell" or "/shout";
 

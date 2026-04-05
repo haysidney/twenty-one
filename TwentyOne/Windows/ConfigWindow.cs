@@ -45,7 +45,7 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Spacing();
 
         var chatEnabled = config.ChatEnabled;
-        if (ImGui.Checkbox("Send narration to FFXIV chat", ref chatEnabled))
+        if (ImGui.Checkbox("Enable FFXIV chat (narration + rolls)", ref chatEnabled))
         {
             config.ChatEnabled = chatEnabled;
             config.Save();
