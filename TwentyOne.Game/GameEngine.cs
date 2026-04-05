@@ -237,7 +237,9 @@ public static class GameEngine
             case AddDealerCard a:
             {
                 var newHand = AddCardToHand(state.DealerHand, a.Card);
-                if (state.Phase == GamePhase.DealerTurn)
+                if (state.Phase == GamePhase.Deal)
+                    Narrate(t.DealDealerCard);
+                else if (state.Phase == GamePhase.DealerTurn)
                 {
                     var cards    = HandString(newHand.Cards);
                     var score    = ScoreString(newHand.Cards);
@@ -266,6 +268,9 @@ public static class GameEngine
 
                 var newPhase  = state.Phase;
                 var newActive = state.ActivePlayerIndex;
+
+                if (state.Phase == GamePhase.Deal && state.Players[pi].Hands[hi].Cards.Count == 0)
+                    Narrate(NarrationTemplates.Fmt(t.DealPlayerHand, ("name", state.Players[pi].Name)));
 
                 if (state.Phase == GamePhase.PlayerTurns)
                 {

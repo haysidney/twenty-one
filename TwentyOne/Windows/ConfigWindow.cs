@@ -150,6 +150,27 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.Spacing();
 
+        // ── Deal announcements ────────────────────────────────────────────────
+        ImGui.TextDisabled("Deal announcements");
+        if (ImGui.BeginTable("##ntDealAnnounce", 3, flags))
+        {
+            ImGui.TableSetupColumn("##ntDALabel", ImGuiTableColumnFlags.WidthFixed, 90);
+            ImGui.TableSetupColumn("##ntDAValue", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("##ntDAReset", ImGuiTableColumnFlags.WidthFixed, 48);
+
+            var vda0 = t.DealDealerCard;
+            NtRow("Dealer##ntDAD",      "(no variables)", Defaults.DealDealerCard, ctrlHeld, ref vda0);
+            if (vda0 != t.DealDealerCard) { t.DealDealerCard = vda0; config.Save(); }
+
+            var vda1 = t.DealPlayerHand;
+            NtRow("Player##ntDAP",      "{name}",         Defaults.DealPlayerHand, ctrlHeld, ref vda1);
+            if (vda1 != t.DealPlayerHand) { t.DealPlayerHand = vda1; config.Save(); }
+
+            ImGui.EndTable();
+        }
+
+        ImGui.Spacing();
+
         // ── Deal summary ──────────────────────────────────────────────────────
         ImGui.TextDisabled("Deal summary");
         if (ImGui.BeginTable("##ntDeal", 3, flags))

@@ -18,6 +18,10 @@ public class NarrationTemplates
     public string PlayerBJ    { get; set; } = "{name} — Blackjack! {cards}";
     public string PlayerStand { get; set; } = "{name} stands. {cards} = {score}";
 
+    // Initial deal announcements (Deal phase)
+    public string DealDealerCard  { get; set; } = "Dealer's Card:";
+    public string DealPlayerHand  { get; set; } = "{name}'s Hand:";
+
     // Deal summary (BeginPlayerTurns): prefix + one entry per player + dealer suffix
     public string DealSummaryPrefix { get; set; } = "Deal — ";
     public string DealSummaryPlayer { get; set; } = "{name}: {cards} ({score}){bj}";
