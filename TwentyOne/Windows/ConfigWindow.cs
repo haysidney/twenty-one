@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using TwentyOne.Game;
 
 namespace TwentyOne.Windows;
 
@@ -30,10 +31,11 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Text("Blackjack Payout");
         ImGui.SameLine();
         var bjOptions = new[] { "3:2", "6:5", "1:1" };
-        var bjIdx = (int)config.GameState.BjPayout;
+        var bjIdx     = (int)config.GameState.BjPayout;
         ImGui.SetNextItemWidth(70);
         if (ImGui.Combo("##bjpayout", ref bjIdx, bjOptions, bjOptions.Length))
         {
+            // BjPayout is a venue setting, not an undoable game action.
             config.GameState.BjPayout = (BlackjackPayout)bjIdx;
             config.Save();
         }
@@ -42,23 +44,23 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.Spacing();
 
-        var chatEnabled = config.GameState.ChatEnabled;
+        var chatEnabled = config.ChatEnabled;
         if (ImGui.Checkbox("Send narration to FFXIV chat", ref chatEnabled))
         {
-            config.GameState.ChatEnabled = chatEnabled;
+            config.ChatEnabled = chatEnabled;
             config.Save();
         }
 
         if (chatEnabled)
         {
             ImGui.SameLine();
-            var currentChannel = config.GameState.ChatChannel;
-            var channelIdx = Array.IndexOf(ChatChannels, currentChannel);
+            var currentChannel = config.ChatChannel;
+            var channelIdx     = Array.IndexOf(ChatChannels, currentChannel);
             if (channelIdx < 0) channelIdx = 3; // fallback to /p
             ImGui.SetNextItemWidth(80);
             if (ImGui.Combo("##chatchannel", ref channelIdx, ChatChannels, ChatChannels.Length))
             {
-                config.GameState.ChatChannel = ChatChannels[channelIdx];
+                config.ChatChannel = ChatChannels[channelIdx];
                 config.Save();
             }
         }

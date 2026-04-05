@@ -11,4 +11,7 @@
     <Description>Facilitates Blackjack games via Chat. Type /twentyone to open the table.</Description>
     <Tags>Blackjack;Black Jack;Cards;Dealer;Croupier;Casino;Venue;Game</Tags>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TwentyOne.Game\TwentyOne.Game.csproj" />
+  </ItemGroup>
 </Project>
