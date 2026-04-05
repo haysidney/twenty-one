@@ -34,12 +34,13 @@ public partial class MainWindow : Window, IDisposable
     private (bool IsDealer, int PlayerIndex, int HandIndex, bool IsPublic)? pendingHit;
     // deferred roll: set by OnChatMessage, applied at the start of the next Draw()
     private (bool IsDealer, int PlayerIndex, int HandIndex, int Roll)?      deferredRoll;
-    // auto-deal queue: populated by StartDeal; SendHitRoll is called one at a time as rolls resolve
+    // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
     private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex)> autoDealQueue = new();
 
-    // chat rate-limiting: 1 message per second, matching vanilla FFXIV macro rate
-    private readonly Queue<string> chatQueue   = new();
-    private          DateTime      lastChatSent = DateTime.MinValue;
+    // rate-limited outgoing queue — narration strings and roll commands share a single FIFO and lastChatSent
+    // each entry: (IsRoll, Invoke) — narration passes through freely; rolls block until pendingHit is clear
+    private readonly Queue<(bool IsRoll, Action Invoke)> chatQueue = new();
+    private          DateTime                             lastChatSent = DateTime.MinValue;
 
     // ── Convenience accessors ─────────────────────────────────────────────────
 
@@ -97,7 +98,10 @@ public partial class MainWindow : Window, IDisposable
             {
                 config.NarrationLog.Add(chat.Text);
                 if (config.ChatEnabled)
-                    chatQueue.Enqueue(config.ChatChannel + " " + chat.Text);
+                {
+                    var msg = config.ChatChannel + " " + chat.Text;
+                    chatQueue.Enqueue((false, () => SendChatMessage(msg)));
+                }
             }
         }
 
@@ -132,7 +136,7 @@ public partial class MainWindow : Window, IDisposable
         uiModule->ProcessChatBoxEntry(&str);
     }
 
-    private unsafe void SendHitRoll(bool isDealer, int playerIndex, int handIndex)
+    private void QueueHitRoll(bool isDealer, int playerIndex, int handIndex)
     {
         if (!config.ChatEnabled)
         {
@@ -140,7 +144,11 @@ public partial class MainWindow : Window, IDisposable
             deferredRoll = (isDealer, playerIndex, handIndex, simRoll);
             return;
         }
+        chatQueue.Enqueue((true, () => SendHitRoll(isDealer, playerIndex, handIndex)));
+    }
 
+    private unsafe void SendHitRoll(bool isDealer, int playerIndex, int handIndex)
+    {
         var channel  = config.ChatChannel;
         var isPublic = channel is "/say" or "/yell" or "/shout";
 
@@ -238,11 +246,16 @@ public partial class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
-        // Drain chat queue at 1 message/second (vanilla FFXIV macro rate)
+        // Drain outgoing queue — hold a roll entry until the previous roll's response has arrived
         if (chatQueue.Count > 0 && (DateTime.UtcNow - lastChatSent).TotalMilliseconds >= 2000)
         {
-            SendChatMessage(chatQueue.Dequeue());
-            lastChatSent = DateTime.UtcNow;
+            var (isRoll, invoke) = chatQueue.Peek();
+            if (!isRoll || pendingHit == null)
+            {
+                chatQueue.Dequeue();
+                invoke();
+                lastChatSent = DateTime.UtcNow;
+            }
         }
 
         // Process deferred roll from OnChatMessage
@@ -253,7 +266,7 @@ public partial class MainWindow : Window, IDisposable
             Apply(isDealer ? new AddDealerCard(roll) : new AddPlayerCard(pi, hi, roll));
             // Advance auto-deal if more cards are needed
             if (Phase == GamePhase.Deal && autoDealQueue.TryDequeue(out var next))
-                SendHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
+                QueueHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
         }
 
         if (ImGui.SmallButton("Config"))
@@ -315,7 +328,7 @@ public partial class MainWindow : Window, IDisposable
         if (dealerHitActive)
         {
             if (State.DealerHand.Cards.Count > 0) ImGui.SameLine();
-            if (ImGui.SmallButton("Hit##dealer")) SendHitRoll(isDealer: true, -1, -1);
+            if (ImGui.SmallButton("Hit##dealer")) QueueHitRoll(isDealer: true, -1, -1);
         }
 
         // ── Player table ──────────────────────────────────────────────────────
@@ -453,7 +466,7 @@ public partial class MainWindow : Window, IDisposable
                 ImGui.SameLine();
                 var hitActive = PlayerHitActive(i, 0);
                 if (!hitActive) ImGui.BeginDisabled();
-                if (ImGui.SmallButton($"Hit##{i}")) SendHitRoll(isDealer: false, i, 0);
+                if (ImGui.SmallButton($"Hit##{i}")) QueueHitRoll(isDealer: false, i, 0);
                 if (!hitActive) ImGui.EndDisabled();
 
                 ImGui.SameLine();
@@ -533,7 +546,7 @@ public partial class MainWindow : Window, IDisposable
                     // Queue all initial cards: dealer 1, each player 2 (standard deal order)
                     for (var i = 0; i < State.Players.Count; i++) autoDealQueue.Enqueue((false, i, 0));
                     for (var i = 0; i < State.Players.Count; i++) autoDealQueue.Enqueue((false, i, 0));
-                    SendHitRoll(isDealer: true, -1, -1);
+                    QueueHitRoll(isDealer: true, -1, -1);
                 }
                 if (!canDeal) ImGui.EndDisabled();
                 break;
