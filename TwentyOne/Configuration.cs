@@ -11,7 +11,6 @@ public class Configuration : IPluginConfiguration
     public int Version { get; set; } = 0;
 
     // ── Game state ─────────────────────────────────────────────────────────────
-    // Property name intentionally kept as "GameState" for JSON backward compatibility.
     public GameState GameState { get; set; } = new();
 
     // Snapshots pushed before each Apply; cleared on NewRound. Persisted so undo
