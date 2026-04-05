@@ -772,7 +772,7 @@ public partial class MainWindow : Window, IDisposable
                 if (config.GameState.ChatEnabled)
                 {
                     ImGui.SameLine();
-                    var canHit = canStand;
+                    var canHit = cardInputActive;
                     if (!canHit) ImGui.BeginDisabled();
                     if (ImGui.SmallButton($"Hit##{i}")) SendHitRoll(isDealer: false, i, 0);
                     if (!canHit) ImGui.EndDisabled();
