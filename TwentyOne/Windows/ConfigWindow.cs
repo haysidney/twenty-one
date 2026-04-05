@@ -66,6 +66,22 @@ public class ConfigWindow : Window, IDisposable
                 config.ChatChannel = ChatChannels[channelIdx];
                 config.Save();
             }
+
+            var pub = config.PublicChatCooldownMs / 1000;
+            ImGui.SetNextItemWidth(120);
+            if (ImGui.SliderInt("Public cooldown (s)##pubCooldown", ref pub, 1, 10))
+            {
+                config.PublicChatCooldownMs = pub * 1000;
+                config.Save();
+            }
+
+            var priv = config.PrivateChatCooldownMs / 1000;
+            ImGui.SetNextItemWidth(120);
+            if (ImGui.SliderInt("Private cooldown (s)##privCooldown", ref priv, 1, 10))
+            {
+                config.PrivateChatCooldownMs = priv * 1000;
+                config.Save();
+            }
         }
 
         ImGui.Spacing();

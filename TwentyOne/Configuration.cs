@@ -27,6 +27,8 @@ public class Configuration : IPluginConfiguration
     // ── Chat ───────────────────────────────────────────────────────────────────
     public bool ChatEnabled { get; set; } = false;
     public string ChatChannel { get; set; } = "/p";
+    public int PublicChatCooldownMs  { get; set; } = 2000;
+    public int PrivateChatCooldownMs { get; set; } = 1000;
 
     // ── Narration templates ────────────────────────────────────────────────────
     public NarrationTemplates NarrationTemplates { get; set; } = new();

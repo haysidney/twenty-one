@@ -256,7 +256,9 @@ public partial class MainWindow : Window, IDisposable
     public override void Draw()
     {
         // Drain outgoing queue — hold a roll entry until the previous roll's response has arrived
-        if (chatQueue.Count > 0 && (DateTime.UtcNow - lastChatSent).TotalMilliseconds >= 2000)
+        var isPublicChannel = config.ChatChannel is "/say" or "/yell" or "/shout";
+        var cooldownMs = isPublicChannel ? config.PublicChatCooldownMs : config.PrivateChatCooldownMs;
+        if (chatQueue.Count > 0 && (DateTime.UtcNow - lastChatSent).TotalMilliseconds >= cooldownMs)
         {
             var (isRoll, invoke) = chatQueue.Peek();
             if (!isRoll || pendingHit == null)
