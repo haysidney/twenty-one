@@ -641,6 +641,7 @@ public class MainWindow : Window, IDisposable
                 }
                 else
                 {
+                    ImGui.AlignTextToFramePadding();
                     ImGui.Text(p.Name);
                     if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                     {
@@ -650,7 +651,7 @@ public class MainWindow : Window, IDisposable
                     // Rename button — right-justified in the Name cell
                     var renameLabel = $"Rename##{i}rename";
                     var renameW = ImGui.CalcTextSize("Rename").X + ImGui.GetStyle().FramePadding.X * 2;
-                    ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - ImGui.GetScrollX());
+                    ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
                     if (ImGui.SmallButton(renameLabel))
                     {
                         renamingIndex = i;
