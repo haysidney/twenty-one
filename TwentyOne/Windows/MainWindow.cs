@@ -34,6 +34,8 @@ public partial class MainWindow : Window, IDisposable
     private (bool IsDealer, int PlayerIndex, int HandIndex, bool IsPublic)? pendingHit;
     // deferred roll: set by OnChatMessage, applied at the start of the next Draw()
     private (bool IsDealer, int PlayerIndex, int HandIndex, int Roll)?      deferredRoll;
+    // auto-deal queue: populated by StartDeal; SendHitRoll is called one at a time as rolls resolve
+    private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex)> autoDealQueue = new();
 
     // chat rate-limiting: 1 message per second, matching vanilla FFXIV macro rate
     private readonly Queue<string> chatQueue   = new();
@@ -75,6 +77,8 @@ public partial class MainWindow : Window, IDisposable
         if (action is NewRound)
         {
             config.UndoStack.Clear();
+            autoDealQueue.Clear();
+            pendingHit = null;
         }
         else
         {
@@ -247,6 +251,9 @@ public partial class MainWindow : Window, IDisposable
             var (isDealer, pi, hi, roll) = deferredRoll.Value;
             deferredRoll = null;
             Apply(isDealer ? new AddDealerCard(roll) : new AddPlayerCard(pi, hi, roll));
+            // Advance auto-deal if more cards are needed
+            if (Phase == GamePhase.Deal && autoDealQueue.TryDequeue(out var next))
+                SendHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
         }
 
         if (ImGui.SmallButton("Config"))
@@ -523,6 +530,10 @@ public partial class MainWindow : Window, IDisposable
                         Apply(new SetPlayerBet(idx, val));
                     }
                     Apply(new StartDeal());
+                    // Queue all initial cards: dealer 1, each player 2 (standard deal order)
+                    for (var i = 0; i < State.Players.Count; i++) autoDealQueue.Enqueue((false, i, 0));
+                    for (var i = 0; i < State.Players.Count; i++) autoDealQueue.Enqueue((false, i, 0));
+                    SendHitRoll(isDealer: true, -1, -1);
                 }
                 if (!canDeal) ImGui.EndDisabled();
                 break;
