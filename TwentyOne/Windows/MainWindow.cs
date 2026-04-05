@@ -647,7 +647,7 @@ public partial class MainWindow : Window, IDisposable
             ImGui.Spacing();
             if (ImGui.BeginChild("##narLog", new Vector2(0, 0), true))
             {
-                for (var ni = config.NarrationLog.Count - 1; ni >= 0; ni--)
+                for (var ni = 0; ni < config.NarrationLog.Count; ni++)
                 {
                     var line    = config.NarrationLog[ni];
                     var display = config.NarrationUseChannelCommand
@@ -660,6 +660,8 @@ public partial class MainWindow : Window, IDisposable
                     ImGui.SameLine();
                     ImGui.TextUnformatted(display);
                 }
+                if (ImGui.GetScrollY() >= ImGui.GetScrollMaxY())
+                    ImGui.SetScrollHereY(1.0f);
             }
             ImGui.EndChild();
         }
