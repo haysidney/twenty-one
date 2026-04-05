@@ -35,6 +35,10 @@ public partial class MainWindow : Window, IDisposable
     // deferred roll: set by OnChatMessage, applied at the start of the next Draw()
     private (bool IsDealer, int PlayerIndex, int HandIndex, int Roll)?      deferredRoll;
 
+    // chat rate-limiting: 1 message per second, matching vanilla FFXIV macro rate
+    private readonly Queue<string> chatQueue   = new();
+    private          DateTime      lastChatSent = DateTime.MinValue;
+
     // ── Convenience accessors ─────────────────────────────────────────────────
 
     private GameState   State             => config.GameState;
@@ -89,7 +93,7 @@ public partial class MainWindow : Window, IDisposable
             {
                 config.NarrationLog.Add(chat.Text);
                 if (config.ChatEnabled)
-                    SendChatMessage(config.ChatChannel + " " + chat.Text);
+                    chatQueue.Enqueue(config.ChatChannel + " " + chat.Text);
             }
         }
 
@@ -230,6 +234,13 @@ public partial class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
+        // Drain chat queue at 1 message/second (vanilla FFXIV macro rate)
+        if (chatQueue.Count > 0 && (DateTime.UtcNow - lastChatSent).TotalMilliseconds >= 1000)
+        {
+            SendChatMessage(chatQueue.Dequeue());
+            lastChatSent = DateTime.UtcNow;
+        }
+
         // Process deferred roll from OnChatMessage
         if (deferredRoll.HasValue)
         {
