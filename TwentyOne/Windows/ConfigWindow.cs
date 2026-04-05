@@ -79,11 +79,16 @@ public class ConfigWindow : Window, IDisposable
             return;
 
         ImGui.Spacing();
+        var ctrlHeld = ImGui.GetIO().KeyCtrl;
+        if (!ctrlHeld) ImGui.BeginDisabled();
         if (ImGui.Button("Reset to Defaults##ntReset"))
         {
             config.NarrationTemplates = new();
             config.Save();
         }
+        if (!ctrlHeld) ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
+            ImGui.SetTooltip("Hold Ctrl to reset narration templates to defaults."u8);
 
         ImGui.Spacing();
         var t     = config.NarrationTemplates;

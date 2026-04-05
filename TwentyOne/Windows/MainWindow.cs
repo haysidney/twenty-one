@@ -561,7 +561,12 @@ public partial class MainWindow : Window, IDisposable
         if (Phase != GamePhase.Payout && Phase != GamePhase.Betting)
         {
             ImGui.SameLine();
+            var ctrlHeld = ImGui.GetIO().KeyCtrl;
+            if (!ctrlHeld) ImGui.BeginDisabled();
             if (ImGui.Button("Abort Round")) Apply(new NewRound());
+            if (!ctrlHeld) ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
+                ImGui.SetTooltip("Hold Ctrl to abort the round."u8);
         }
 
         // ── Narration panel ───────────────────────────────────────────────────
