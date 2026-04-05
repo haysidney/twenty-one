@@ -28,5 +28,8 @@ public class Configuration : IPluginConfiguration
     public bool ChatEnabled { get; set; } = false;
     public string ChatChannel { get; set; } = "/p";
 
+    // ── Narration templates ────────────────────────────────────────────────────
+    public NarrationTemplates NarrationTemplates { get; set; } = new();
+
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

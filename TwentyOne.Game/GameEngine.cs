@@ -207,8 +207,9 @@ public static class GameEngine
     /// Never mutates <paramref name="state"/>.
     /// </summary>
     public static (GameState State, IReadOnlyList<SideEffect> Effects) Apply(
-        GameState state, GameAction action)
+        GameState state, GameAction action, NarrationTemplates? templates = null)
     {
+        var t       = templates ?? new NarrationTemplates();
         var effects = new List<SideEffect>();
         void Narrate(string text) => effects.Add(new SendChat(text));
 
@@ -220,15 +221,19 @@ public static class GameEngine
                 var newHand = AddCardToHand(state.DealerHand, a.Card);
                 if (state.Phase == GamePhase.DealerTurn)
                 {
-                    var cards = HandString(newHand.Cards);
-                    var score = ScoreString(newHand.Cards);
-                    var val   = HandValue(newHand.Cards);
+                    var cards    = HandString(newHand.Cards);
+                    var score    = ScoreString(newHand.Cards);
+                    var val      = HandValue(newHand.Cards);
+                    var cardLbl  = CardLabel(a.Card);
                     if (val > 21)
-                        Narrate($"Dealer draws {CardLabel(a.Card)} → {cards} = {score} — Bust!");
+                        Narrate(NarrationTemplates.Fmt(t.DealerBust,
+                            ("card", cardLbl), ("cards", cards), ("score", score)));
                     else if (newHand.Cards.Count == 2 && val == 21)
-                        Narrate($"Dealer draws {CardLabel(a.Card)} → {cards} — Blackjack!");
+                        Narrate(NarrationTemplates.Fmt(t.DealerBJ,
+                            ("card", cardLbl), ("cards", cards)));
                     else
-                        Narrate($"Dealer draws {CardLabel(a.Card)} → {cards} = {score}");
+                        Narrate(NarrationTemplates.Fmt(t.DealerHit,
+                            ("card", cardLbl), ("cards", cards), ("score", score)));
                 }
                 return (With(state, dealerHand: newHand), effects);
             }
@@ -246,19 +251,23 @@ public static class GameEngine
 
                 if (state.Phase == GamePhase.PlayerTurns)
                 {
-                    var name  = state.Players[pi].Name;
-                    var cards = HandString(newHand.Cards);
-                    var score = ScoreString(newHand.Cards);
+                    var name    = state.Players[pi].Name;
+                    var cards   = HandString(newHand.Cards);
+                    var score   = ScoreString(newHand.Cards);
+                    var cardLbl = CardLabel(a.Card);
                     switch (newHand.State)
                     {
                         case HandState.Bust:
-                            Narrate($"{name} busts! {cards} = {score}");
+                            Narrate(NarrationTemplates.Fmt(t.PlayerBust,
+                                ("name", name), ("cards", cards), ("score", score)));
                             break;
                         case HandState.Blackjack:
-                            Narrate($"{name} — Blackjack! {cards}");
+                            Narrate(NarrationTemplates.Fmt(t.PlayerBJ,
+                                ("name", name), ("cards", cards)));
                             break;
                         default:
-                            Narrate($"{name} hits → {CardLabel(a.Card)} | {cards} = {score}");
+                            Narrate(NarrationTemplates.Fmt(t.PlayerHit,
+                                ("name", name), ("card", cardLbl), ("cards", cards), ("score", score)));
                             break;
                     }
 
@@ -288,8 +297,10 @@ public static class GameEngine
 
                 if (state.Phase == GamePhase.PlayerTurns)
                 {
-                    Narrate($"{state.Players[pi].Name} stands. " +
-                            $"{HandString(hand.Cards)} = {ScoreString(hand.Cards)}");
+                    Narrate(NarrationTemplates.Fmt(t.PlayerStand,
+                        ("name", state.Players[pi].Name),
+                        ("cards", HandString(hand.Cards)),
+                        ("score", ScoreString(hand.Cards))));
 
                     if (pi == state.ActivePlayerIndex)
                     {
@@ -308,17 +319,20 @@ public static class GameEngine
             // ── BeginPlayerTurns ─────────────────────────────────────────────
             case BeginPlayerTurns:
             {
-                var sb = new StringBuilder("Deal — ");
+                var sb = new StringBuilder(t.DealSummaryPrefix);
                 for (var i = 0; i < state.Players.Count; i++)
                 {
                     if (i > 0) sb.Append(", ");
                     var p    = state.Players[i];
                     var hand = p.Hands[0];
-                    sb.Append(p.Name).Append(": ").Append(HandString(hand.Cards))
-                      .Append(" (").Append(ScoreString(hand.Cards)).Append(')');
-                    if (hand.State == HandState.Blackjack) sb.Append(" BJ!");
+                    sb.Append(NarrationTemplates.Fmt(t.DealSummaryPlayer,
+                        ("name",  p.Name),
+                        ("cards", HandString(hand.Cards)),
+                        ("score", ScoreString(hand.Cards)),
+                        ("bj",    hand.State == HandState.Blackjack ? " BJ!" : string.Empty)));
                 }
-                sb.Append(" | Dealer shows ").Append(HandString(state.DealerHand.Cards));
+                sb.Append(NarrationTemplates.Fmt(t.DealSummaryDealer,
+                    ("cards", HandString(state.DealerHand.Cards))));
                 Narrate(sb.ToString());
 
                 var (nextActive, nextPhase) = AdvanceFrom(-1, state.Players);
@@ -331,8 +345,10 @@ public static class GameEngine
                 var dealerScore = HandValue(state.DealerHand.Cards);
                 var dealerBust  = state.DealerHand.Cards.Count > 0 && dealerScore > 21;
                 Narrate(dealerBust
-                    ? $"Dealer busts ({dealerScore})"
-                    : $"Dealer {ScoreString(state.DealerHand.Cards)}");
+                    ? NarrationTemplates.Fmt(t.PayoutDealerBust,
+                        ("score", dealerScore.ToString()))
+                    : NarrationTemplates.Fmt(t.PayoutDealerStands,
+                        ("score", ScoreString(state.DealerHand.Cards))));
 
                 for (var i = 0; i < state.Players.Count; i++)
                 {
@@ -352,7 +368,11 @@ public static class GameEngine
                                        ? string.Empty
                                        : $" (bet: {state.Players[i].Bet})";
                     var amountStr = amount.Length > 0 ? $" {amount}" : string.Empty;
-                    Narrate($"{state.Players[i].Name}: {label}{betStr}{amountStr}");
+                    Narrate(NarrationTemplates.Fmt(t.PayoutPlayer,
+                        ("name",   state.Players[i].Name),
+                        ("result", label),
+                        ("bet",    betStr),
+                        ("amount", amountStr)));
                 }
 
                 return (With(state, phase: GamePhase.Payout), effects);

@@ -80,7 +80,7 @@ public partial class MainWindow : Window, IDisposable
         }
         config.RedoStack.Clear();
 
-        var (newState, effects) = GameEngine.Apply(config.GameState, action);
+        var (newState, effects) = GameEngine.Apply(config.GameState, action, config.NarrationTemplates);
         config.GameState = newState;
 
         foreach (var effect in effects)

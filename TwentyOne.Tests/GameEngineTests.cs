@@ -508,6 +508,105 @@ public class RosterManagementTests
     }
 }
 
+public class NarrationTemplateTests
+{
+    private static GameState PlayerTurnsState() => new()
+    {
+        Phase             = GamePhase.PlayerTurns,
+        ActivePlayerIndex = 0,
+        DealerHand        = new Hand { Cards = [10], State = HandState.Playing },
+        Players           =
+        [
+            new Player { Name = "Lorah", Bet = "50", Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] },
+        ],
+    };
+
+    [Fact]
+    public void CustomPlayerHit_UsesTemplate()
+    {
+        var t = new NarrationTemplates { PlayerHit = "CUSTOM {name} drew {card}" };
+        var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3), t);
+        Assert.Equal("CUSTOM Lorah drew 3", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void CustomPlayerBust_UsesTemplate()
+    {
+        var t = new NarrationTemplates { PlayerBust = "OUT: {name}" };
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            Players           = [new Player { Name = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7), t);
+        Assert.Equal("OUT: Lorah", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void CustomDealerHit_UsesTemplate()
+    {
+        var t = new NarrationTemplates { DealerHit = "D+{card}={score}" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
+        };
+        var (_, effects) = GameEngine.Apply(state, new AddDealerCard(7), t);
+        Assert.Equal("D+7=17", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void CustomPlayerStand_UsesTemplate()
+    {
+        var t = new NarrationTemplates { PlayerStand = "{name} done ({score})" };
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            Players           = [new Player { Name = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new StandPlayer(0, 0), t);
+        Assert.Equal("Lorah done (17)", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void CustomDealSummaryPrefix_UsesTemplate()
+    {
+        var t = new NarrationTemplates { DealSummaryPrefix = "DEALT: ", DealSummaryDealer = "" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.Deal,
+            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
+            Players    = [new Player { Name = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
+        Assert.StartsWith("DEALT: ", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void CustomPayoutPlayer_UsesTemplate()
+    {
+        var t = new NarrationTemplates { PayoutPlayer = "{name} {result}", PayoutDealerStands = "D" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players    = [new Player { Name = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
+        // effects[0] = dealer line, effects[1] = player line
+        Assert.Equal("Lorah Win", ((SendChat)effects[1]).Text);
+    }
+
+    [Fact]
+    public void NullTemplates_UsesDefaults()
+    {
+        var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3));
+        Assert.Contains("Lorah hits", ((SendChat)effects[0]).Text);
+    }
+}
+
 public class ImmutabilityTests
 {
     [Fact]
