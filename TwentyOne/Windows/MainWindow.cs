@@ -55,6 +55,8 @@ public partial class MainWindow : Window, IDisposable
 
     // pending hit: null = not waiting, IsDealer=true for dealer, otherwise PlayerIndex/HandIndex
     private (bool IsDealer, int PlayerIndex, int HandIndex)? pendingHit;
+    // deferred roll: set by OnChatMessage, applied at the start of the next Draw() to avoid re-entering chat processing
+    private (bool IsDealer, int PlayerIndex, int HandIndex, int Roll)? deferredRoll;
 
     // ── Narration ─────────────────────────────────────────────────────────────
     private readonly List<string> narrationLog = [];
@@ -210,11 +212,9 @@ public partial class MainWindow : Window, IDisposable
 
         var (isDealer, pi, hi) = pendingHit.Value;
         pendingHit = null;
-
-        if (isDealer)
-            AddDealerCard(roll);
-        else
-            AddPlayerCard(pi, hi, roll);
+        // Defer to next Draw() — calling AddCard here would invoke Narrate → SendChatMessage
+        // while the game is still processing this message, corrupting the chat output.
+        deferredRoll = (isDealer, pi, hi, roll);
     }
 
     private void NarratePlayerAction(int pi, int hi, int card)
@@ -584,6 +584,14 @@ public partial class MainWindow : Window, IDisposable
 
     public override void Draw()
     {
+        if (deferredRoll.HasValue)
+        {
+            var (isDealer, pi, hi, roll) = deferredRoll.Value;
+            deferredRoll = null;
+            if (isDealer) AddDealerCard(roll);
+            else AddPlayerCard(pi, hi, roll);
+        }
+
         if (ImGui.SmallButton("Config"))
             configWindow.Toggle();
         ImGui.Separator();
