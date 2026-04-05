@@ -137,11 +137,18 @@ public partial class MainWindow : Window, IDisposable
         uiModule->ProcessChatBoxEntry(&str);
     }
 
+    private void LogRoll(bool isDealer, int playerIndex, int roll)
+    {
+        var who  = isDealer ? "Dealer" : State.Players[playerIndex].Name;
+        config.NarrationLog.Add($"[Roll] {who}: {roll}");
+    }
+
     private void QueueHitRoll(bool isDealer, int playerIndex, int handIndex)
     {
         if (!config.ChatEnabled)
         {
             var simRoll = Random.Shared.Next(1, 14);
+            LogRoll(isDealer, playerIndex, simRoll);
             deferredRoll = (isDealer, playerIndex, handIndex, simRoll);
             return;
         }
@@ -187,6 +194,7 @@ public partial class MainWindow : Window, IDisposable
         if (!int.TryParse(match.Groups[1].Value, out var roll) || roll < 1 || roll > 13) return;
 
         pendingHit   = null;
+        LogRoll(isDealer, pi, roll);
         deferredRoll = (isDealer, pi, hi, roll);
     }
 
