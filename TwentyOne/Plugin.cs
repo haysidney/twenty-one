@@ -37,6 +37,7 @@ public sealed class Plugin : IDalamudPlugin
 
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
+        PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
 
         Log.Information("Twenty One plugin loaded!");
     }
@@ -45,6 +46,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
+        PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
 
         WindowSystem.RemoveAllWindows();
         ConfigWindow.Dispose();
@@ -55,4 +57,5 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCommand(string command, string args) => MainWindow.Toggle();
     public void ToggleMainUi() => MainWindow.Toggle();
+    public void ToggleConfigUi() => ConfigWindow.Toggle();
 }
