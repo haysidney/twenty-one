@@ -75,7 +75,7 @@ public class ConfigWindow : Window, IDisposable
                 config.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Public channels: /say, /yell, /shout");
+                ImGui.SetTooltip("Public channels: /say, /yell, /shout\nThese are rate limited more aggressively than private channels.");
 
             var priv = config.PrivateChatCooldownMs;
             ImGui.SetNextItemWidth(100);
