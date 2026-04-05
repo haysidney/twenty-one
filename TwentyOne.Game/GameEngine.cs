@@ -211,7 +211,7 @@ public static class GameEngine
     {
         var t       = templates ?? new NarrationTemplates();
         var effects = new List<SideEffect>();
-        void Narrate(string text) => effects.Add(new SendChat(text));
+        void Narrate(string text) { if (!string.IsNullOrWhiteSpace(text)) effects.Add(new SendChat(text)); }
 
         switch (action)
         {
