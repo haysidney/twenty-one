@@ -9,5 +9,6 @@
     <Author>HaySidney</Author>
     <Punchline>Run a Blackjack table in your FFXIV venue.</Punchline>
     <Description>Facilitates Blackjack games via Chat. Type /twentyone to open the table.</Description>
+    <Tags>Blackjack;Black Jack;Cards;Dealer;Croupier;Casino;Venue;Game</Tags>
   </PropertyGroup>
 </Project>
