@@ -215,7 +215,7 @@ public class ApplyAddPlayerCardTests
     }
 
     [Fact]
-    public void AddPlayerCard_LastPlayerBusts_TransitionsToDealerTurn()
+    public void AddPlayerCard_LastPlayerBusts_SkipsToPayout()
     {
         var state = new GameState
         {
@@ -223,12 +223,29 @@ public class ApplyAddPlayerCardTests
             ActivePlayerIndex = 0,
             Players =
             [
-                new Player { Name = "Alice", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
+                new Player { Name = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
+            ],
+        };
+        var (newState, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
+        Assert.Equal(GamePhase.Payout, newState.Phase);
+        Assert.Equal(-1, newState.ActivePlayerIndex);
+    }
+
+    [Fact]
+    public void AddPlayerCard_AllBustExceptStanding_TransitionsToDealerTurn()
+    {
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            Players =
+            [
+                new Player { Name = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
+                new Player { Name = "Bekki", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] },
             ],
         };
         var (newState, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
         Assert.Equal(GamePhase.DealerTurn, newState.Phase);
-        Assert.Equal(-1, newState.ActivePlayerIndex);
     }
 
     [Fact]

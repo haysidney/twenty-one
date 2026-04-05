@@ -175,7 +175,9 @@ public static class GameEngine
             if (players[i].Hands[0].State == HandState.Playing)
                 return (i, GamePhase.PlayerTurns);
         }
-        return (-1, GamePhase.DealerTurn);
+        // If every player busted, dealer has nothing to beat — skip to payout.
+        var allBust = players.All(p => p.Hands[0].State == HandState.Bust);
+        return (-1, allBust ? GamePhase.Payout : GamePhase.DealerTurn);
     }
 
     // ── Apply ─────────────────────────────────────────────────────────────────
