@@ -41,7 +41,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly Configuration config;
     private readonly ConfigWindow configWindow;
     private readonly IChatGui chatGui;
-    private readonly IClientState clientState;
+    private readonly IObjectTable objectTable;
     private readonly List<PlayerRow> players = [];
     private string newPlayerName = string.Empty;
     private readonly Hand dealerHand = new();
@@ -63,13 +63,13 @@ public partial class MainWindow : Window, IDisposable
     private bool narrationUseChannelCommand = false;
     private bool narrationPanelOpen = true;
 
-    public MainWindow(Configuration config, ConfigWindow configWindow, IChatGui chatGui, IClientState clientState)
+    public MainWindow(Configuration config, ConfigWindow configWindow, IChatGui chatGui, IObjectTable objectTable)
         : base("Twenty One##TwentyOneMain")
     {
         this.config = config;
         this.configWindow = configWindow;
         this.chatGui = chatGui;
-        this.clientState = clientState;
+        this.objectTable = objectTable;
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(640, 320),
@@ -209,6 +209,10 @@ public partial class MainWindow : Window, IDisposable
         if (pendingHit == null) return;
 
         var (isDealer, pi, hi, isPublic) = pendingHit.Value;
+
+        // For /dice (private channels), verify the sender is the local player
+        if (!isPublic && sender.TextValue != objectTable.LocalPlayer?.Name.TextValue) return;
+
         var msgText = message.TextValue;
         var match = (isPublic ? RandomRollRegex() : DiceRollRegex()).Match(msgText);
         if (!match.Success) return;
