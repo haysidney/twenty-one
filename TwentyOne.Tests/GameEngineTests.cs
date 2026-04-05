@@ -157,12 +157,11 @@ public class ApplyAddDealerCardTests
     }
 
     [Fact]
-    public void AddDealerCard_DealPhase_NarratesDealerCard()
+    public void AddDealerCard_DealPhase_NoNarration()
     {
         var state = new GameState { Phase = GamePhase.Deal };
         var (_, effects) = GameEngine.Apply(state, new AddDealerCard(10));
-        Assert.Single(effects);
-        Assert.Equal("Dealer's Card:", ((SendChat)effects[0]).Text);
+        Assert.Empty(effects);
     }
 
     [Fact]
@@ -250,7 +249,7 @@ public class ApplyAddPlayerCardTests
     }
 
     [Fact]
-    public void AddPlayerCard_DealPhase_FirstCard_NarratesPlayerHand()
+    public void AddPlayerCard_DealPhase_NoNarration()
     {
         var state = new GameState
         {
@@ -259,22 +258,35 @@ public class ApplyAddPlayerCardTests
             Players           = [new Player { Name = "Lorah", Hands = [new Hand()] }],
         };
         var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 5));
+        Assert.Empty(effects);
+        Assert.Equal(GamePhase.Deal, newState.Phase);
+    }
+}
+
+public class ApplyAnnounceTests
+{
+    [Fact]
+    public void AnnounceDealerDeal_EmitsNarrationNoStateChange()
+    {
+        var state = new GameState { Phase = GamePhase.Deal };
+        var (newState, effects) = GameEngine.Apply(state, new AnnounceDealerDeal());
         Assert.Single(effects);
-        Assert.Equal("Lorah's Hand:", ((SendChat)effects[0]).Text);
+        Assert.Equal("Dealer's Card:", ((SendChat)effects[0]).Text);
         Assert.Equal(GamePhase.Deal, newState.Phase);
     }
 
     [Fact]
-    public void AddPlayerCard_DealPhase_SecondCard_NoNarration()
+    public void AnnouncePlayerDeal_EmitsPlayerNameNarration()
     {
         var state = new GameState
         {
-            Phase             = GamePhase.Deal,
-            ActivePlayerIndex = -1,
-            Players           = [new Player { Name = "Lorah", Hands = [new Hand { Cards = [5], State = HandState.Playing }] }],
+            Phase   = GamePhase.Deal,
+            Players = [new Player { Name = "Lorah", Hands = [new Hand()] }],
         };
-        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
-        Assert.Empty(effects);
+        var (newState, effects) = GameEngine.Apply(state, new AnnouncePlayerDeal(0));
+        Assert.Single(effects);
+        Assert.Equal("Lorah's Hand:", ((SendChat)effects[0]).Text);
+        Assert.Equal(GamePhase.Deal, newState.Phase);
     }
 }
 

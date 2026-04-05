@@ -35,7 +35,8 @@ public partial class MainWindow : Window, IDisposable
     // deferred roll: set by OnChatMessage, applied at the start of the next Draw()
     private (bool IsDealer, int PlayerIndex, int HandIndex, int Roll)?      deferredRoll;
     // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
-    private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex)> autoDealQueue = new();
+    // IsFirstCard=true → emit AnnouncePlayerDeal before rolling
+    private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex, bool IsFirstCard)> autoDealQueue = new();
 
     // rate-limited outgoing queue — narration strings and roll commands share a single FIFO and lastChatSent
     // each entry: (IsRoll, Invoke) — narration passes through freely; rolls block until pendingHit is clear
@@ -266,7 +267,10 @@ public partial class MainWindow : Window, IDisposable
             Apply(isDealer ? new AddDealerCard(roll) : new AddPlayerCard(pi, hi, roll));
             // Advance auto-deal if more cards are needed
             if (Phase == GamePhase.Deal && autoDealQueue.TryDequeue(out var next))
+            {
+                if (next.IsFirstCard) Apply(new AnnouncePlayerDeal(next.PlayerIndex));
                 QueueHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
+            }
         }
 
         if (ImGui.SmallButton("Config"))
@@ -546,9 +550,10 @@ public partial class MainWindow : Window, IDisposable
                     // Queue initial cards: dealer first, then each player gets both cards in a pair
                     for (var i = 0; i < State.Players.Count; i++)
                     {
-                        autoDealQueue.Enqueue((false, i, 0));
-                        autoDealQueue.Enqueue((false, i, 0));
+                        autoDealQueue.Enqueue((false, i, 0, true));   // first card — announce
+                        autoDealQueue.Enqueue((false, i, 0, false));  // second card
                     }
+                    Apply(new AnnounceDealerDeal());
                     QueueHitRoll(isDealer: true, -1, -1);
                 }
                 if (!canDeal) ImGui.EndDisabled();

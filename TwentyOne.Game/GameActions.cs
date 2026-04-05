@@ -7,6 +7,10 @@ public record AddDealerCard(int Card) : GameAction;
 public record AddPlayerCard(int PlayerIndex, int HandIndex, int Card) : GameAction;
 public record StandPlayer(int PlayerIndex, int HandIndex) : GameAction;
 
+// Deal announcements (narration only, no state change)
+public record AnnounceDealerDeal : GameAction;
+public record AnnouncePlayerDeal(int PlayerIndex) : GameAction;
+
 // Phase transitions
 public record StartDeal : GameAction;
 public record BeginPlayerTurns : GameAction;

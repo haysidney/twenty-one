@@ -4,8 +4,6 @@
   ProcessChatBoxEntry. This would be cleaner and avoid any unwanted sending bare
   channel commands through the chat box.
 
-- Make the players get dealt their cards in pairs.
-
 - Message before dealing a dealer's card.
 
 - Message before dealing a player's hand.
