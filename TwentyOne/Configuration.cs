@@ -29,7 +29,7 @@ public class GameState
     public int ActivePlayerIndex { get; set; } = -1;
     public BlackjackPayout BjPayout { get; set; } = BlackjackPayout.ThreeToTwo;
     public List<string> NarrationLog { get; set; } = [];
-    public bool NarrationUsePrefix { get; set; } = false;
+    public bool NarrationUseChannelCommand { get; set; } = false;
     public bool NarrationPanelOpen { get; set; } = true;
     public bool ChatEnabled { get; set; } = false;
     public string ChatChannel { get; set; } = "/p";

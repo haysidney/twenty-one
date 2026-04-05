@@ -49,7 +49,7 @@ public class MainWindow : Window, IDisposable
 
     // ── Narration ─────────────────────────────────────────────────────────────
     private readonly List<string> narrationLog = [];
-    private bool narrationUsePrefix = false;
+    private bool narrationUseChannelCommand = false;
     private bool narrationPanelOpen = true;
 
     public MainWindow(Configuration config, ConfigWindow configWindow)
@@ -289,7 +289,7 @@ public class MainWindow : Window, IDisposable
         gs.ActivePlayerIndex = activePlayerIndex;
         gs.BjPayout          = config.GameState.BjPayout;
         gs.NarrationLog       = [..narrationLog];
-        gs.NarrationUsePrefix = narrationUsePrefix;
+        gs.NarrationUseChannelCommand = narrationUseChannelCommand;
         gs.NarrationPanelOpen = narrationPanelOpen;
         // ChatEnabled and ChatChannel are config-only settings, not game state
         config.Save();
@@ -321,7 +321,7 @@ public class MainWindow : Window, IDisposable
         config.GameState.BjPayout = gs.BjPayout;
         narrationLog.Clear();
         narrationLog.AddRange(gs.NarrationLog);
-        narrationUsePrefix    = gs.NarrationUsePrefix;
+        narrationUseChannelCommand    = gs.NarrationUseChannelCommand;
         narrationPanelOpen    = gs.NarrationPanelOpen;
     }
 
@@ -861,7 +861,7 @@ public class MainWindow : Window, IDisposable
         if (ImGui.CollapsingHeader("Chat Narration", ref narrationPanelOpen, ImGuiTreeNodeFlags.DefaultOpen))
         {
             // Channel command toggle
-            if (ImGui.Checkbox("Add channel command", ref narrationUsePrefix)) SaveState();
+            if (ImGui.Checkbox("Add channel command", ref narrationUseChannelCommand)) SaveState();
 
             // Copy All / Clear
             ImGui.SameLine();
@@ -872,7 +872,7 @@ public class MainWindow : Window, IDisposable
                 foreach (var line in narrationLog)
                 {
                     if (sb.Length > 0) sb.Append('\n');
-                    sb.Append(narrationUsePrefix ? config.GameState.ChatChannel + " " + line : line);
+                    sb.Append(narrationUseChannelCommand ? config.GameState.ChatChannel + " " + line : line);
                 }
                 ImGui.SetClipboardText(sb.ToString());
             }
@@ -887,7 +887,7 @@ public class MainWindow : Window, IDisposable
                 for (var ni = narrationLog.Count - 1; ni >= 0; ni--)
                 {
                     var line = narrationLog[ni];
-                    var display = narrationUsePrefix ? config.GameState.ChatChannel + " " + line : line;
+                    var display = narrationUseChannelCommand ? config.GameState.ChatChannel + " " + line : line;
                     ImGui.PushID(ni);
                     if (ImGui.SmallButton("C"))
                         ImGui.SetClipboardText(display);
