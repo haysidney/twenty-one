@@ -77,6 +77,25 @@ public static class GameEngine
         return (val < 17 || (val == 17 && IsSoft(hand.Cards))) ? "HIT" : "STAND";
     }
 
+    public static bool CanGoToPayout(GameState state)
+    {
+        if (state.Phase != GamePhase.DealerTurn) return false;
+
+        var allBJ = state.Players.Count > 0
+                 && state.Players.All(p => p.Hands[0].State == HandState.Blackjack);
+        if (allBJ)
+        {
+            var dc    = state.DealerHand.Cards;
+            var upCard = dc.Count > 0 ? dc[0] : 0;
+            // Dealer can only have BJ if up-card is an ace or ten-value.
+            var couldHaveBJ = upCard == 1 || upCard >= 10;
+            return dc.Count >= 2 || !couldHaveBJ;
+        }
+
+        return DealerRecommendation(state.DealerHand) == "STAND"
+            && state.DealerHand.Cards.Count > 0;
+    }
+
     // ── Payout helpers (public for UI use) ────────────────────────────────────
 
     public static PayoutResult GetPayoutResult(GameState state, int playerIndex)

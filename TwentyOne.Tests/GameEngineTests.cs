@@ -530,3 +530,81 @@ public class ImmutabilityTests
         Assert.Equal(GamePhase.PlayerTurns, state.Phase);
     }
 }
+
+public class CanGoToPayoutTests
+{
+    private static Player BjPlayer(string name) =>
+        new() { Name = name, Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] };
+
+    [Fact]
+    public void AllBJ_DealerUpCardNotTenValue_CanPayout()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            Players    = [BjPlayer("Lorah")],
+            DealerHand = new Hand { Cards = [7] },
+        };
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void AllBJ_DealerUpCardAce_NeedHoleCard()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            Players    = [BjPlayer("Lorah")],
+            DealerHand = new Hand { Cards = [1] },
+        };
+        Assert.False(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void AllBJ_DealerUpCardTenValue_NeedHoleCard()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            Players    = [BjPlayer("Lorah")],
+            DealerHand = new Hand { Cards = [13] },
+        };
+        Assert.False(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void AllBJ_DealerHasTwoCards_CanPayout()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            Players    = [BjPlayer("Lorah")],
+            DealerHand = new Hand { Cards = [1, 10] },
+        };
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void NormalPlay_DealerMustStand_CanPayout()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            Players    = [new Player { Name = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Stand }] }],
+            DealerHand = new Hand { Cards = [10, 8] },
+        };
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void NormalPlay_DealerMustHit_CannotPayout()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            Players    = [new Player { Name = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Stand }] }],
+            DealerHand = new Hand { Cards = [10, 6] },
+        };
+        Assert.False(GameEngine.CanGoToPayout(state));
+    }
+}

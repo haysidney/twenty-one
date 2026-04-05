@@ -534,9 +534,7 @@ public partial class MainWindow : Window, IDisposable
                 break;
 
             case GamePhase.DealerTurn:
-                var allBJ     = State.Players.Count > 0
-                             && State.Players.TrueForAll(p => p.Hands[0].State == HandState.Blackjack);
-                var canPayout = allBJ || (dealerShouldStop && State.DealerHand.Cards.Count > 0);
+                var canPayout = GameEngine.CanGoToPayout(State);
                 if (!canPayout) ImGui.BeginDisabled();
                 if (ImGui.Button("Go to Payout →")) Apply(new GoToPayout());
                 if (!canPayout) ImGui.EndDisabled();
