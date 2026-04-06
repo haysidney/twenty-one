@@ -18,17 +18,20 @@ public class Hand
 [Serializable]
 public class Player
 {
-    public string Name { get; set; } = string.Empty;
+    // For manual players: their name. For FFXIV players: their nickname (may be empty).
+    public string Nickname { get; set; } = string.Empty;
     // Set for players added via right-click; empty for manually-entered players.
     public string FullName { get; set; } = string.Empty;
     public string World { get; set; } = string.Empty;
     public string Bet { get; set; } = string.Empty;
     public List<Hand> Hands { get; set; } = [];
 
-    // First name for display; falls back to Name for manually-entered players.
-    public string DisplayName => FullName.Length > 0
-        ? FullName.Split(' ')[0]
-        : Name;
+    // Nickname if set; else first name from FullName; else Nickname (empty for edge cases).
+    public string DisplayName => Nickname.Length > 0
+        ? Nickname
+        : FullName.Length > 0
+            ? FullName.Split(' ')[0]
+            : Nickname;
 }
 
 [Serializable]

@@ -160,9 +160,11 @@ public static class GameEngine
     private static Player WithHand(Player player, int hi, Hand newHand) =>
         new Player
         {
-            Name  = player.Name,
-            Bet   = player.Bet,
-            Hands = player.Hands.Select((h, i) => i == hi ? newHand : h).ToList()
+            Nickname = player.Nickname,
+            FullName = player.FullName,
+            World    = player.World,
+            Bet      = player.Bet,
+            Hands    = player.Hands.Select((h, i) => i == hi ? newHand : h).ToList()
         };
 
     private static List<Player> WithPlayer(List<Player> players, int pi, Player newPlayer) =>
@@ -229,7 +231,7 @@ public static class GameEngine
             var hand = players[pi].Hands[0];
             var actions = ValidActionsString(hand);
             Narrate(NarrationTemplates.Fmt(t.PlayerTurnStart,
-                ("name",        players[pi].Name),
+                ("name",        players[pi].DisplayName),
                 ("dealerCards", HandString(dealerHand.Cards)),
                 ("dealerScore", ScoreString(dealerHand.Cards)),
                 ("actions",     actions)));
@@ -273,7 +275,7 @@ public static class GameEngine
 
                 if (state.Phase == GamePhase.PlayerTurns)
                 {
-                    var name    = state.Players[pi].Name;
+                    var name    = state.Players[pi].DisplayName;
                     var cards   = HandString(newHand.Cards);
                     var score   = ScoreString(newHand.Cards);
                     var cardLbl = CardLabel(a.Card);
@@ -322,7 +324,7 @@ public static class GameEngine
                 if (state.Phase == GamePhase.PlayerTurns)
                 {
                     Narrate(NarrationTemplates.Fmt(t.PlayerStand,
-                        ("name", state.Players[pi].Name),
+                        ("name", state.Players[pi].DisplayName),
                         ("cards", HandString(hand.Cards)),
                         ("score", ScoreString(hand.Cards))));
 
@@ -349,7 +351,7 @@ public static class GameEngine
                 return (state, effects);
 
             case AnnouncePlayerDeal a:
-                Narrate(NarrationTemplates.Fmt(t.DealPlayerHand, ("name", state.Players[a.PlayerIndex].Name)));
+                Narrate(NarrationTemplates.Fmt(t.DealPlayerHand, ("name", state.Players[a.PlayerIndex].DisplayName)));
                 return (state, effects);
 
             // ── StartDeal ────────────────────────────────────────────────────
@@ -366,7 +368,7 @@ public static class GameEngine
                     var p    = state.Players[i];
                     var hand = p.Hands[0];
                     sb.Append(NarrationTemplates.Fmt(t.DealSummaryPlayer,
-                        ("name",  p.Name),
+                        ("name",  p.DisplayName),
                         ("cards", HandString(hand.Cards)),
                         ("score", ScoreString(hand.Cards)),
                         ("bj",    hand.State == HandState.Blackjack ? " BJ!" : string.Empty)));
@@ -411,7 +413,7 @@ public static class GameEngine
                                        : $" (bet: {state.Players[i].Bet})";
                     var amountStr = amount.Length > 0 ? $" {amount}" : string.Empty;
                     Narrate(NarrationTemplates.Fmt(t.PayoutPlayer,
-                        ("name",   state.Players[i].Name),
+                        ("name",   state.Players[i].DisplayName),
                         ("result", label),
                         ("bet",    betStr),
                         ("amount", amountStr)));
@@ -426,9 +428,11 @@ public static class GameEngine
                 {
                     Players = state.Players.Select(p => new Player
                     {
-                        Name  = p.Name,
-                        Bet   = p.Bet,
-                        Hands = [new Hand()],
+                        Nickname = p.Nickname,
+                        FullName = p.FullName,
+                        World    = p.World,
+                        Bet      = p.Bet,
+                        Hands    = [new Hand()],
                     }).ToList(),
                     DealerHand        = new Hand(),
                     Phase             = GamePhase.Betting,
@@ -439,7 +443,7 @@ public static class GameEngine
             // ── Roster management ────────────────────────────────────────────
             case AddPlayer a:
                 return (With(state, players:
-                    [..state.Players, new Player { Name = a.Name, FullName = a.FullName, World = a.World, Hands = [new Hand()] }]), effects);
+                    [..state.Players, new Player { Nickname = a.Nickname, FullName = a.FullName, World = a.World, Hands = [new Hand()] }]), effects);
 
             case RemovePlayer a:
             {
@@ -454,14 +458,14 @@ public static class GameEngine
             {
                 var p = state.Players[a.PlayerIndex];
                 return (With(state, players: WithPlayer(state.Players, a.PlayerIndex,
-                    new Player { Name = p.Name, Bet = a.Bet, Hands = p.Hands })), effects);
+                    new Player { Nickname = p.Nickname, FullName = p.FullName, World = p.World, Bet = a.Bet, Hands = p.Hands })), effects);
             }
 
             case RenamePlayer a:
             {
                 var p = state.Players[a.PlayerIndex];
                 return (With(state, players: WithPlayer(state.Players, a.PlayerIndex,
-                    new Player { Name = a.Name, Bet = p.Bet, Hands = p.Hands })), effects);
+                    new Player { Nickname = a.Nickname, FullName = p.FullName, World = p.World, Bet = p.Bet, Hands = p.Hands })), effects);
             }
 
             default:

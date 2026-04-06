@@ -77,8 +77,7 @@ public partial class MainWindow : Window, IDisposable
     // Called from Plugin.OnMenuOpened (runs on framework thread via context menu callback).
     public void AddPlayerFromContext(string fullName, string world)
     {
-        var firstName = fullName.Split(' ')[0];
-        Apply(new AddPlayer(firstName, fullName, world));
+        Apply(new AddPlayer(Nickname: "", FullName: fullName, World: world));
     }
 
     // ── Apply / Undo ──────────────────────────────────────────────────────────
@@ -148,7 +147,7 @@ public partial class MainWindow : Window, IDisposable
 
     private void LogRoll(bool isDealer, int playerIndex, int roll)
     {
-        var who  = isDealer ? "Dealer" : State.Players[playerIndex].Name;
+        var who  = isDealer ? "Dealer" : State.Players[playerIndex].DisplayName;
         config.NarrationLog.Add($"[Roll] {who}: {roll}");
     }
 
@@ -387,18 +386,19 @@ public partial class MainWindow : Window, IDisposable
                 ImGui.TableSetColumnIndex(0);
                 if (renamingIndex == i)
                 {
-                    ImGui.SetNextItemWidth(-1);
-                    if (ImGui.InputText($"##rename{i}", ref renamingBuffer, 64,
-                            ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll))
+                    var okW = ImGui.CalcTextSize("OK").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+                    ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - okW);
+                    var submitted = ImGui.InputText($"##rename{i}", ref renamingBuffer, 64,
+                        ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll);
+                    ImGui.SameLine();
+                    var canConfirm = renamingBuffer.Length > 0 || p.World.Length > 0;
+                    if (!canConfirm) ImGui.BeginDisabled();
+                    if (ImGui.SmallButton($"OK##{i}ok") || submitted)
                     {
-                        if (renamingBuffer.Length > 0) Apply(new RenamePlayer(i, renamingBuffer));
+                        if (canConfirm) Apply(new RenamePlayer(i, renamingBuffer));
                         renamingIndex = -1;
                     }
-                    if (!ImGui.IsItemActive() && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                    {
-                        if (renamingBuffer.Length > 0) Apply(new RenamePlayer(i, renamingBuffer));
-                        renamingIndex = -1;
-                    }
+                    if (!canConfirm) ImGui.EndDisabled();
                 }
                 else
                 {
@@ -411,21 +411,33 @@ public partial class MainWindow : Window, IDisposable
                         if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                         {
                             renamingIndex  = i;
-                            renamingBuffer = p.Name;
+                            renamingBuffer = p.Nickname;
                         }
                     }
 
-                    var hasWorld = p.World.Length > 0;
-                    var targetW  = hasWorld ? ImGui.CalcTextSize("@").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
+                    var hasWorld    = p.World.Length > 0;
+                    var hasNickname = p.Nickname.Length > 0;
+                    var clearW   = hasWorld && hasNickname
+                        ? ImGui.CalcTextSize("Clear").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
+                    var targetW  = hasWorld
+                        ? ImGui.CalcTextSize("@").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
                     var renameW  = ImGui.CalcTextSize("Rename").X + ImGui.GetStyle().FramePadding.X * 2;
-                    ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - targetW
+                    ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - clearW - targetW
                                    - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
                     if (ImGui.SmallButton($"Rename##{i}rename"))
                     {
                         renamingIndex  = i;
-                        renamingBuffer = p.Name;
+                        renamingBuffer = p.Nickname;
                     }
                     if (ImGui.IsItemHovered()) ImGui.SetTooltip("Rename"u8);
+
+                    if (hasWorld && hasNickname)
+                    {
+                        ImGui.SameLine();
+                        if (ImGui.SmallButton($"Clear##{i}clear"))
+                            Apply(new RenamePlayer(i, ""));
+                        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Clear nickname"u8);
+                    }
 
                     if (hasWorld)
                     {
@@ -535,7 +547,7 @@ public partial class MainWindow : Window, IDisposable
             if (!canAdd) ImGui.BeginDisabled();
             if (ImGui.Button("Add Player") || (nameSubmitted && canAdd))
             {
-                Apply(new AddPlayer(newPlayerName));
+                Apply(new AddPlayer(Nickname: newPlayerName));
                 newPlayerName = string.Empty;
             }
             if (!canAdd) ImGui.EndDisabled();
