@@ -218,7 +218,11 @@ public static class GameEngine
     {
         var t       = templates ?? new NarrationTemplates();
         var effects = new List<SideEffect>();
-        void Narrate(string text) { if (!string.IsNullOrWhiteSpace(text)) effects.Add(new SendChat(text)); }
+        void Narrate(string text)
+        {
+            foreach (var part in text.Split("{|}"))
+                if (!string.IsNullOrWhiteSpace(part)) effects.Add(new SendChat(part.Trim()));
+        }
         void NarratePlayerTurn(int pi, List<Player> players, Hand dealerHand)
         {
             if (pi < 0 || pi >= players.Count) return;

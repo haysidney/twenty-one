@@ -33,6 +33,7 @@ public class NarrationTemplates
     // {bet} = " (bet: 100)" or ""; {amount} = " +150" or ""
     public string PayoutPlayer { get; set; } = "{name}: {result}{bet}{amount}";
 
+    /// Use <c>{|}</c> in any template to split the output into multiple chat messages.
     public static string Fmt(string template, params (string Key, string Value)[] vars)
     {
         foreach (var (k, v) in vars)
