@@ -424,6 +424,15 @@ public partial class MainWindow : Window, IDisposable
                     var renameW  = ImGui.CalcTextSize("Rename").X + ImGui.GetStyle().FramePadding.X * 2;
                     ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - clearW - targetW
                                    - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
+
+                    if (hasWorld)
+                    {
+                        if (ImGui.SmallButton($"@##{i}target"))
+                            Plugin.TargetPlayer(p.FullName, p.World);
+                        if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Target {p.FullName}@{p.World}");
+                        ImGui.SameLine();
+                    }
+
                     if (ImGui.SmallButton($"Rename##{i}rename"))
                     {
                         renamingIndex  = i;
@@ -437,14 +446,6 @@ public partial class MainWindow : Window, IDisposable
                         if (ImGui.SmallButton($"Clear##{i}clear"))
                             Apply(new RenamePlayer(i, ""));
                         if (ImGui.IsItemHovered()) ImGui.SetTooltip("Clear nickname"u8);
-                    }
-
-                    if (hasWorld)
-                    {
-                        ImGui.SameLine();
-                        if (ImGui.SmallButton($"@##{i}target"))
-                            Plugin.TargetPlayer(p.FullName, p.World);
-                        if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Target {p.FullName}@{p.World}");
                     }
                 }
 
