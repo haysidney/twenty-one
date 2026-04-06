@@ -373,7 +373,12 @@ public static class GameEngine
                         {
                             (newActivePi, newActiveHi, newPhase) = AdvanceFrom(pi, hi, newPlayers);
                             if (newPhase == GamePhase.PlayerTurns)
-                                NarratePlayerTurn(newActivePi, newActiveHi, newPlayers, state.DealerHand);
+                            {
+                                if (newPlayers[newActivePi].Hands[newActiveHi].Cards.Count == 1)
+                                    effects.Add(new AutoHit(newActivePi, newActiveHi));
+                                else
+                                    NarratePlayerTurn(newActivePi, newActiveHi, newPlayers, state.DealerHand);
+                            }
                         }
                         else if (prevCardCount == 1)
                         {
@@ -461,7 +466,7 @@ public static class GameEngine
                 var newPlayers = WithPlayer(state.Players, pi, newPlayer);
                 var name       = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
                 Narrate(NarrationTemplates.Fmt(t.PlayerSplit, ("name", name)));
-                // Active stays at (pi, hi) — the first split hand. UI will auto-hit the 1-card hand.
+                effects.Add(new AutoHit(pi, hi));
                 return (With(state, players: newPlayers, activePlayerIndex: pi, activeHandIndex: hi), effects);
             }
 

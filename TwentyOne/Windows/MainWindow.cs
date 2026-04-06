@@ -120,6 +120,10 @@ public partial class MainWindow : Window, IDisposable
                     chatQueue.Enqueue((false, () => SendChatMessage(msg)));
                 }
             }
+            else if (effect is AutoHit ah)
+            {
+                QueueHitRoll(isDealer: false, ah.PlayerIndex, ah.HandIndex);
+            }
         }
 
         config.Save();
@@ -301,18 +305,6 @@ public partial class MainWindow : Window, IDisposable
                 if (next.IsFirstCard) Apply(new AnnouncePlayerDeal(next.PlayerIndex));
                 QueueHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
             }
-        }
-
-        // Auto-hit 1-card split hands during PlayerTurns (mandatory 2nd card before the player acts).
-        if (Phase == GamePhase.PlayerTurns
-            && ActivePlayerIndex >= 0 && ActiveHandIndex >= 0
-            && ActivePlayerIndex < State.Players.Count
-            && ActiveHandIndex < State.Players[ActivePlayerIndex].Hands.Count
-            && State.Players[ActivePlayerIndex].Hands[ActiveHandIndex].Cards.Count == 1
-            && pendingHit == null && !deferredRoll.HasValue && chatQueue.Count == 0
-            && !pendingDouble.HasValue && !pendingSplit.HasValue)
-        {
-            QueueHitRoll(isDealer: false, ActivePlayerIndex, ActiveHandIndex);
         }
 
         if (ImGui.SmallButton("Config"))

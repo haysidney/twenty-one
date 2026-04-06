@@ -933,8 +933,8 @@ public class SplitHandTests
     public void SplitHand_NarratesSplit()
     {
         var (_, effects) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0));
-        Assert.Single(effects);
-        Assert.Contains("splits", ((SendChat)effects[0]).Text.ToLower());
+        Assert.Contains(effects, e => e is SendChat c && c.Text.ToLower().Contains("splits"));
+        Assert.Contains(effects, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 0);
     }
 
     [Fact]
