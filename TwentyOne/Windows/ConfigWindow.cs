@@ -67,22 +67,28 @@ public class ConfigWindow : Window, IDisposable
                 config.Save();
             }
 
-            var pub = config.PublicChatCooldownMs;
-            ImGui.SetNextItemWidth(100);
-            if (ImGui.InputInt("Time between public channel messages (ms)##pubCooldown", ref pub, 100))
+            var isPublic = currentChannel is "/say" or "/yell" or "/shout";
+            if (isPublic)
             {
-                config.PublicChatCooldownMs = Math.Clamp(pub, 100, 10000);
-                config.Save();
+                var pub = config.PublicChatCooldownMs;
+                ImGui.SetNextItemWidth(100);
+                if (ImGui.InputInt("Time between messages (ms)##pubCooldown", ref pub, 100))
+                {
+                    config.PublicChatCooldownMs = Math.Clamp(pub, 100, 10000);
+                    config.Save();
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Public channels: /say, /yell, /shout\nThese are rate limited more aggressively than private channels.");
             }
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Public channels: /say, /yell, /shout\nThese are rate limited more aggressively than private channels.");
-
-            var priv = config.PrivateChatCooldownMs;
-            ImGui.SetNextItemWidth(100);
-            if (ImGui.InputInt("Time between private channel messages (ms)##privCooldown", ref priv, 100))
+            else
             {
-                config.PrivateChatCooldownMs = Math.Clamp(priv, 100, 10000);
-                config.Save();
+                var priv = config.PrivateChatCooldownMs;
+                ImGui.SetNextItemWidth(100);
+                if (ImGui.InputInt("Time between messages (ms)##privCooldown", ref priv, 100))
+                {
+                    config.PrivateChatCooldownMs = Math.Clamp(priv, 100, 10000);
+                    config.Save();
+                }
             }
         }
 
