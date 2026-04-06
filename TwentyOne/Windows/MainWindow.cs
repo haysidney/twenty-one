@@ -418,10 +418,10 @@ public partial class MainWindow : Window, IDisposable
                     var hasWorld    = p.World.Length > 0;
                     var hasNickname = p.Nickname.Length > 0;
                     var clearW   = hasWorld && hasNickname
-                        ? ImGui.CalcTextSize("Clear").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
+                        ? ImGui.CalcTextSize("C").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
                     var targetW  = hasWorld
                         ? ImGui.CalcTextSize("@").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
-                    var renameW  = ImGui.CalcTextSize("Rename").X + ImGui.GetStyle().FramePadding.X * 2;
+                    var renameW  = ImGui.CalcTextSize("R").X + ImGui.GetStyle().FramePadding.X * 2;
                     ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - clearW - targetW
                                    - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
 
@@ -433,7 +433,7 @@ public partial class MainWindow : Window, IDisposable
                         ImGui.SameLine();
                     }
 
-                    if (ImGui.SmallButton($"Rename##{i}rename"))
+                    if (ImGui.SmallButton($"R##{i}rename"))
                     {
                         renamingIndex  = i;
                         renamingBuffer = p.Nickname;
@@ -443,7 +443,7 @@ public partial class MainWindow : Window, IDisposable
                     if (hasWorld && hasNickname)
                     {
                         ImGui.SameLine();
-                        if (ImGui.SmallButton($"Clear##{i}clear"))
+                        if (ImGui.SmallButton($"C##{i}clear"))
                             Apply(new RenamePlayer(i, ""));
                         if (ImGui.IsItemHovered()) ImGui.SetTooltip("Clear nickname"u8);
                     }
