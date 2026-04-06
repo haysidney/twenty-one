@@ -19,8 +19,16 @@ public class Hand
 public class Player
 {
     public string Name { get; set; } = string.Empty;
+    // Set for players added via right-click; empty for manually-entered players.
+    public string FullName { get; set; } = string.Empty;
+    public string World { get; set; } = string.Empty;
     public string Bet { get; set; } = string.Empty;
     public List<Hand> Hands { get; set; } = [];
+
+    // First name for display; falls back to Name for manually-entered players.
+    public string DisplayName => FullName.Length > 0
+        ? FullName.Split(' ')[0]
+        : Name;
 }
 
 [Serializable]

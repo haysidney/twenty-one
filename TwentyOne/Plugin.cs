@@ -1,8 +1,12 @@
+using System.Linq;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Command;
+using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
+using TwentyOne.Game;
 using TwentyOne.Windows;
 
 namespace TwentyOne;
@@ -14,6 +18,8 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
+    [PluginService] internal static ITargetManager TargetManager { get; private set; } = null!;
+    [PluginService] internal static IContextMenu ContextMenu { get; private set; } = null!;
 
     private const string CommandName = "/twentyone";
 
@@ -28,7 +34,8 @@ public sealed class Plugin : IDalamudPlugin
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         ConfigWindow = new ConfigWindow(Configuration);
-        MainWindow = new MainWindow(Configuration, ConfigWindow, ChatGui, ObjectTable);
+        MainWindow = new MainWindow(Configuration, ConfigWindow, ChatGui, ObjectTable, TargetManager);
+        ContextMenu.OnMenuOpened += OnMenuOpened;
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(MainWindow);
 
@@ -44,11 +51,57 @@ public sealed class Plugin : IDalamudPlugin
         Log.Information("Twenty One plugin loaded!");
     }
 
+    private void OnMenuOpened(IMenuOpenedArgs args)
+    {
+        if (args.MenuType != ContextMenuType.Default) return;
+        if (args.Target is not MenuTargetDefault target) return;
+        if (Phase != GamePhase.Betting) return;
+
+        string name, world;
+        if (args.AddonName == "Social" && target.TargetCharacter is { } character)
+        {
+            name  = character.Name;
+            world = character.HomeWorld.Value.Name.ToString();
+        }
+        else if (target.TargetHomeWorld.RowId != 0)
+        {
+            name  = target.TargetName;
+            world = target.TargetHomeWorld.Value.Name.ToString();
+        }
+        else return;
+
+        if (Configuration.GameState.Players.Any(p => p.FullName == name && p.World == world)) return;
+
+        args.AddMenuItem(new MenuItem
+        {
+            Name = "Add to Blackjack Table",
+            OnClicked = _ => MainWindow.AddPlayerFromContext(name, world)
+        });
+    }
+
+    private GamePhase Phase => Configuration.GameState.Phase;
+
+    public static bool TargetPlayer(string fullName, string world)
+    {
+        foreach (var obj in ObjectTable.PlayerObjects)
+        {
+            if (obj is IPlayerCharacter player &&
+                player.Name.TextValue == fullName &&
+                player.HomeWorld.Value.Name.ToString() == world)
+            {
+                TargetManager.Target = player;
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void Dispose()
     {
         PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
+        ContextMenu.OnMenuOpened -= OnMenuOpened;
 
         WindowSystem.RemoveAllWindows();
         ConfigWindow.Dispose();

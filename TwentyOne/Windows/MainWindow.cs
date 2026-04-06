@@ -22,6 +22,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly ConfigWindow  configWindow;
     private readonly IChatGui      chatGui;
     private readonly IObjectTable  objectTable;
+    private readonly ITargetManager targetManager;
 
     // Betting-phase UI state
     private string newPlayerName  = string.Empty;
@@ -52,13 +53,14 @@ public partial class MainWindow : Window, IDisposable
     // ── Constructor / Dispose ─────────────────────────────────────────────────
 
     public MainWindow(Configuration config, ConfigWindow configWindow,
-                      IChatGui chatGui, IObjectTable objectTable)
+                      IChatGui chatGui, IObjectTable objectTable, ITargetManager targetManager)
         : base("Twenty One##TwentyOneMain")
     {
-        this.config       = config;
-        this.configWindow = configWindow;
-        this.chatGui      = chatGui;
-        this.objectTable  = objectTable;
+        this.config         = config;
+        this.configWindow   = configWindow;
+        this.chatGui        = chatGui;
+        this.objectTable    = objectTable;
+        this.targetManager  = targetManager;
         SizeConstraints   = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(640, 320),
@@ -70,6 +72,13 @@ public partial class MainWindow : Window, IDisposable
     public void Dispose()
     {
         chatGui.ChatMessage -= OnChatMessage;
+    }
+
+    // Called from Plugin.OnMenuOpened (runs on framework thread via context menu callback).
+    public void AddPlayerFromContext(string fullName, string world)
+    {
+        var firstName = fullName.Split(' ')[0];
+        Apply(new AddPlayer(firstName, fullName, world));
     }
 
     // ── Apply / Undo ──────────────────────────────────────────────────────────
@@ -394,14 +403,22 @@ public partial class MainWindow : Window, IDisposable
                 else
                 {
                     ImGui.AlignTextToFramePadding();
-                    ImGui.Text(p.Name);
-                    if (ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                    ImGui.Text(p.DisplayName);
+                    if (ImGui.IsItemHovered())
                     {
-                        renamingIndex  = i;
-                        renamingBuffer = p.Name;
+                        if (p.World.Length > 0)
+                            ImGui.SetTooltip($"{p.FullName}@{p.World}");
+                        if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                        {
+                            renamingIndex  = i;
+                            renamingBuffer = p.Name;
+                        }
                     }
-                    var renameW = ImGui.CalcTextSize("Rename").X + ImGui.GetStyle().FramePadding.X * 2;
-                    ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW
+
+                    var hasWorld = p.World.Length > 0;
+                    var targetW  = hasWorld ? ImGui.CalcTextSize("@").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
+                    var renameW  = ImGui.CalcTextSize("Rename").X + ImGui.GetStyle().FramePadding.X * 2;
+                    ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - targetW
                                    - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
                     if (ImGui.SmallButton($"Rename##{i}rename"))
                     {
@@ -409,6 +426,14 @@ public partial class MainWindow : Window, IDisposable
                         renamingBuffer = p.Name;
                     }
                     if (ImGui.IsItemHovered()) ImGui.SetTooltip("Rename"u8);
+
+                    if (hasWorld)
+                    {
+                        ImGui.SameLine();
+                        if (ImGui.SmallButton($"@##{i}target"))
+                            Plugin.TargetPlayer(p.FullName, p.World);
+                        if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Target {p.FullName}@{p.World}");
+                    }
                 }
 
                 // Bet — editable only in Betting phase; buffer in betEdits to avoid per-keystroke Apply
@@ -531,7 +556,7 @@ public partial class MainWindow : Window, IDisposable
             GamePhase.Betting     => "Phase: Betting",
             GamePhase.Deal        => $"Phase: Deal{dealProgress}",
             GamePhase.PlayerTurns => ActivePlayerIndex >= 0 && ActivePlayerIndex < State.Players.Count
-                ? $"Phase: Player Actions  ({State.Players[ActivePlayerIndex].Name}'s turn — Hit, Stand, Double, Split)"
+                ? $"Phase: Player Actions  ({State.Players[ActivePlayerIndex].DisplayName}'s turn — Hit, Stand, Double, Split)"
                 : "Phase: Player Actions",
             GamePhase.DealerTurn  => "Phase: Dealer Turn",
             GamePhase.Payout      => "Phase: Payout",

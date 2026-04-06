@@ -21,7 +21,7 @@ public record GoToPayout : GameAction;
 public record NewRound : GameAction;
 
 // Roster management (Betting phase only)
-public record AddPlayer(string Name) : GameAction;
+public record AddPlayer(string Name, string FullName = "", string World = "") : GameAction;
 public record RemovePlayer(int Index) : GameAction;
 public record SetPlayerBet(int PlayerIndex, string Bet) : GameAction;
 public record RenamePlayer(int PlayerIndex, string Name) : GameAction;

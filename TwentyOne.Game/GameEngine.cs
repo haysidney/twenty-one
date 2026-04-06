@@ -439,7 +439,7 @@ public static class GameEngine
             // ── Roster management ────────────────────────────────────────────
             case AddPlayer a:
                 return (With(state, players:
-                    [..state.Players, new Player { Name = a.Name, Hands = [new Hand()] }]), effects);
+                    [..state.Players, new Player { Name = a.Name, FullName = a.FullName, World = a.World, Hands = [new Hand()] }]), effects);
 
             case RemovePlayer a:
             {
