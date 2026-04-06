@@ -103,21 +103,27 @@ public sealed class Plugin : IDalamudPlugin
     public static void TradePlayer(string fullName, string world)
     {
         uint entityId = 0;
+        bool alreadyTargeted = false;
         foreach (var obj in ObjectTable.PlayerObjects)
         {
             if (obj is IPlayerCharacter player &&
                 player.Name.TextValue == fullName &&
                 player.HomeWorld.Value.Name.ToString() == world)
             {
-                TargetManager.Target = player;
+                alreadyTargeted = TargetManager.Target?.EntityId == player.EntityId;
+                if (!alreadyTargeted)
+                    TargetManager.Target = player;
                 entityId = player.EntityId;
                 break;
             }
         }
         if (entityId == 0) return;
 
-        Task.Delay(1000).ContinueWith(_ =>
-            Framework.RunOnFrameworkThread(OpenTrade(entityId)));
+        if (alreadyTargeted)
+            Framework.RunOnFrameworkThread(OpenTrade(entityId));
+        else
+            Task.Delay(1000).ContinueWith(_ =>
+                Framework.RunOnFrameworkThread(OpenTrade(entityId)));
     }
 
     private static unsafe Action OpenTrade(uint entityId) => () =>
