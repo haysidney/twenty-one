@@ -226,10 +226,8 @@ public partial class MainWindow : Window, IDisposable
         return Phase switch
         {
             GamePhase.Deal        => hand.State == HandState.Playing && hand.Cards.Count < 2,
-            // During PlayerTurns: manual Hit only allowed on the active hand with ≥2 cards
-            // (1-card split hands are auto-hit in Draw(); no manual button shown).
             GamePhase.PlayerTurns => pi == ActivePlayerIndex && hi == ActiveHandIndex
-                                  && hand.State == HandState.Playing && hand.Cards.Count >= 2
+                                  && GameEngine.CanHit(hand)
                                   && !pendingDouble.HasValue && !pendingSplit.HasValue,
             _ => false,
         };
@@ -327,10 +325,7 @@ public partial class MainWindow : Window, IDisposable
 
         ImGui.Separator();
 
-        var dealerShouldStop = GameEngine.DealerRecommendation(State.DealerHand) == "STAND"
-                            || GameEngine.HandValue(State.DealerHand.Cards) > 21;
-        var dealerHitActive  = (Phase == GamePhase.Deal && State.DealerHand.Cards.Count < 1)
-                            || (Phase == GamePhase.DealerTurn && !dealerShouldStop);
+        var dealerHitActive = GameEngine.CanHitDealer(State);
 
         // ── Dealer section ────────────────────────────────────────────────────
         ImGui.Text("-- Dealer --");
@@ -589,7 +584,7 @@ public partial class MainWindow : Window, IDisposable
                     {
                         var canStand = !hasAnyPending && Phase == GamePhase.PlayerTurns
                                     && pi == ActivePlayerIndex && hi == ActiveHandIndex
-                                    && hand.State == HandState.Playing && hand.Cards.Count >= 2;
+                                    && GameEngine.CanHit(hand);
                         if (!canStand) ImGui.BeginDisabled();
                         if (ImGui.SmallButton($"Stand##{pi}_{hi}")) Apply(new StandPlayer(pi, hi));
                         if (!canStand) ImGui.EndDisabled();
@@ -739,9 +734,7 @@ public partial class MainWindow : Window, IDisposable
                 break;
 
             case GamePhase.Deal:
-                var dealDone = State.DealerHand.Cards.Count >= 1
-                            && State.Players.Count > 0
-                            && State.Players.TrueForAll(p => p.Hands.Count > 0 && p.Hands[0].Cards.Count >= 2);
+                var dealDone = GameEngine.IsDealComplete(State);
                 if (!dealDone) ImGui.BeginDisabled();
                 if (ImGui.Button("Begin Player Turns →")) Apply(new BeginPlayerTurns());
                 if (!dealDone) ImGui.EndDisabled();

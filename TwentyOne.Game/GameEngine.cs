@@ -116,6 +116,23 @@ public static class GameEngine
         hand.Cards.Count == 2 && hand.State == HandState.Playing
         && CardValue(hand.Cards[0]) == CardValue(hand.Cards[1]);
 
+    // Hit is allowed on a Playing hand that already has ≥2 cards (1-card split hands are auto-hit).
+    public static bool CanHit(Hand hand) =>
+        hand.State == HandState.Playing && hand.Cards.Count >= 2;
+
+    // Deal phase is complete when the dealer has ≥1 card and every player's first hand has ≥2 cards.
+    public static bool IsDealComplete(GameState state) =>
+        state.DealerHand.Cards.Count >= 1
+        && state.Players.Count > 0
+        && state.Players.TrueForAll(p => p.Hands.Count > 0 && p.Hands[0].Cards.Count >= 2);
+
+    // Dealer may receive a card during Deal (exactly 1 card; 0 so far) or during DealerTurn (must hit).
+    public static bool CanHitDealer(GameState state) =>
+        (state.Phase == GamePhase.Deal && state.DealerHand.Cards.Count < 1)
+        || (state.Phase == GamePhase.DealerTurn
+            && DealerRecommendation(state.DealerHand) == "HIT"
+            && GameEngine.HandValue(state.DealerHand.Cards) <= 21);
+
     public static string ValidActionsString(Hand hand, bool canDouble, bool canSplit)
     {
         if (hand.State != HandState.Playing) return string.Empty;

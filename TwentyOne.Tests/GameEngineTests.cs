@@ -1130,6 +1130,110 @@ public class SplitHandTests
     }
 
     [Fact]
+    public void CanHit_TrueForPlayingHandWith2PlusCards()
+    {
+        var hand = new Hand { Cards = [5, 7], State = HandState.Playing };
+        Assert.True(GameEngine.CanHit(hand));
+    }
+
+    [Fact]
+    public void CanHit_FalseFor1CardSplitHand()
+    {
+        var hand = new Hand { Cards = [8], State = HandState.Playing, IsFromSplit = true };
+        Assert.False(GameEngine.CanHit(hand));
+    }
+
+    [Fact]
+    public void CanHit_FalseForStandHand()
+    {
+        var hand = new Hand { Cards = [5, 7, 3], State = HandState.Stand };
+        Assert.False(GameEngine.CanHit(hand));
+    }
+
+    [Fact]
+    public void IsDealComplete_TrueWhenDealerHas1AndPlayersHave2()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.Deal,
+            DealerHand = new Hand { Cards = [10] },
+            Players    =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 9] }] },
+                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [3, 8] }] },
+            ],
+        };
+        Assert.True(GameEngine.IsDealComplete(state));
+    }
+
+    [Fact]
+    public void IsDealComplete_FalseWhenPlayerMissingSecondCard()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.Deal,
+            DealerHand = new Hand { Cards = [10] },
+            Players    =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5] }] },
+            ],
+        };
+        Assert.False(GameEngine.IsDealComplete(state));
+    }
+
+    [Fact]
+    public void IsDealComplete_FalseWhenDealerHasNoCard()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.Deal,
+            DealerHand = new Hand { Cards = [] },
+            Players    =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 9] }] },
+            ],
+        };
+        Assert.False(GameEngine.IsDealComplete(state));
+    }
+
+    [Fact]
+    public void CanHitDealer_TrueDuringDealWithNoDealerCard()
+    {
+        var state = new GameState { Phase = GamePhase.Deal, DealerHand = new Hand { Cards = [] } };
+        Assert.True(GameEngine.CanHitDealer(state));
+    }
+
+    [Fact]
+    public void CanHitDealer_FalseDuringDealWhenDealerAlreadyHasCard()
+    {
+        var state = new GameState { Phase = GamePhase.Deal, DealerHand = new Hand { Cards = [7] } };
+        Assert.False(GameEngine.CanHitDealer(state));
+    }
+
+    [Fact]
+    public void CanHitDealer_TrueDuringDealerTurnWhenShouldHit()
+    {
+        // Soft 16 — dealer must hit
+        var state = new GameState { Phase = GamePhase.DealerTurn, DealerHand = new Hand { Cards = [1, 5] } };
+        Assert.True(GameEngine.CanHitDealer(state));
+    }
+
+    [Fact]
+    public void CanHitDealer_FalseDuringDealerTurnWhenShouldStand()
+    {
+        // Hard 18 — dealer stands
+        var state = new GameState { Phase = GamePhase.DealerTurn, DealerHand = new Hand { Cards = [10, 8] } };
+        Assert.False(GameEngine.CanHitDealer(state));
+    }
+
+    [Fact]
+    public void CanHitDealer_FalseDuringDealerTurnWhenBust()
+    {
+        var state = new GameState { Phase = GamePhase.DealerTurn, DealerHand = new Hand { Cards = [10, 8, 6] } };
+        Assert.False(GameEngine.CanHitDealer(state));
+    }
+
+    [Fact]
     public void AnnounceSplit_NarratesWithAmount()
     {
         var state = new GameState
