@@ -382,6 +382,9 @@ public partial class MainWindow : Window, IDisposable
                     ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1,
                         ToU32(new Vector4(0.25f, 0.45f, 0.75f, 0.35f)));
 
+                var hasWorld    = p.World.Length > 0;
+                var hasNickname = p.Nickname.Length > 0;
+
                 // Name
                 ImGui.TableSetColumnIndex(0);
                 if (renamingIndex == i)
@@ -415,8 +418,6 @@ public partial class MainWindow : Window, IDisposable
                         }
                     }
 
-                    var hasWorld    = p.World.Length > 0;
-                    var hasNickname = p.Nickname.Length > 0;
                     var clearW   = hasWorld && hasNickname
                         ? ImGui.CalcTextSize("C").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
                     var targetW  = hasWorld
@@ -451,7 +452,10 @@ public partial class MainWindow : Window, IDisposable
 
                 // Bet — editable only in Betting phase; buffer in betEdits to avoid per-keystroke Apply
                 ImGui.TableSetColumnIndex(1);
-                ImGui.SetNextItemWidth(-1);
+                var tradeButtonW = hasWorld
+                    ? ImGui.CalcTextSize("Trade").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X
+                    : 0;
+                ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - tradeButtonW);
                 if (Phase != GamePhase.Betting) ImGui.BeginDisabled();
                 var bet = betEdits.TryGetValue(i, out var e) ? e : p.Bet;
                 if (ImGui.InputText($"##bet{i}", ref bet, 16, ImGuiInputTextFlags.EnterReturnsTrue))
@@ -464,6 +468,13 @@ public partial class MainWindow : Window, IDisposable
                     betEdits[i] = bet; // track in-progress, don't push to undo stack
                 }
                 if (Phase != GamePhase.Betting) ImGui.EndDisabled();
+                if (hasWorld)
+                {
+                    ImGui.SameLine();
+                    if (ImGui.SmallButton($"Trade##{i}trade"))
+                        Plugin.TradePlayer(p.FullName, p.World);
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Trade {p.FullName}@{p.World}");
+                }
 
                 // Cards
                 ImGui.TableSetColumnIndex(2);

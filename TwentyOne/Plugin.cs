@@ -1,4 +1,6 @@
+using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Command;
 using Dalamud.Game.Gui.ContextMenu;
@@ -6,6 +8,7 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using TwentyOne.Game;
 using TwentyOne.Windows;
 
@@ -20,6 +23,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
     [PluginService] internal static ITargetManager TargetManager { get; private set; } = null!;
     [PluginService] internal static IContextMenu ContextMenu { get; private set; } = null!;
+    [PluginService] internal static IFramework Framework { get; private set; } = null!;
 
     private const string CommandName = "/twentyone";
 
@@ -95,6 +99,29 @@ public sealed class Plugin : IDalamudPlugin
         }
         return false;
     }
+
+    public static void TradePlayer(string fullName, string world)
+    {
+        uint entityId = 0;
+        foreach (var obj in ObjectTable.PlayerObjects)
+        {
+            if (obj is IPlayerCharacter player &&
+                player.Name.TextValue == fullName &&
+                player.HomeWorld.Value.Name.ToString() == world)
+            {
+                TargetManager.Target = player;
+                entityId = player.EntityId;
+                break;
+            }
+        }
+        if (entityId == 0) return;
+
+        Task.Delay(1000).ContinueWith(_ =>
+            Framework.RunOnFrameworkThread(OpenTrade(entityId)));
+    }
+
+    private static unsafe Action OpenTrade(uint entityId) => () =>
+        InventoryManager.Instance()->SendTradeRequest(entityId);
 
     public void Dispose()
     {
