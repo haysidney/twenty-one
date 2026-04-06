@@ -1016,9 +1016,8 @@ public class SplitHandTests
     }
 
     [Fact]
-    public void SplitHand_AdvancesFromFirstHandToSecond_AfterStand()
+    public void SplitHand_StandOnFirstHand_EmitsAutoHitForSecondHand()
     {
-        // After split, hand 0 stands — should advance to hand 1
         var state = new GameState
         {
             Phase             = GamePhase.PlayerTurns,
@@ -1033,14 +1032,74 @@ public class SplitHandTests
                     Hands    =
                     [
                         new Hand { Cards = [8, 5], State = HandState.Playing, IsFromSplit = true },
-                        new Hand { Cards = [8, 9], State = HandState.Playing, IsFromSplit = true },
+                        new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
                     ],
                 },
             ],
         };
-        var (ns, _) = GameEngine.Apply(state, new StandPlayer(0, 0));
-        Assert.Equal(0, ns.ActivePlayerIndex);
+        var (ns, effects) = GameEngine.Apply(state, new StandPlayer(0, 0));
         Assert.Equal(1, ns.ActiveHandIndex);
+        Assert.Contains(effects, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 1);
+    }
+
+    [Fact]
+    public void SplitHand_BustOnFirstHand_EmitsAutoHitForSecondHand()
+    {
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            DealerHand        = new Hand { Cards = [10] },
+            Players           =
+            [
+                new Player
+                {
+                    Nickname = "Lorah", Bet = "100",
+                    Hands    =
+                    [
+                        new Hand { Cards = [8, 7], State = HandState.Playing, IsFromSplit = true },
+                        new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
+                    ],
+                },
+            ],
+        };
+        // Draw a card that busts hand 0
+        var (ns, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 9));
+        Assert.Equal(HandState.Bust, ns.Players[0].Hands[0].State);
+        Assert.Equal(1, ns.ActiveHandIndex);
+        Assert.Contains(effects, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 1);
+    }
+
+    [Fact]
+    public void SplitHand_MandatoryCardOnFirstHand_ThenNarratesTurn()
+    {
+        // After the mandatory 2nd card lands on hand 0 (still Playing), no AutoHit —
+        // the player now acts on hand 0 before hand 1 gets its card.
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            DealerHand        = new Hand { Cards = [10] },
+            Players           =
+            [
+                new Player
+                {
+                    Nickname = "Lorah", Bet = "100",
+                    Hands    =
+                    [
+                        new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
+                        new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
+                    ],
+                },
+            ],
+        };
+        var (ns, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 5));
+        Assert.Equal(2, ns.Players[0].Hands[0].Cards.Count);
+        Assert.Equal(HandState.Playing, ns.Players[0].Hands[0].State);
+        Assert.Equal(0, ns.ActiveHandIndex); // still on hand 0
+        Assert.DoesNotContain(effects, e => e is AutoHit);
     }
 
     [Fact]
