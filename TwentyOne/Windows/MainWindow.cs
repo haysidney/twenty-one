@@ -543,6 +543,9 @@ public partial class MainWindow : Window, IDisposable
         switch (Phase)
         {
             case GamePhase.Betting:
+                if (ImGui.Button("Announce Betting Open"))
+                    Apply(new AnnounceBettingOpen(config.MinBet, config.MaxBet));
+                ImGui.SameLine();
                 var effectiveBets = State.Players.Select((p, i) =>
                     betEdits.TryGetValue(i, out var e) ? e : p.Bet);
                 var canDeal = State.Players.Count > 0
