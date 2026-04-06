@@ -14,12 +14,27 @@ public class NarrationTemplates
     public string DealerBJ   { get; set; } = "Dealer draws {card} → {cards} — Blackjack!";
 
     // Player actions (PlayerTurns phase)
-    // {actions} = e.g. "Hit, Stand" or "Hit, Stand, Split"
+    // {actions} = e.g. "Hit or Stand" or "Hit or Stand, Double, Split"
     public string PlayerTurnStart { get; set; } = "{name}'s turn — Dealer shows {dealerCards} ({dealerScore}). {actions}";
     public string PlayerHit   { get; set; } = "{name} hits → {card} | {cards} = {score}";
     public string PlayerBust  { get; set; } = "{name} busts! {cards} = {score}";
     public string PlayerBJ    { get; set; } = "{name} — Blackjack! {cards}";
     public string PlayerStand { get; set; } = "{name} stands. {cards} = {score}";
+
+    // Double down — sent when the card lands and the hand is auto-stood
+    // {name} may include "(Hand N)" for split hands
+    public string PlayerDouble { get; set; } = "{name} doubles down → {card} | {cards} = {score}";
+
+    // Split ace mandatory card — card dealt, hand auto-stood per split-ace rule
+    public string PlayerSplitAce { get; set; } = "{name} draws {card} — {cards} = {score} (split aces, auto-stand)";
+
+    // Trade-request announcements (sent when dealer clicks Double/Split, before confirming trade)
+    // {amount} = the extra chips required
+    public string PlayerDoubleRequest { get; set; } = "{name} would like to double down! Please trade {amount} gil to the dealer.";
+    public string PlayerSplitRequest  { get; set; } = "{name} would like to split! Please trade {amount} gil to the dealer.";
+
+    // Sent when the split is confirmed (after trade)
+    public string PlayerSplit { get; set; } = "{name} splits into two hands!";
 
     // Initial deal announcements (Deal phase)
     public string DealDealerCard  { get; set; } = "Dealer's Card:";

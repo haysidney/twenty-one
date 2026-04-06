@@ -13,6 +13,12 @@ public class Hand
 {
     public List<int> Cards { get; set; } = [];
     public HandState State { get; set; } = HandState.Playing;
+    // True after player doubles; Bet holds the new (doubled) amount.
+    public bool Doubled { get; set; } = false;
+    // Per-hand effective bet (empty string = inherit from Player.Bet). Set on double.
+    public string Bet { get; set; } = string.Empty;
+    // True when created by splitting: 21 is not a blackjack; aces forced-stand after 1 card.
+    public bool IsFromSplit { get; set; } = false;
 }
 
 [Serializable]
@@ -41,5 +47,6 @@ public class GameState
     public Hand DealerHand { get; set; } = new();
     public GamePhase Phase { get; set; } = GamePhase.Betting;
     public int ActivePlayerIndex { get; set; } = -1;
+    public int ActiveHandIndex { get; set; } = -1;
     public BlackjackPayout BjPayout { get; set; } = BlackjackPayout.ThreeToTwo;
 }

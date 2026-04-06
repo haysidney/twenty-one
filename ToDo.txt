@@ -4,18 +4,22 @@
   ProcessChatBoxEntry. This would be cleaner and avoid any unwanted sending bare
   channel commands through the chat box.
 
-- Add a betting announcement.
-
 - Trade help/automation.
-
-- Player targeting.
 
 - Better payout screen.
 
 - Round summary
 
-- Splits/Doubles
+- Splits/Doubles: implemented. Split ace house rule variants: currently forces stand after
+  one card per standard casino rules, but some venues allow free hits on split aces.
+  Consider making this configurable.
 
 - Shout timer for advertising
 
+- Timestamps in the narration log?
+
 - Add /tell as a channel?
+
+- Figure out what the other plugin supports.
+
+- Edit game state directly (move cards around and whatnot for testing and/or unsupported house rules)

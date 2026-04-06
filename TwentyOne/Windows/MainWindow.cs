@@ -35,6 +35,9 @@ public partial class MainWindow : Window, IDisposable
     private (bool IsDealer, int PlayerIndex, int HandIndex, bool IsPublic)? pendingHit;
     // deferred roll: set by OnChatMessage, applied at the start of the next Draw()
     private (bool IsDealer, int PlayerIndex, int HandIndex, int Roll)?      deferredRoll;
+    // pending trade confirmation for double/split: set when dealer clicks the button, cleared on confirm/cancel
+    private (int PlayerIndex, int HandIndex)? pendingDouble;
+    private (int PlayerIndex, int HandIndex)? pendingSplit;
     // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
     // IsFirstCard=true → emit AnnouncePlayerDeal before rolling
     private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex, bool IsFirstCard)> autoDealQueue = new();
@@ -49,6 +52,7 @@ public partial class MainWindow : Window, IDisposable
     private GameState   State             => config.GameState;
     private GamePhase   Phase             => config.GameState.Phase;
     private int         ActivePlayerIndex => config.GameState.ActivePlayerIndex;
+    private int         ActiveHandIndex   => config.GameState.ActiveHandIndex;
 
     // ── Constructor / Dispose ─────────────────────────────────────────────────
 
@@ -88,9 +92,13 @@ public partial class MainWindow : Window, IDisposable
         {
             config.UndoStack.Clear();
             autoDealQueue.Clear();
-            pendingHit = null;
+            pendingHit    = null;
+            pendingDouble = null;
+            pendingSplit  = null;
         }
-        else if (action is not AnnounceBettingOpen)
+        else if (action is not AnnounceBettingOpen
+                         and not AnnounceDouble
+                         and not AnnounceSplit)
         {
             // GameEngine is pure — it never mutates state, so pushing the current
             // reference is safe; future Apply calls create entirely new objects.
@@ -214,7 +222,11 @@ public partial class MainWindow : Window, IDisposable
         return Phase switch
         {
             GamePhase.Deal        => hand.State == HandState.Playing && hand.Cards.Count < 2,
-            GamePhase.PlayerTurns => pi == ActivePlayerIndex && hi == 0 && hand.State == HandState.Playing,
+            // During PlayerTurns: manual Hit only allowed on the active hand with ≥2 cards
+            // (1-card split hands are auto-hit in Draw(); no manual button shown).
+            GamePhase.PlayerTurns => pi == ActivePlayerIndex && hi == ActiveHandIndex
+                                  && hand.State == HandState.Playing && hand.Cards.Count >= 2
+                                  && !pendingDouble.HasValue && !pendingSplit.HasValue,
             _ => false,
         };
     }
@@ -236,14 +248,14 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private static (string Label, Vector4 Color) PayoutDisplay(GameState state, int playerIndex)
+    private static (string Label, Vector4 Color) PayoutDisplay(GameState state, int playerIndex, int handIndex)
     {
         var grey  = new Vector4(0.55f, 0.55f, 0.55f, 1f);
         var red   = new Vector4(1f, 0.35f, 0.35f, 1f);
         var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
         var gold  = new Vector4(1f, 0.85f, 0f, 1f);
 
-        return GameEngine.GetPayoutResult(state, playerIndex) switch
+        return GameEngine.GetPayoutResult(state, playerIndex, handIndex) switch
         {
             PayoutResult.Win   => ("Win",    green),
             PayoutResult.BjWin => ("BJ Win", gold),
@@ -289,6 +301,18 @@ public partial class MainWindow : Window, IDisposable
                 if (next.IsFirstCard) Apply(new AnnouncePlayerDeal(next.PlayerIndex));
                 QueueHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
             }
+        }
+
+        // Auto-hit 1-card split hands during PlayerTurns (mandatory 2nd card before the player acts).
+        if (Phase == GamePhase.PlayerTurns
+            && ActivePlayerIndex >= 0 && ActiveHandIndex >= 0
+            && ActivePlayerIndex < State.Players.Count
+            && ActiveHandIndex < State.Players[ActivePlayerIndex].Hands.Count
+            && State.Players[ActivePlayerIndex].Hands[ActiveHandIndex].Cards.Count == 1
+            && pendingHit == null && !deferredRoll.HasValue && chatQueue.Count == 0
+            && !pendingDouble.HasValue && !pendingSplit.HasValue)
+        {
+            QueueHitRoll(isDealer: false, ActivePlayerIndex, ActiveHandIndex);
         }
 
         if (ImGui.SmallButton("Config"))
@@ -367,180 +391,261 @@ public partial class MainWindow : Window, IDisposable
             ImGui.TableSetupColumn("Cards"u8,     ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Score"u8,     ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Status"u8,    ImGuiTableColumnFlags.WidthFixed, 100);
-            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 140);
+            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 190);
             ImGui.TableHeadersRow();
 
             int removeAt = -1;
-            for (var i = 0; i < State.Players.Count; i++)
+            for (var pi = 0; pi < State.Players.Count; pi++)
             {
-                var p      = State.Players[i];
-                var hand   = p.Hands[0];
-                var isActive = Phase == GamePhase.PlayerTurns && i == ActivePlayerIndex;
-
-                ImGui.TableNextRow();
-                if (isActive)
-                    ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1,
-                        ToU32(new Vector4(0.25f, 0.45f, 0.75f, 0.35f)));
-
+                var p         = State.Players[pi];
                 var hasWorld    = p.World.Length > 0;
                 var hasNickname = p.Nickname.Length > 0;
+                var multiHand = p.Hands.Count > 1;
 
-                // Name
-                ImGui.TableSetColumnIndex(0);
-                if (renamingIndex == i)
+                for (var hi = 0; hi < p.Hands.Count; hi++)
                 {
-                    var okW = ImGui.CalcTextSize("OK").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
-                    ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - okW);
-                    var submitted = ImGui.InputText($"##rename{i}", ref renamingBuffer, 64,
-                        ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll);
-                    ImGui.SameLine();
-                    var canConfirm = renamingBuffer.Length > 0 || p.World.Length > 0;
-                    if (!canConfirm) ImGui.BeginDisabled();
-                    if (ImGui.SmallButton($"OK##{i}ok") || submitted)
+                    var hand        = p.Hands[hi];
+                    var isFirstHand = hi == 0;
+                    var isActiveHand = Phase == GamePhase.PlayerTurns
+                                    && pi == ActivePlayerIndex && hi == ActiveHandIndex;
+
+                    ImGui.TableNextRow();
+                    if (isActiveHand)
+                        ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1,
+                            ToU32(new Vector4(0.25f, 0.45f, 0.75f, 0.35f)));
+
+                    // ── Name column ───────────────────────────────────────────
+                    ImGui.TableSetColumnIndex(0);
+                    if (isFirstHand)
                     {
-                        if (canConfirm) Apply(new RenamePlayer(i, renamingBuffer));
-                        renamingIndex = -1;
-                    }
-                    if (!canConfirm) ImGui.EndDisabled();
-                }
-                else
-                {
-                    ImGui.AlignTextToFramePadding();
-                    ImGui.Text(p.DisplayName);
-                    if (ImGui.IsItemHovered())
-                    {
-                        if (p.World.Length > 0)
-                            ImGui.SetTooltip($"{p.FullName}@{p.World}");
-                        if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                        if (renamingIndex == pi)
                         {
-                            renamingIndex  = i;
-                            renamingBuffer = p.Nickname;
+                            var okW = ImGui.CalcTextSize("OK").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+                            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - okW);
+                            var submitted = ImGui.InputText($"##rename{pi}", ref renamingBuffer, 64,
+                                ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll);
+                            ImGui.SameLine();
+                            var canConfirm = renamingBuffer.Length > 0 || p.World.Length > 0;
+                            if (!canConfirm) ImGui.BeginDisabled();
+                            if (ImGui.SmallButton($"OK##{pi}ok") || submitted)
+                            {
+                                if (canConfirm) Apply(new RenamePlayer(pi, renamingBuffer));
+                                renamingIndex = -1;
+                            }
+                            if (!canConfirm) ImGui.EndDisabled();
+                        }
+                        else
+                        {
+                            ImGui.AlignTextToFramePadding();
+                            ImGui.Text(p.DisplayName);
+                            if (ImGui.IsItemHovered())
+                            {
+                                if (p.World.Length > 0)
+                                    ImGui.SetTooltip($"{p.FullName}@{p.World}");
+                                if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                                {
+                                    renamingIndex  = pi;
+                                    renamingBuffer = p.Nickname;
+                                }
+                            }
+
+                            var clearW  = hasWorld && hasNickname
+                                ? ImGui.CalcTextSize("C").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
+                            var targetW = hasWorld
+                                ? ImGui.CalcTextSize("@").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
+                            var renameW = ImGui.CalcTextSize("R").X + ImGui.GetStyle().FramePadding.X * 2;
+                            ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - clearW - targetW
+                                           - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
+
+                            if (hasWorld)
+                            {
+                                if (ImGui.SmallButton($"@##{pi}target"))
+                                    Plugin.TargetPlayer(p.FullName, p.World);
+                                if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Target {p.FullName}@{p.World}");
+                                ImGui.SameLine();
+                            }
+
+                            if (ImGui.SmallButton($"R##{pi}rename"))
+                            {
+                                renamingIndex  = pi;
+                                renamingBuffer = p.Nickname;
+                            }
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Rename"u8);
+
+                            if (hasWorld && hasNickname)
+                            {
+                                ImGui.SameLine();
+                                if (ImGui.SmallButton($"C##{pi}clear"))
+                                    Apply(new RenamePlayer(pi, ""));
+                                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Clear nickname"u8);
+                            }
                         }
                     }
-
-                    var clearW   = hasWorld && hasNickname
-                        ? ImGui.CalcTextSize("C").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
-                    var targetW  = hasWorld
-                        ? ImGui.CalcTextSize("@").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
-                    var renameW  = ImGui.CalcTextSize("R").X + ImGui.GetStyle().FramePadding.X * 2;
-                    ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - clearW - targetW
-                                   - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
-
-                    if (hasWorld)
-                    {
-                        if (ImGui.SmallButton($"@##{i}target"))
-                            Plugin.TargetPlayer(p.FullName, p.World);
-                        if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Target {p.FullName}@{p.World}");
-                        ImGui.SameLine();
-                    }
-
-                    if (ImGui.SmallButton($"R##{i}rename"))
-                    {
-                        renamingIndex  = i;
-                        renamingBuffer = p.Nickname;
-                    }
-                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Rename"u8);
-
-                    if (hasWorld && hasNickname)
-                    {
-                        ImGui.SameLine();
-                        if (ImGui.SmallButton($"C##{i}clear"))
-                            Apply(new RenamePlayer(i, ""));
-                        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Clear nickname"u8);
-                    }
-                }
-
-                // Bet — editable only in Betting phase; buffer in betEdits to avoid per-keystroke Apply
-                ImGui.TableSetColumnIndex(1);
-                var tradeButtonW = hasWorld
-                    ? ImGui.CalcTextSize("Trade").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X
-                    : 0;
-                ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - tradeButtonW);
-                if (Phase != GamePhase.Betting) ImGui.BeginDisabled();
-                var bet = betEdits.TryGetValue(i, out var e) ? e : p.Bet;
-                if (ImGui.InputText($"##bet{i}", ref bet, 16, ImGuiInputTextFlags.EnterReturnsTrue))
-                {
-                    betEdits.Remove(i);
-                    Apply(new SetPlayerBet(i, bet));
-                }
-                else
-                {
-                    betEdits[i] = bet; // track in-progress, don't push to undo stack
-                }
-                if (Phase != GamePhase.Betting) ImGui.EndDisabled();
-                if (hasWorld)
-                {
-                    ImGui.SameLine();
-                    if (ImGui.SmallButton($"Trade##{i}trade"))
-                        Plugin.TradePlayer(p.FullName, p.World);
-                    if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Trade {p.FullName}@{p.World}");
-                }
-
-                // Cards
-                ImGui.TableSetColumnIndex(2);
-                if (hand.Cards.Count > 0)
-                {
-                    ImGui.AlignTextToFramePadding();
-                    ImGui.Text(GameEngine.HandString(hand.Cards));
-                }
-
-                // Score
-                ImGui.TableSetColumnIndex(3);
-                if (hand.Cards.Count > 0)
-                {
-                    var val = GameEngine.HandValue(hand.Cards);
-                    var scoreStr = hand.State == HandState.Stand
-                        ? val.ToString()
-                        : GameEngine.ScoreString(hand.Cards);
-                    if (val > 21)
-                        ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f), scoreStr);
-                    else if (val == 21)
-                        ImGui.TextColored(new Vector4(1f, 0.85f, 0f, 1f), scoreStr);
                     else
-                        ImGui.Text(scoreStr);
-                }
-
-                // Status
-                ImGui.TableSetColumnIndex(4);
-                if (Phase == GamePhase.Payout)
-                {
-                    var (label, color) = PayoutDisplay(State, i);
-                    if (label.Length > 0)
                     {
-                        var amount  = GameEngine.PayoutAmountString(State, i);
-                        var display = amount.Length > 0 ? $"{label} {amount}" : label;
-                        ImGui.TextColored(color, display);
+                        // Subsequent split-hand rows: show indented label
+                        ImGui.AlignTextToFramePadding();
+                        ImGui.TextDisabled($"  ↳ Hand {hi + 1}");
+                    }
+
+                    // ── Bet column ────────────────────────────────────────────
+                    ImGui.TableSetColumnIndex(1);
+                    if (isFirstHand)
+                    {
+                        var tradeButtonW = hasWorld
+                            ? ImGui.CalcTextSize("Trade").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X
+                            : 0;
+                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - tradeButtonW);
+                        if (Phase != GamePhase.Betting) ImGui.BeginDisabled();
+                        var betVal = betEdits.TryGetValue(pi, out var e) ? e : p.Bet;
+                        if (ImGui.InputText($"##bet{pi}", ref betVal, 16, ImGuiInputTextFlags.EnterReturnsTrue))
+                        {
+                            betEdits.Remove(pi);
+                            Apply(new SetPlayerBet(pi, betVal));
+                        }
+                        else
+                        {
+                            betEdits[pi] = betVal;
+                        }
+                        if (Phase != GamePhase.Betting) ImGui.EndDisabled();
+                        if (hasWorld)
+                        {
+                            ImGui.SameLine();
+                            if (ImGui.SmallButton($"Trade##{pi}trade"))
+                                Plugin.TradePlayer(p.FullName, p.World);
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Trade {p.FullName}@{p.World}");
+                        }
+                    }
+                    else
+                    {
+                        // Show the effective bet for this split hand (read-only)
+                        var eb = GameEngine.GetEffectiveBet(p, hand);
+                        ImGui.AlignTextToFramePadding();
+                        ImGui.TextDisabled(eb > 0 ? eb.ToString("0.##") : p.Bet);
+                    }
+
+                    // ── Cards column ──────────────────────────────────────────
+                    ImGui.TableSetColumnIndex(2);
+                    if (hand.Cards.Count > 0)
+                    {
+                        ImGui.AlignTextToFramePadding();
+                        ImGui.Text(GameEngine.HandString(hand.Cards));
+                    }
+
+                    // ── Score column ──────────────────────────────────────────
+                    ImGui.TableSetColumnIndex(3);
+                    if (hand.Cards.Count > 0)
+                    {
+                        var val      = GameEngine.HandValue(hand.Cards);
+                        var scoreStr = hand.State == HandState.Stand
+                            ? val.ToString()
+                            : GameEngine.ScoreString(hand.Cards);
+                        if (val > 21)
+                            ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f), scoreStr);
+                        else if (val == 21)
+                            ImGui.TextColored(new Vector4(1f, 0.85f, 0f, 1f), scoreStr);
+                        else
+                            ImGui.Text(scoreStr);
+                    }
+
+                    // ── Status column ─────────────────────────────────────────
+                    ImGui.TableSetColumnIndex(4);
+                    if (Phase == GamePhase.Payout)
+                    {
+                        var (label, color) = PayoutDisplay(State, pi, hi);
+                        if (label.Length > 0)
+                        {
+                            var amount  = GameEngine.PayoutAmountString(State, pi, hi);
+                            var display = amount.Length > 0 ? $"{label} {amount}" : label;
+                            ImGui.TextColored(color, display);
+                        }
+                    }
+                    else
+                    {
+                        DrawHandStateLabel(hand);
+                    }
+
+                    // ── Actions column ────────────────────────────────────────
+                    ImGui.TableSetColumnIndex(5);
+                    var hasAnyPending = pendingDouble.HasValue || pendingSplit.HasValue;
+                    var isPendingDouble = pendingDouble.HasValue && pendingDouble.Value == (pi, hi);
+                    var isPendingSplit  = pendingSplit.HasValue  && pendingSplit.Value  == (pi, hi);
+
+                    if (isPendingDouble)
+                    {
+                        if (ImGui.SmallButton($"Confirm Dbl##{pi}_{hi}"))
+                        {
+                            Apply(new DoubleDown(pi, hi));
+                            pendingDouble = null;
+                            QueueHitRoll(isDealer: false, pi, hi);
+                        }
+                        ImGui.SameLine();
+                        if (ImGui.SmallButton($"Cancel##{pi}_{hi}dblcancel")) pendingDouble = null;
+                    }
+                    else if (isPendingSplit)
+                    {
+                        if (ImGui.SmallButton($"Confirm Spl##{pi}_{hi}"))
+                        {
+                            Apply(new SplitHand(pi, hi));
+                            pendingSplit = null;
+                            // The 1-card split hands are auto-hit in Draw()
+                        }
+                        ImGui.SameLine();
+                        if (ImGui.SmallButton($"Cancel##{pi}_{hi}splcancel")) pendingSplit = null;
+                    }
+                    else
+                    {
+                        var canStand = !hasAnyPending && Phase == GamePhase.PlayerTurns
+                                    && pi == ActivePlayerIndex && hi == ActiveHandIndex
+                                    && hand.State == HandState.Playing && hand.Cards.Count >= 2;
+                        if (!canStand) ImGui.BeginDisabled();
+                        if (ImGui.SmallButton($"Stand##{pi}_{hi}")) Apply(new StandPlayer(pi, hi));
+                        if (!canStand) ImGui.EndDisabled();
+
+                        ImGui.SameLine();
+                        var hitActive = PlayerHitActive(pi, hi);
+                        if (!hitActive) ImGui.BeginDisabled();
+                        if (ImGui.SmallButton($"Hit##{pi}_{hi}")) QueueHitRoll(isDealer: false, pi, hi);
+                        if (!hitActive) ImGui.EndDisabled();
+
+                        ImGui.SameLine();
+                        var canDouble = !hasAnyPending && isActiveHand
+                                     && GameEngine.CanDouble(hand, p.Bet);
+                        if (!canDouble) ImGui.BeginDisabled();
+                        if (ImGui.SmallButton($"Dbl##{pi}_{hi}"))
+                        {
+                            pendingDouble = (pi, hi);
+                            Apply(new AnnounceDouble(pi, hi));
+                            if (hasWorld) Plugin.TradePlayer(p.FullName, p.World);
+                        }
+                        if (!canDouble) ImGui.EndDisabled();
+
+                        ImGui.SameLine();
+                        var canSplit = !hasAnyPending && isActiveHand
+                                    && GameEngine.CanSplit(hand);
+                        if (!canSplit) ImGui.BeginDisabled();
+                        if (ImGui.SmallButton($"Spl##{pi}_{hi}"))
+                        {
+                            pendingSplit = (pi, hi);
+                            Apply(new AnnounceSplit(pi, hi));
+                            if (hasWorld) Plugin.TradePlayer(p.FullName, p.World);
+                        }
+                        if (!canSplit) ImGui.EndDisabled();
+
+                        if (isFirstHand)
+                        {
+                            ImGui.SameLine();
+                            var canRemove = Phase == GamePhase.Betting;
+                            if (!canRemove) ImGui.BeginDisabled();
+                            ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.7f, 0.15f, 0.15f, 1f));
+                            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.25f, 0.25f, 1f));
+                            ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.5f, 0.05f, 0.05f, 1f));
+                            if (ImGui.SmallButton($"X##{pi}")) removeAt = pi;
+                            ImGui.PopStyleColor(3);
+                            if (!canRemove) ImGui.EndDisabled();
+                        }
                     }
                 }
-                else
-                {
-                    DrawHandStateLabel(hand);
-                }
-
-                // Actions
-                ImGui.TableSetColumnIndex(5);
-                var canStand = Phase == GamePhase.PlayerTurns
-                            && i == ActivePlayerIndex
-                            && hand.State == HandState.Playing;
-                if (!canStand) ImGui.BeginDisabled();
-                if (ImGui.SmallButton($"Stand##{i}")) Apply(new StandPlayer(i, 0));
-                if (!canStand) ImGui.EndDisabled();
-
-                ImGui.SameLine();
-                var hitActive = PlayerHitActive(i, 0);
-                if (!hitActive) ImGui.BeginDisabled();
-                if (ImGui.SmallButton($"Hit##{i}")) QueueHitRoll(isDealer: false, i, 0);
-                if (!hitActive) ImGui.EndDisabled();
-
-                ImGui.SameLine();
-                var canRemove = Phase == GamePhase.Betting;
-                if (!canRemove) ImGui.BeginDisabled();
-                ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.7f, 0.15f, 0.15f, 1f));
-                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.25f, 0.25f, 1f));
-                ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.5f, 0.05f, 0.05f, 1f));
-                if (ImGui.SmallButton($"X##{i}")) removeAt = i;
-                ImGui.PopStyleColor(3);
-                if (!canRemove) ImGui.EndDisabled();
             }
 
             if (removeAt >= 0) { betEdits.Remove(removeAt); Apply(new RemovePlayer(removeAt)); }
@@ -575,17 +680,31 @@ public partial class MainWindow : Window, IDisposable
               $"{(State.Players.Count > 0 ? State.Players.Min(p => p.Hands[0].Cards.Count) : 0)}-" +
               $"{(State.Players.Count > 0 ? State.Players.Max(p => p.Hands[0].Cards.Count) : 0)}/2)"
             : string.Empty;
-        var phaseLabel = Phase switch
+        string phaseLabel;
+        if (Phase == GamePhase.PlayerTurns
+            && ActivePlayerIndex >= 0 && ActivePlayerIndex < State.Players.Count
+            && ActiveHandIndex >= 0)
         {
-            GamePhase.Betting     => "Phase: Betting",
-            GamePhase.Deal        => $"Phase: Deal{dealProgress}",
-            GamePhase.PlayerTurns => ActivePlayerIndex >= 0 && ActivePlayerIndex < State.Players.Count
-                ? $"Phase: Player Actions  ({State.Players[ActivePlayerIndex].DisplayName}'s turn — Hit, Stand, Double, Split)"
-                : "Phase: Player Actions",
-            GamePhase.DealerTurn  => "Phase: Dealer Turn",
-            GamePhase.Payout      => "Phase: Payout",
-            _                     => string.Empty,
-        };
+            var ap   = State.Players[ActivePlayerIndex];
+            var ah   = ActiveHandIndex < ap.Hands.Count ? ap.Hands[ActiveHandIndex] : null;
+            var name = ap.Hands.Count > 1 ? $"{ap.DisplayName} (Hand {ActiveHandIndex + 1})" : ap.DisplayName;
+            var acts = ah != null
+                ? GameEngine.ValidActionsString(ah, GameEngine.CanDouble(ah, ap.Bet), GameEngine.CanSplit(ah))
+                : string.Empty;
+            phaseLabel = $"Phase: Player Actions  ({name}'s turn — {acts})";
+        }
+        else
+        {
+            phaseLabel = Phase switch
+            {
+                GamePhase.Betting    => "Phase: Betting",
+                GamePhase.Deal       => $"Phase: Deal{dealProgress}",
+                GamePhase.PlayerTurns => "Phase: Player Actions",
+                GamePhase.DealerTurn => "Phase: Dealer Turn",
+                GamePhase.Payout     => "Phase: Payout",
+                _                    => string.Empty,
+            };
+        }
         ImGui.TextDisabled(phaseLabel);
         ImGui.Spacing();
 
@@ -624,7 +743,7 @@ public partial class MainWindow : Window, IDisposable
             case GamePhase.Deal:
                 var dealDone = State.DealerHand.Cards.Count >= 1
                             && State.Players.Count > 0
-                            && State.Players.TrueForAll(p => p.Hands[0].Cards.Count >= 2);
+                            && State.Players.TrueForAll(p => p.Hands.Count > 0 && p.Hands[0].Cards.Count >= 2);
                 if (!dealDone) ImGui.BeginDisabled();
                 if (ImGui.Button("Begin Player Turns →")) Apply(new BeginPlayerTurns());
                 if (!dealDone) ImGui.EndDisabled();

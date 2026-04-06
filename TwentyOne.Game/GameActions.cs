@@ -6,10 +6,16 @@ public abstract record GameAction;
 public record AddDealerCard(int Card) : GameAction;
 public record AddPlayerCard(int PlayerIndex, int HandIndex, int Card) : GameAction;
 public record StandPlayer(int PlayerIndex, int HandIndex) : GameAction;
+public record DoubleDown(int PlayerIndex, int HandIndex) : GameAction;
+public record SplitHand(int PlayerIndex, int HandIndex) : GameAction;
 
 // Deal announcements (narration only, no state change)
 public record AnnounceDealerDeal : GameAction;
 public record AnnouncePlayerDeal(int PlayerIndex) : GameAction;
+
+// Double/Split trade-request announcements (narration only, no state change)
+public record AnnounceDouble(int PlayerIndex, int HandIndex) : GameAction;
+public record AnnounceSplit(int PlayerIndex, int HandIndex) : GameAction;
 
 // Betting phase announcement (narration only)
 public record AnnounceBettingOpen : GameAction;

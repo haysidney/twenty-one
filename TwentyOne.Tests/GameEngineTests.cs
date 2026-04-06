@@ -180,6 +180,7 @@ public class ApplyAddPlayerCardTests
     {
         Phase             = GamePhase.PlayerTurns,
         ActivePlayerIndex = activeIndex,
+        ActiveHandIndex   = 0,
         Players =
         [
             new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] },
@@ -202,6 +203,7 @@ public class ApplyAddPlayerCardTests
         {
             Phase             = GamePhase.PlayerTurns,
             ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
             Players =
             [
                 new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
@@ -221,6 +223,7 @@ public class ApplyAddPlayerCardTests
         {
             Phase             = GamePhase.PlayerTurns,
             ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
             Players =
             [
                 new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
@@ -238,6 +241,7 @@ public class ApplyAddPlayerCardTests
         {
             Phase             = GamePhase.PlayerTurns,
             ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
             Players =
             [
                 new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
@@ -299,6 +303,7 @@ public class ApplyStandPlayerTests
         {
             Phase             = GamePhase.PlayerTurns,
             ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
             Players =
             [
                 new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] },
@@ -318,6 +323,7 @@ public class ApplyStandPlayerTests
         {
             Phase             = GamePhase.PlayerTurns,
             ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
             Players           = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] }],
         };
         var (newState, _) = GameEngine.Apply(state, new StandPlayer(0, 0));
@@ -575,6 +581,7 @@ public class NarrationTemplateTests
     {
         Phase             = GamePhase.PlayerTurns,
         ActivePlayerIndex = 0,
+        ActiveHandIndex   = 0,
         DealerHand        = new Hand { Cards = [10], State = HandState.Playing },
         Players           =
         [
@@ -598,6 +605,7 @@ public class NarrationTemplateTests
         {
             Phase             = GamePhase.PlayerTurns,
             ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
             Players           = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] }],
         };
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7), t);
@@ -625,6 +633,7 @@ public class NarrationTemplateTests
         {
             Phase             = GamePhase.PlayerTurns,
             ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
             Players           = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] }],
         };
         var (_, effects) = GameEngine.Apply(state, new StandPlayer(0, 0), t);
@@ -677,6 +686,7 @@ public class ImmutabilityTests
         {
             Phase             = GamePhase.PlayerTurns,
             ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
             Players =
             [
                 new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] },
@@ -787,5 +797,295 @@ public class CanGoToPayoutTests
             DealerHand = new Hand { Cards = [10, 6] },
         };
         Assert.False(GameEngine.CanGoToPayout(state));
+    }
+}
+
+public class DoubleDownTests
+{
+    private static GameState ActiveState(int[] cards, string bet = "100") => new()
+    {
+        Phase             = GamePhase.PlayerTurns,
+        ActivePlayerIndex = 0,
+        ActiveHandIndex   = 0,
+        DealerHand        = new Hand { Cards = [10], State = HandState.Playing },
+        Players           =
+        [
+            new Player { Nickname = "Lorah", Bet = bet, Hands = [new Hand { Cards = [..cards], State = HandState.Playing }] },
+        ],
+    };
+
+    [Fact]
+    public void DoubleDown_SetDoubledFlagAndDoublesBet()
+    {
+        var (ns, _) = GameEngine.Apply(ActiveState([5, 6]), new DoubleDown(0, 0));
+        Assert.True(ns.Players[0].Hands[0].Doubled);
+        Assert.Equal("200", ns.Players[0].Hands[0].Bet);
+    }
+
+    [Fact]
+    public void DoubleDown_CardLands_AutoStands_NarratesDouble()
+    {
+        var (s1, _) = GameEngine.Apply(ActiveState([5, 6]), new DoubleDown(0, 0));
+        var (s2, effects) = GameEngine.Apply(s1, new AddPlayerCard(0, 0, 3));
+        Assert.Equal(HandState.Stand, s2.Players[0].Hands[0].State);
+        Assert.Contains("doubles down", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void DoubleDown_CardLands_AdvancesToDealerTurn()
+    {
+        var (s1, _) = GameEngine.Apply(ActiveState([5, 6]), new DoubleDown(0, 0));
+        var (s2, _) = GameEngine.Apply(s1, new AddPlayerCard(0, 0, 3));
+        Assert.Equal(GamePhase.DealerTurn, s2.Phase);
+    }
+
+    [Fact]
+    public void CanDouble_TwoCards_NumericBet_True()
+    {
+        var hand = new Hand { Cards = [5, 6], State = HandState.Playing };
+        Assert.True(GameEngine.CanDouble(hand, "100"));
+    }
+
+    [Fact]
+    public void CanDouble_AlreadyDoubled_False()
+    {
+        var hand = new Hand { Cards = [5, 6], State = HandState.Playing, Doubled = true, Bet = "200" };
+        Assert.False(GameEngine.CanDouble(hand, "100"));
+    }
+
+    [Fact]
+    public void CanDouble_ThreeCards_False()
+    {
+        var hand = new Hand { Cards = [5, 3, 6], State = HandState.Playing };
+        Assert.False(GameEngine.CanDouble(hand, "100"));
+    }
+
+    [Fact]
+    public void AnnounceDouble_NarratesWithAmount()
+    {
+        var state = ActiveState([5, 6]);
+        var (_, effects) = GameEngine.Apply(state, new AnnounceDouble(0, 0));
+        Assert.Single(effects);
+        Assert.Contains("100", ((SendChat)effects[0]).Text);
+        Assert.Contains("double", ((SendChat)effects[0]).Text.ToLower());
+    }
+
+    [Fact]
+    public void PayoutAmountString_DoubledHand_UsesDoubledBet()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.Payout,
+            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players    =
+            [
+                new Player
+                {
+                    Nickname = "Lorah", Bet = "100",
+                    Hands    = [new Hand { Cards = [10, 9], State = HandState.Stand, Doubled = true, Bet = "200" }],
+                },
+            ],
+        };
+        Assert.Equal("+200", GameEngine.PayoutAmountString(state, 0, 0));
+    }
+}
+
+public class SplitHandTests
+{
+    private static GameState ActiveState(int c0, int c1, string bet = "100") => new()
+    {
+        Phase             = GamePhase.PlayerTurns,
+        ActivePlayerIndex = 0,
+        ActiveHandIndex   = 0,
+        DealerHand        = new Hand { Cards = [10], State = HandState.Playing },
+        Players           =
+        [
+            new Player { Nickname = "Lorah", Bet = bet, Hands = [new Hand { Cards = [c0, c1], State = HandState.Playing }] },
+        ],
+    };
+
+    [Fact]
+    public void SplitHand_CreatesTwoOneCardHands()
+    {
+        var (ns, _) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0));
+        Assert.Equal(2, ns.Players[0].Hands.Count);
+        Assert.Equal([8], ns.Players[0].Hands[0].Cards.ToArray());
+        Assert.Equal([8], ns.Players[0].Hands[1].Cards.ToArray());
+    }
+
+    [Fact]
+    public void SplitHand_BothHandsMarkedIsFromSplit()
+    {
+        var (ns, _) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0));
+        Assert.True(ns.Players[0].Hands[0].IsFromSplit);
+        Assert.True(ns.Players[0].Hands[1].IsFromSplit);
+    }
+
+    [Fact]
+    public void SplitHand_ActiveRemainsAtFirstSplitHand()
+    {
+        var (ns, _) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0));
+        Assert.Equal(0, ns.ActivePlayerIndex);
+        Assert.Equal(0, ns.ActiveHandIndex);
+    }
+
+    [Fact]
+    public void SplitHand_NarratesSplit()
+    {
+        var (_, effects) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0));
+        Assert.Single(effects);
+        Assert.Contains("splits", ((SendChat)effects[0]).Text.ToLower());
+    }
+
+    [Fact]
+    public void CanSplit_SameValue_True()
+    {
+        var hand = new Hand { Cards = [8, 8], State = HandState.Playing };
+        Assert.True(GameEngine.CanSplit(hand));
+    }
+
+    [Fact]
+    public void CanSplit_TenValueCards_True()
+    {
+        // 10, J, Q, K all have CardValue 10 — split allowed
+        var hand = new Hand { Cards = [10, 12], State = HandState.Playing };
+        Assert.True(GameEngine.CanSplit(hand));
+    }
+
+    [Fact]
+    public void CanSplit_DifferentValues_False()
+    {
+        var hand = new Hand { Cards = [7, 8], State = HandState.Playing };
+        Assert.False(GameEngine.CanSplit(hand));
+    }
+
+    [Fact]
+    public void SplitAce_SecondCard_AutoStands()
+    {
+        // Simulate split ace: 1-card hand with ace, IsFromSplit = true
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            DealerHand        = new Hand { Cards = [10] },
+            Players           =
+            [
+                new Player
+                {
+                    Nickname = "Lorah", Bet = "100",
+                    Hands    = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
+                },
+            ],
+        };
+        var (ns, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
+        Assert.Equal(HandState.Stand, ns.Players[0].Hands[0].State);
+        Assert.Contains("split ace", ((SendChat)effects[0]).Text.ToLower());
+    }
+
+    [Fact]
+    public void SplitAce_AcePlusTen_NotBlackjack()
+    {
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            DealerHand        = new Hand { Cards = [10] },
+            Players           =
+            [
+                new Player
+                {
+                    Nickname = "Lorah", Bet = "100",
+                    Hands    = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
+                },
+            ],
+        };
+        var (ns, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 10));
+        // A + 10 = 21 but IsFromSplit → forced Stand, not Blackjack
+        Assert.Equal(HandState.Stand, ns.Players[0].Hands[0].State);
+        Assert.NotEqual(HandState.Blackjack, ns.Players[0].Hands[0].State);
+    }
+
+    [Fact]
+    public void ReSplit_AllowedOnSplitHand()
+    {
+        // A split hand that ends up with two equal-value cards can split again
+        var hand = new Hand { Cards = [8, 8], State = HandState.Playing, IsFromSplit = true };
+        Assert.True(GameEngine.CanSplit(hand));
+    }
+
+    [Fact]
+    public void SplitHand_AdvancesFromFirstHandToSecond_AfterStand()
+    {
+        // After split, hand 0 stands — should advance to hand 1
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            DealerHand        = new Hand { Cards = [10] },
+            Players           =
+            [
+                new Player
+                {
+                    Nickname = "Lorah", Bet = "100",
+                    Hands    =
+                    [
+                        new Hand { Cards = [8, 5], State = HandState.Playing, IsFromSplit = true },
+                        new Hand { Cards = [8, 9], State = HandState.Playing, IsFromSplit = true },
+                    ],
+                },
+            ],
+        };
+        var (ns, _) = GameEngine.Apply(state, new StandPlayer(0, 0));
+        Assert.Equal(0, ns.ActivePlayerIndex);
+        Assert.Equal(1, ns.ActiveHandIndex);
+    }
+
+    [Fact]
+    public void SplitPayout_EachHandIndependent()
+    {
+        // Hand 0 wins, Hand 1 loses
+        var state = new GameState
+        {
+            Phase      = GamePhase.Payout,
+            DealerHand = new Hand { Cards = [10, 8], State = HandState.Stand },
+            Players    =
+            [
+                new Player
+                {
+                    Nickname = "Lorah", Bet = "100",
+                    Hands    =
+                    [
+                        new Hand { Cards = [10, 9], State = HandState.Stand, IsFromSplit = true }, // 19 > 18 → Win
+                        new Hand { Cards = [8, 6],  State = HandState.Stand, IsFromSplit = true }, // 14 < 18 → Lose
+                    ],
+                },
+            ],
+        };
+        Assert.Equal(PayoutResult.Win,  GameEngine.GetPayoutResult(state, 0, 0));
+        Assert.Equal(PayoutResult.Lose, GameEngine.GetPayoutResult(state, 0, 1));
+        Assert.Equal("+100", GameEngine.PayoutAmountString(state, 0, 0));
+        Assert.Equal("-100", GameEngine.PayoutAmountString(state, 0, 1));
+    }
+
+    [Fact]
+    public void AnnounceSplit_NarratesWithAmount()
+    {
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            Players           =
+            [
+                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [8, 8], State = HandState.Playing }] },
+            ],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceSplit(0, 0));
+        Assert.Single(effects);
+        Assert.Contains("100", ((SendChat)effects[0]).Text);
+        Assert.Contains("split", ((SendChat)effects[0]).Text.ToLower());
     }
 }
