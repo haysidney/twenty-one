@@ -66,4 +66,8 @@ Use only these player names in test cases: Lorah, Bekki, Nolla. If more than 3 n
 
 - Dealer hits on soft 17.
 - `BjPayout` (3:2 / 6:5 / 1:1) is a venue setting stored in `GameState` so it is snapshotted with each undo entry. It is changed directly (not via `Apply`) since payout changes are not undoable game actions.
-- The `Hands` list on `Player` supports multiple hands to enable Splits in the future. All current logic assumes index 0.
+- `Player.Hands` supports multiple hands for splits. `GameState.ActiveHandIndex` tracks which hand is currently active alongside `ActivePlayerIndex`. `AdvanceFrom` iterates all `(player, hand)` pairs in order.
+- Double Down and Split require a trade from the player before they take effect. The UI tracks this as `pendingDouble`/`pendingSplit` (not in `GameState`). Clicking Dbl/Spl fires an `AnnounceDouble`/`AnnounceSplit` narration-only action and opens the trade window; the actual `DoubleDown`/`SplitHand` action fires only after the dealer clicks Confirm.
+- `AnnounceDouble` and `AnnounceSplit` are excluded from the undo stack (like `AnnounceBettingOpen`).
+- Split rules: re-splits allowed (no limit); 21 on a split hand (`IsFromSplit=true`) is Playing/Stand, never Blackjack; split aces receive exactly one card then auto-stand (standard casino rule, see ToDo.txt for variant note).
+- Payout is calculated per-hand. `Hand.Bet` holds the effective bet when a hand has been doubled (empty = inherit `Player.Bet`).
