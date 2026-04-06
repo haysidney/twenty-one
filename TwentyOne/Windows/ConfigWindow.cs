@@ -105,6 +105,8 @@ public class ConfigWindow : Window, IDisposable
             return;
 
         ImGui.Spacing();
+        ImGui.TextDisabled("Use {|} in any template to split it into multiple chat messages.");
+        ImGui.Spacing();
         var ctrlHeld = ImGui.GetIO().KeyCtrl;
         if (!ctrlHeld) ImGui.BeginDisabled();
         if (ImGui.Button("Reset to Defaults##ntReset"))
