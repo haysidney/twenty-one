@@ -46,12 +46,14 @@ public class ConfigWindow : Window, IDisposable
             _narrationDirty = false;
         }
 
+        ImGui.AlignTextToFramePadding();
         ImGui.Text("Min Bet");
         ImGui.SameLine();
         ImGui.SetNextItemWidth(80);
         var minBet = config.MinBet;
         if (ImGui.InputText("##minBet", ref minBet, 32)) { config.MinBet = minBet; config.Save(); }
         ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
         ImGui.Text("Max Bet");
         ImGui.SameLine();
         ImGui.SetNextItemWidth(80);
@@ -62,6 +64,7 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.Spacing();
 
+        ImGui.AlignTextToFramePadding();
         ImGui.Text("Blackjack Payout");
         ImGui.SameLine();
         var bjOptions = new[] { "3:2", "6:5", "1:1" };
