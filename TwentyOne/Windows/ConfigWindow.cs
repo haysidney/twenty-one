@@ -22,6 +22,15 @@ public class ConfigWindow : Window, IDisposable
 
     private static readonly NarrationTemplates Defaults = new();
 
+    private bool   _narrationDirty;
+    private double _narrationDirtyAt;
+
+    private void MarkNarrationDirty()
+    {
+        _narrationDirty   = true;
+        _narrationDirtyAt = ImGui.GetTime();
+    }
+
     private static readonly string[] ChatChannels =
     [
         "/say", "/yell", "/shout", "/p", "/a", "/fc",
@@ -31,6 +40,12 @@ public class ConfigWindow : Window, IDisposable
 
     public override void Draw()
     {
+        if (_narrationDirty && ImGui.GetTime() - _narrationDirtyAt > 1.0)
+        {
+            config.Save();
+            _narrationDirty = false;
+        }
+
         ImGui.Text("Blackjack Payout");
         ImGui.SameLine();
         var bjOptions = new[] { "3:2", "6:5", "1:1" };
@@ -112,6 +127,7 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.Button("Reset to Defaults##ntReset"))
         {
             config.NarrationTemplates = new();
+            _narrationDirty = false;
             config.Save();
         }
         if (!ctrlHeld) ImGui.EndDisabled();
@@ -132,15 +148,15 @@ public class ConfigWindow : Window, IDisposable
 
             var v0 = t.DealerHit;
             NtRow("Hit##ntDH",        "{card}  {cards}  {score}", Defaults.DealerHit,  ctrlHeld, ref v0);
-            if (v0 != t.DealerHit)   { t.DealerHit  = v0; config.Save(); }
+            if (v0 != t.DealerHit)   { t.DealerHit  = v0; MarkNarrationDirty(); }
 
             var v1 = t.DealerBust;
             NtRow("Bust##ntDB",       "{card}  {cards}  {score}", Defaults.DealerBust, ctrlHeld, ref v1);
-            if (v1 != t.DealerBust)  { t.DealerBust = v1; config.Save(); }
+            if (v1 != t.DealerBust)  { t.DealerBust = v1; MarkNarrationDirty(); }
 
             var v2 = t.DealerBJ;
             NtRow("Blackjack##ntDBJ", "{card}  {cards}",          Defaults.DealerBJ,   ctrlHeld, ref v2);
-            if (v2 != t.DealerBJ)   { t.DealerBJ   = v2; config.Save(); }
+            if (v2 != t.DealerBJ)   { t.DealerBJ   = v2; MarkNarrationDirty(); }
 
             ImGui.EndTable();
         }
@@ -157,19 +173,19 @@ public class ConfigWindow : Window, IDisposable
 
             var v0 = t.PlayerHit;
             NtRow("Hit##ntPH",        "{name}  {card}  {cards}  {score}", Defaults.PlayerHit,   ctrlHeld, ref v0);
-            if (v0 != t.PlayerHit)   { t.PlayerHit   = v0; config.Save(); }
+            if (v0 != t.PlayerHit)   { t.PlayerHit   = v0; MarkNarrationDirty(); }
 
             var v1 = t.PlayerBust;
             NtRow("Bust##ntPB",       "{name}  {cards}  {score}",         Defaults.PlayerBust,  ctrlHeld, ref v1);
-            if (v1 != t.PlayerBust)  { t.PlayerBust  = v1; config.Save(); }
+            if (v1 != t.PlayerBust)  { t.PlayerBust  = v1; MarkNarrationDirty(); }
 
             var v2 = t.PlayerBJ;
             NtRow("Blackjack##ntPBJ", "{name}  {cards}",                  Defaults.PlayerBJ,    ctrlHeld, ref v2);
-            if (v2 != t.PlayerBJ)   { t.PlayerBJ    = v2; config.Save(); }
+            if (v2 != t.PlayerBJ)   { t.PlayerBJ    = v2; MarkNarrationDirty(); }
 
             var v3 = t.PlayerStand;
             NtRow("Stand##ntPS",      "{name}  {cards}  {score}",         Defaults.PlayerStand, ctrlHeld, ref v3);
-            if (v3 != t.PlayerStand) { t.PlayerStand = v3; config.Save(); }
+            if (v3 != t.PlayerStand) { t.PlayerStand = v3; MarkNarrationDirty(); }
 
             ImGui.EndTable();
         }
@@ -186,11 +202,11 @@ public class ConfigWindow : Window, IDisposable
 
             var vda0 = t.DealDealerCard;
             NtRow("Dealer##ntDAD",      "(no variables)", Defaults.DealDealerCard, ctrlHeld, ref vda0);
-            if (vda0 != t.DealDealerCard) { t.DealDealerCard = vda0; config.Save(); }
+            if (vda0 != t.DealDealerCard) { t.DealDealerCard = vda0; MarkNarrationDirty(); }
 
             var vda1 = t.DealPlayerHand;
             NtRow("Player##ntDAP",      "{name}",         Defaults.DealPlayerHand, ctrlHeld, ref vda1);
-            if (vda1 != t.DealPlayerHand) { t.DealPlayerHand = vda1; config.Save(); }
+            if (vda1 != t.DealPlayerHand) { t.DealPlayerHand = vda1; MarkNarrationDirty(); }
 
             ImGui.EndTable();
         }
@@ -207,15 +223,15 @@ public class ConfigWindow : Window, IDisposable
 
             var v0 = t.DealSummaryPrefix;
             NtRow("Prefix##ntDP",      "(no variables)",                  Defaults.DealSummaryPrefix, ctrlHeld, ref v0);
-            if (v0 != t.DealSummaryPrefix) { t.DealSummaryPrefix = v0; config.Save(); }
+            if (v0 != t.DealSummaryPrefix) { t.DealSummaryPrefix = v0; MarkNarrationDirty(); }
 
             var v1 = t.DealSummaryPlayer;
             NtRow("Per player##ntDPP", "{name}  {cards}  {score}  {bj}", Defaults.DealSummaryPlayer, ctrlHeld, ref v1);
-            if (v1 != t.DealSummaryPlayer) { t.DealSummaryPlayer = v1; config.Save(); }
+            if (v1 != t.DealSummaryPlayer) { t.DealSummaryPlayer = v1; MarkNarrationDirty(); }
 
             var v2 = t.DealSummaryDealer;
             NtRow("Dealer##ntDD",      "{cards}",                         Defaults.DealSummaryDealer, ctrlHeld, ref v2);
-            if (v2 != t.DealSummaryDealer) { t.DealSummaryDealer = v2; config.Save(); }
+            if (v2 != t.DealSummaryDealer) { t.DealSummaryDealer = v2; MarkNarrationDirty(); }
 
             ImGui.EndTable();
         }
@@ -232,15 +248,15 @@ public class ConfigWindow : Window, IDisposable
 
             var v0 = t.PayoutDealerBust;
             NtRow("Dlr Bust##ntPDB",   "{score}",                            Defaults.PayoutDealerBust,   ctrlHeld, ref v0);
-            if (v0 != t.PayoutDealerBust)   { t.PayoutDealerBust   = v0; config.Save(); }
+            if (v0 != t.PayoutDealerBust)   { t.PayoutDealerBust   = v0; MarkNarrationDirty(); }
 
             var v1 = t.PayoutDealerStands;
             NtRow("Dlr Stands##ntPDS", "{score}",                            Defaults.PayoutDealerStands, ctrlHeld, ref v1);
-            if (v1 != t.PayoutDealerStands) { t.PayoutDealerStands = v1; config.Save(); }
+            if (v1 != t.PayoutDealerStands) { t.PayoutDealerStands = v1; MarkNarrationDirty(); }
 
             var v2 = t.PayoutPlayer;
             NtRow("Player##ntPP",      "{name}  {result}  {bet}  {amount}", Defaults.PayoutPlayer,       ctrlHeld, ref v2);
-            if (v2 != t.PayoutPlayer)       { t.PayoutPlayer       = v2; config.Save(); }
+            if (v2 != t.PayoutPlayer)       { t.PayoutPlayer       = v2; MarkNarrationDirty(); }
 
             ImGui.EndTable();
         }
