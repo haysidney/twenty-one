@@ -421,7 +421,12 @@ public static class GameEngine
                     {
                         (newActivePi, newActiveHi, newPhase) = AdvanceFrom(pi, hi, newPlayers);
                         if (newPhase == GamePhase.PlayerTurns)
-                            NarratePlayerTurn(newActivePi, newActiveHi, newPlayers, state.DealerHand);
+                        {
+                            if (newPlayers[newActivePi].Hands[newActiveHi].Cards.Count == 1)
+                                effects.Add(new AutoHit(newActivePi, newActiveHi));
+                            else
+                                NarratePlayerTurn(newActivePi, newActiveHi, newPlayers, state.DealerHand);
+                        }
                     }
                 }
 
