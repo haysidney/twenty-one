@@ -12,7 +12,7 @@ public record AnnounceDealerDeal : GameAction;
 public record AnnouncePlayerDeal(int PlayerIndex) : GameAction;
 
 // Betting phase announcement (narration only)
-public record AnnounceBettingOpen(string MinBet, string MaxBet) : GameAction;
+public record AnnounceBettingOpen : GameAction;
 
 // Phase transitions
 public record StartDeal : GameAction;

@@ -47,24 +47,6 @@ public class ConfigWindow : Window, IDisposable
         }
 
         ImGui.AlignTextToFramePadding();
-        ImGui.Text("Min Bet");
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(80);
-        var minBet = config.MinBet;
-        if (ImGui.InputText("##minBet", ref minBet, 32)) { config.MinBet = minBet; config.Save(); }
-        ImGui.SameLine();
-        ImGui.AlignTextToFramePadding();
-        ImGui.Text("Max Bet");
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(80);
-        var maxBet = config.MaxBet;
-        if (ImGui.InputText("##maxBet", ref maxBet, 32)) { config.MaxBet = maxBet; config.Save(); }
-
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
-
-        ImGui.AlignTextToFramePadding();
         ImGui.Text("Blackjack Payout");
         ImGui.SameLine();
         var bjOptions = new[] { "3:2", "6:5", "1:1" };
@@ -166,7 +148,7 @@ public class ConfigWindow : Window, IDisposable
             ImGui.TableSetupColumn("##ntBettingReset", ImGuiTableColumnFlags.WidthFixed, 48);
 
             var vb0 = t.BettingOpen;
-            NtRow("Open##ntBO", "{minBet}  {maxBet}", Defaults.BettingOpen, ctrlHeld, ref vb0);
+            NtRow("Open##ntBO", "", Defaults.BettingOpen, ctrlHeld, ref vb0);
             if (vb0 != t.BettingOpen) { t.BettingOpen = vb0; MarkNarrationDirty(); }
 
             ImGui.EndTable();

@@ -6,7 +6,7 @@ namespace TwentyOne.Game;
 public class NarrationTemplates
 {
     // Betting phase open announcement
-    public string BettingOpen { get; set; } = "Betting is now open! Min: {minBet} / Max: {maxBet} — I'll initiate a trade with you, please be patient!";
+    public string BettingOpen { get; set; } = "Betting is now open! Min: 50,000 / Max: 250,000 — I'll initiate a trade with you, please be patient!";
 
     // Dealer card draws (DealerTurn phase)
     public string DealerHit  { get; set; } = "Dealer draws {card} → {cards} = {score}";

@@ -544,7 +544,7 @@ public partial class MainWindow : Window, IDisposable
         {
             case GamePhase.Betting:
                 if (ImGui.Button("Announce Betting Open"))
-                    Apply(new AnnounceBettingOpen(config.MinBet, config.MaxBet));
+                    Apply(new AnnounceBettingOpen());
                 ImGui.SameLine();
                 var effectiveBets = State.Players.Select((p, i) =>
                     betEdits.TryGetValue(i, out var e) ? e : p.Bet);
@@ -602,7 +602,7 @@ public partial class MainWindow : Window, IDisposable
                 if (ImGui.Button("New Round"))
                 {
                     Apply(new NewRound());
-                    Apply(new AnnounceBettingOpen(config.MinBet, config.MaxBet));
+                    Apply(new AnnounceBettingOpen());
                 }
                 break;
         }
@@ -616,7 +616,7 @@ public partial class MainWindow : Window, IDisposable
             {
                 config.NarrationLog.Add("Round aborted.");
                 Apply(new NewRound());
-                Apply(new AnnounceBettingOpen(config.MinBet, config.MaxBet));
+                Apply(new AnnounceBettingOpen());
             }
             if (!ctrlHeld) ImGui.EndDisabled();
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)

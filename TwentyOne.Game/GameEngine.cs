@@ -339,10 +339,8 @@ public static class GameEngine
             }
 
             // ── AnnounceBettingOpen ──────────────────────────────────────────
-            case AnnounceBettingOpen a:
-                Narrate(NarrationTemplates.Fmt(t.BettingOpen,
-                    ("minBet", a.MinBet),
-                    ("maxBet", a.MaxBet)));
+            case AnnounceBettingOpen:
+                Narrate(t.BettingOpen);
                 return (state, effects);
 
             // ── AnnounceDealerDeal / AnnouncePlayerDeal ──────────────────────
