@@ -4,14 +4,18 @@
   ProcessChatBoxEntry. This would be cleaner and avoid any unwanted sending bare
   channel commands through the chat box.
 
-- Message before dealing a dealer's card.
+- Add a betting announcement.
 
-- Message before dealing a player's hand.
+- Trade help/automation.
 
-- When chat is disabled, we should print each card drawn.
+- Player targeting.
 
-- Add config options for public vs private chat cooldown. 1 to 10 seconds seems reasonable. Public channels (/say /yell /shout) are rate limited more than private ones, so a default of 2 seconds for public and 1 second for private seems reasonable.
+- Better payout screen.
 
-- Add a way to split a narrator template into multiple messages. Maybe a {} placeholder that represents a split between messages.
+- Round summary
+
+- Splits/Doubles
+
+- Shout timer for advertising
 
 - Add /tell as a channel?

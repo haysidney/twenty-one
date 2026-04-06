@@ -338,6 +338,13 @@ public static class GameEngine
                     activePlayerIndex: newActive), effects);
             }
 
+            // ── AnnounceBettingOpen ──────────────────────────────────────────
+            case AnnounceBettingOpen a:
+                Narrate(NarrationTemplates.Fmt(t.BettingOpen,
+                    ("minBet", a.MinBet),
+                    ("maxBet", a.MaxBet)));
+                return (state, effects);
+
             // ── AnnounceDealerDeal / AnnouncePlayerDeal ──────────────────────
             case AnnounceDealerDeal:
                 Narrate(t.DealDealerCard);

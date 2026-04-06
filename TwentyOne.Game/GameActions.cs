@@ -11,6 +11,9 @@ public record StandPlayer(int PlayerIndex, int HandIndex) : GameAction;
 public record AnnounceDealerDeal : GameAction;
 public record AnnouncePlayerDeal(int PlayerIndex) : GameAction;
 
+// Betting phase announcement (narration only)
+public record AnnounceBettingOpen(string MinBet, string MaxBet) : GameAction;
+
 // Phase transitions
 public record StartDeal : GameAction;
 public record BeginPlayerTurns : GameAction;

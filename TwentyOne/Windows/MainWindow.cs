@@ -82,7 +82,7 @@ public partial class MainWindow : Window, IDisposable
             autoDealQueue.Clear();
             pendingHit = null;
         }
-        else
+        else if (action is not AnnounceBettingOpen)
         {
             // GameEngine is pure — it never mutates state, so pushing the current
             // reference is safe; future Apply calls create entirely new objects.
@@ -596,7 +596,11 @@ public partial class MainWindow : Window, IDisposable
                 break;
 
             case GamePhase.Payout:
-                if (ImGui.Button("New Round")) Apply(new NewRound());
+                if (ImGui.Button("New Round"))
+                {
+                    Apply(new NewRound());
+                    Apply(new AnnounceBettingOpen(config.MinBet, config.MaxBet));
+                }
                 break;
         }
 
@@ -609,6 +613,7 @@ public partial class MainWindow : Window, IDisposable
             {
                 config.NarrationLog.Add("Round aborted.");
                 Apply(new NewRound());
+                Apply(new AnnounceBettingOpen(config.MinBet, config.MaxBet));
             }
             if (!ctrlHeld) ImGui.EndDisabled();
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)

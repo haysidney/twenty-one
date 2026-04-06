@@ -30,6 +30,10 @@ public class Configuration : IPluginConfiguration
     public int PublicChatCooldownMs  { get; set; } = 2000;
     public int PrivateChatCooldownMs { get; set; } = 1000;
 
+    // ── Venue bet limits ───────────────────────────────────────────────────────
+    public string MinBet { get; set; } = string.Empty;
+    public string MaxBet { get; set; } = string.Empty;
+
     // ── Narration templates ────────────────────────────────────────────────────
     public NarrationTemplates NarrationTemplates { get; set; } = new();
 

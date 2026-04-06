@@ -657,6 +657,30 @@ public class ImmutabilityTests
     }
 }
 
+public class AnnounceBettingOpenTests
+{
+    [Fact]
+    public void AnnounceBettingOpen_NarratesWithMinMax()
+    {
+        var state = new GameState { Phase = GamePhase.Betting };
+        var (newState, effects) = GameEngine.Apply(state, new AnnounceBettingOpen("100", "500"));
+        Assert.Same(state, newState);
+        Assert.Single(effects);
+        var text = ((SendChat)effects[0]).Text;
+        Assert.Contains("100", text);
+        Assert.Contains("500", text);
+    }
+
+    [Fact]
+    public void AnnounceBettingOpen_CustomTemplate()
+    {
+        var t = new NarrationTemplates { BettingOpen = "Min {minBet} Max {maxBet}" };
+        var state = new GameState { Phase = GamePhase.Betting };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceBettingOpen("50", "1000"), t);
+        Assert.Equal("Min 50 Max 1000", ((SendChat)effects[0]).Text);
+    }
+}
+
 public class CanGoToPayoutTests
 {
     private static Player BjPlayer(string name) =>
