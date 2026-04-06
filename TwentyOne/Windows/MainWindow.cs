@@ -648,7 +648,13 @@ public partial class MainWindow : Window, IDisposable
                 }
             }
 
-            if (removeAt >= 0) { betEdits.Remove(removeAt); Apply(new RemovePlayer(removeAt)); }
+            if (removeAt >= 0)
+            {
+                betEdits.Remove(removeAt);
+                var shifted = betEdits.Where(kv => kv.Key > removeAt).ToList();
+                foreach (var kv in shifted) { betEdits.Remove(kv.Key); betEdits[kv.Key - 1] = kv.Value; }
+                Apply(new RemovePlayer(removeAt));
+            }
             ImGui.EndTable();
         }
 
