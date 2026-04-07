@@ -305,6 +305,25 @@ public static class GameEngine
                 ("actions",     actions)));
         }
 
+        void NarrateDealSummary(GameState s)
+        {
+            var sb = new StringBuilder(t.DealSummaryPrefix);
+            for (var i = 0; i < s.Players.Count; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                var p    = s.Players[i];
+                var hand = p.Hands[0];
+                sb.Append(NarrationTemplates.Fmt(t.DealSummaryPlayer,
+                    ("name",  p.DisplayName),
+                    ("cards", HandString(hand.Cards)),
+                    ("score", ScoreString(hand.Cards)),
+                    ("bj",    hand.State == HandState.Blackjack ? " BJ!" : string.Empty)));
+            }
+            sb.Append(NarrationTemplates.Fmt(t.DealSummaryDealer,
+                ("cards", HandString(s.DealerHand.Cards))));
+            Narrate(sb.ToString());
+        }
+
         switch (action)
         {
             // ── AddDealerCard ────────────────────────────────────────────────
@@ -327,7 +346,10 @@ public static class GameEngine
                         Narrate(NarrationTemplates.Fmt(t.DealerHit,
                             ("card", cardLbl), ("cards", cards), ("score", score)));
                 }
-                return (With(state, dealerHand: newHand), effects);
+                var newStateD = With(state, dealerHand: newHand);
+                if (state.Phase == GamePhase.Deal && IsDealComplete(newStateD))
+                    NarrateDealSummary(newStateD);
+                return (newStateD, effects);
             }
 
             // ── AddPlayerCard ────────────────────────────────────────────────
@@ -354,7 +376,13 @@ public static class GameEngine
                 var newActivePi = state.ActivePlayerIndex;
                 var newActiveHi = state.ActiveHandIndex;
 
-                if (state.Phase == GamePhase.PlayerTurns)
+                if (state.Phase == GamePhase.Deal)
+                {
+                    var newStateP = With(state, players: newPlayers);
+                    if (IsDealComplete(newStateP))
+                        NarrateDealSummary(newStateP);
+                }
+                else if (state.Phase == GamePhase.PlayerTurns)
                 {
                     var multiHand   = state.Players[pi].Hands.Count > 1;
                     var displayName = multiHand
@@ -563,22 +591,6 @@ public static class GameEngine
             // ── BeginPlayerTurns ─────────────────────────────────────────────
             case BeginPlayerTurns:
             {
-                var sb = new StringBuilder(t.DealSummaryPrefix);
-                for (var i = 0; i < state.Players.Count; i++)
-                {
-                    if (i > 0) sb.Append(", ");
-                    var p    = state.Players[i];
-                    var hand = p.Hands[0];
-                    sb.Append(NarrationTemplates.Fmt(t.DealSummaryPlayer,
-                        ("name",  p.DisplayName),
-                        ("cards", HandString(hand.Cards)),
-                        ("score", ScoreString(hand.Cards)),
-                        ("bj",    hand.State == HandState.Blackjack ? " BJ!" : string.Empty)));
-                }
-                sb.Append(NarrationTemplates.Fmt(t.DealSummaryDealer,
-                    ("cards", HandString(state.DealerHand.Cards))));
-                Narrate(sb.ToString());
-
                 var (nextPi, nextHi, nextPhase) = AdvanceFrom(-1, -1, state.Players);
                 if (nextPhase == GamePhase.PlayerTurns)
                     NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);

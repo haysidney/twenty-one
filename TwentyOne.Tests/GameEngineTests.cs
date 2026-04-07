@@ -356,7 +356,26 @@ public class ApplyPhaseTransitionTests
     }
 
     [Fact]
-    public void BeginPlayerTurns_NarratesDealSummary_SetsFirstActivePlayer()
+    public void AddPlayerCard_CompletingDeal_NarratesDealSummary()
+    {
+        // Last card dealt (Bekki's 2nd card) completes the deal — summary fires here.
+        var state = new GameState
+        {
+            Phase      = GamePhase.Deal,
+            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
+            Players =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8],  State = HandState.Playing }] },
+                new Player { Nickname = "Bekki",   Hands = [new Hand { Cards = [10], State = HandState.Playing }] },
+            ],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(1, 0, 9));
+        Assert.Single(effects);
+        Assert.Contains("Deal —", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void BeginPlayerTurns_SetsFirstActivePlayer()
     {
         var state = new GameState
         {
@@ -369,9 +388,8 @@ public class ApplyPhaseTransitionTests
             ],
         };
         var (newState, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
-        Assert.Equal(2, effects.Count);
-        Assert.Contains("Deal —", ((SendChat)effects[0]).Text);
-        Assert.Contains("Lorah's turn", ((SendChat)effects[1]).Text);
+        Assert.Single(effects);
+        Assert.Contains("Lorah's turn", ((SendChat)effects[0]).Text);
         Assert.Equal(0, newState.ActivePlayerIndex);
         Assert.Equal(GamePhase.PlayerTurns, newState.Phase);
     }
@@ -645,13 +663,14 @@ public class NarrationTemplateTests
     public void CustomDealSummaryPrefix_UsesTemplate()
     {
         var t = new NarrationTemplates { DealSummaryPrefix = "DEALT: ", DealSummaryDealer = "" };
+        // Deal is incomplete: Lorah has 1 card. Adding 2nd card completes the deal.
         var state = new GameState
         {
             Phase      = GamePhase.Deal,
             DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
+            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5], State = HandState.Playing }] }],
         };
-        var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 8), t);
         Assert.StartsWith("DEALT: ", ((SendChat)effects[0]).Text);
     }
 
@@ -699,8 +718,8 @@ public class NarrationTemplateTests
             Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
         };
         var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
-        // effects[0] = deal summary, effects[1] = PlayerTurnStart
-        var turnStart = ((SendChat)effects[1]).Text;
+        // effects[0] = PlayerTurnStart (deal summary is emitted when the last card is dealt)
+        var turnStart = ((SendChat)effects[0]).Text;
         Assert.Contains("13", turnStart); // score of 5+8
     }
 }
