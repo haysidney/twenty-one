@@ -39,5 +39,8 @@ public class Configuration : IPluginConfiguration
     // ── Narration templates ────────────────────────────────────────────────────
     public NarrationTemplates NarrationTemplates { get; set; } = new();
 
+    // Used as {dealer} in narration templates.
+    public string DealerName { get; set; } = "Dealer";
+
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

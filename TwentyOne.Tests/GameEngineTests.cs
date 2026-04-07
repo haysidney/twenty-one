@@ -763,6 +763,62 @@ public class NarrationTemplateTests
         Assert.Contains("10", text);  // cards
         Assert.Contains("17", text);  // score of 10+7
     }
+
+    [Fact]
+    public void DealerHit_SubstitutesDealerName()
+    {
+        var t     = new NarrationTemplates { DealerHit = "{dealer}+{card}" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
+        };
+        var (_, effects) = GameEngine.Apply(state, new AddDealerCard(7), t, dealerName: "Vera");
+        Assert.Equal("Vera+7", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void DealerTurnStart_SubstitutesDealerName()
+    {
+        var t     = new NarrationTemplates { DealerTurnStart = "{dealer}: {cards}" };
+        var state = new GameState
+        {
+            Phase            = GamePhase.DealerTurn,
+            WaitingForDealer = true,
+            DealerHand       = new Hand { Cards = [10, 7], State = HandState.Playing },
+            Players          = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Stand }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new BeginDealerTurn(), t, dealerName: "Vera");
+        Assert.StartsWith("Vera:", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void PayoutDealerBust_SubstitutesDealerName()
+    {
+        var t     = new NarrationTemplates { PayoutDealerBust = "{dealer} BUST", PayoutPlayer = "" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 7, 8], State = HandState.Bust },
+            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t, dealerName: "Vera");
+        Assert.Equal("Vera BUST", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void DealSummaryDealer_SubstitutesDealerName()
+    {
+        var t     = new NarrationTemplates { DealSummaryDealer = "|{dealer}:{cards}", DealSummaryPrefix = "", DealSummaryPlayer = "" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.Deal,
+            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
+            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5], State = HandState.Playing }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 8), t, dealerName: "Vera");
+        Assert.Contains("Vera:", ((SendChat)effects[0]).Text);
+    }
 }
 
 public class ImmutabilityTests

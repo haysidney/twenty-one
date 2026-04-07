@@ -113,7 +113,7 @@ public partial class MainWindow : Window, IDisposable
         }
         config.RedoStack.Clear();
 
-        var (newState, effects) = GameEngine.Apply(config.GameState, action, config.NarrationTemplates);
+        var (newState, effects) = GameEngine.Apply(config.GameState, action, config.NarrationTemplates, config.DealerName);
         config.GameState = newState;
 
         if (config.AutoTargetEnabled

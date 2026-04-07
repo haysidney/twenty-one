@@ -281,7 +281,7 @@ public static class GameEngine
     // ── Apply ─────────────────────────────────────────────────────────────────
 
     public static (GameState State, IReadOnlyList<SideEffect> Effects) Apply(
-        GameState state, GameAction action, NarrationTemplates? templates = null)
+        GameState state, GameAction action, NarrationTemplates? templates = null, string dealerName = "Dealer")
     {
         var t       = templates ?? new NarrationTemplates();
         var effects = new List<SideEffect>();
@@ -325,7 +325,7 @@ public static class GameEngine
                     ("bj",    hand.State == HandState.Blackjack ? " BJ!" : string.Empty)));
             }
             sb.Append(NarrationTemplates.Fmt(t.DealSummaryDealer,
-                ("cards", HandString(s.DealerHand.Cards))));
+                ("dealer", dealerName), ("cards", HandString(s.DealerHand.Cards))));
             Narrate(sb.ToString());
         }
 
@@ -343,17 +343,17 @@ public static class GameEngine
                     var cardLbl = CardLabel(a.Card);
                     if (val > 21)
                         Narrate(NarrationTemplates.Fmt(t.DealerBust,
-                            ("card", cardLbl), ("cards", cards), ("score", score)));
+                            ("dealer", dealerName), ("card", cardLbl), ("cards", cards), ("score", score)));
                     else if (newHand.Cards.Count == 2 && val == 21)
                         Narrate(NarrationTemplates.Fmt(t.DealerBJ,
-                            ("card", cardLbl), ("cards", cards)));
+                            ("dealer", dealerName), ("card", cardLbl), ("cards", cards)));
                     else
                     {
                         Narrate(NarrationTemplates.Fmt(t.DealerHit,
-                            ("card", cardLbl), ("cards", cards), ("score", score)));
+                            ("dealer", dealerName), ("card", cardLbl), ("cards", cards), ("score", score)));
                         if (DealerRecommendation(newHand) == "STAND")
                             Narrate(NarrationTemplates.Fmt(t.DealerStand,
-                                ("cards", cards), ("score", score)));
+                                ("dealer", dealerName), ("cards", cards), ("score", score)));
                     }
                 }
                 var newStateD = With(state, dealerHand: newHand);
@@ -579,7 +579,7 @@ public static class GameEngine
 
             // ── AnnounceDealerHit / AnnouncePlayerHit ───────────────────────
             case AnnounceDealerHit:
-                Narrate(t.DealerHitAnnounce);
+                Narrate(NarrationTemplates.Fmt(t.DealerHitAnnounce, ("dealer", dealerName)));
                 return (state, effects);
 
             case AnnouncePlayerHit a:
@@ -628,7 +628,7 @@ public static class GameEngine
 
             // ── AnnounceDealerDeal / AnnouncePlayerDeal ──────────────────────
             case AnnounceDealerDeal:
-                Narrate(t.DealDealerCard);
+                Narrate(NarrationTemplates.Fmt(t.DealDealerCard, ("dealer", dealerName)));
                 return (state, effects);
 
             case AnnouncePlayerDeal a:
@@ -671,6 +671,7 @@ public static class GameEngine
             {
                 if (!state.WaitingForDealer) return (state, effects);
                 Narrate(NarrationTemplates.Fmt(t.DealerTurnStart,
+                    ("dealer", dealerName),
                     ("cards", HandString(state.DealerHand.Cards)),
                     ("score", ScoreString(state.DealerHand.Cards))));
                 return (With(state, waitingForDealer: false), effects);
@@ -683,9 +684,9 @@ public static class GameEngine
                 var dealerBust  = state.DealerHand.Cards.Count > 0 && dealerScore > 21;
                 Narrate(dealerBust
                     ? NarrationTemplates.Fmt(t.PayoutDealerBust,
-                        ("score", dealerScore.ToString()))
+                        ("dealer", dealerName), ("score", dealerScore.ToString()))
                     : NarrationTemplates.Fmt(t.PayoutDealerStands,
-                        ("score", ScoreString(state.DealerHand.Cards))));
+                        ("dealer", dealerName), ("score", ScoreString(state.DealerHand.Cards))));
 
                 for (var pi = 0; pi < state.Players.Count; pi++)
                 {

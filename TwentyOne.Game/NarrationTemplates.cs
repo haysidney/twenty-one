@@ -9,12 +9,13 @@ public class NarrationTemplates
     public string BettingOpen { get; set; } = "Betting is now open! Min: 50,000 / Max: 250,000 — I'll initiate a trade with you, please be patient!{|}/wringhands";
 
     // Dealer card draws (DealerTurn phase)
-    public string DealerTurnStart   { get; set; } = "Dealer's turn — showing {cards} ({score}).";
-    public string DealerHitAnnounce { get; set; } = "Dealer hits!";
-    public string DealerHit  { get; set; } = "Dealer draws {card} → {cards} = {score}";
-    public string DealerBust  { get; set; } = "Dealer draws {card} → {cards} = {score} — Bust!";
-    public string DealerBJ    { get; set; } = "Dealer draws {card} → {cards} — Blackjack!";
-    public string DealerStand { get; set; } = "Dealer stands. {cards} = {score}";
+    // {dealer} = dealer's name (configured in Settings)
+    public string DealerTurnStart   { get; set; } = "{dealer}'s turn — showing {cards} ({score}).";
+    public string DealerHitAnnounce { get; set; } = "{dealer} hits!";
+    public string DealerHit  { get; set; } = "{dealer} draws {card} → {cards} = {score}";
+    public string DealerBust  { get; set; } = "{dealer} draws {card} → {cards} = {score} — Bust!";
+    public string DealerBJ    { get; set; } = "{dealer} draws {card} → {cards} — Blackjack!";
+    public string DealerStand { get; set; } = "{dealer} stands. {cards} = {score}";
 
     // Player actions (PlayerTurns phase)
     // {actions} = e.g. "Hit or Stand" or "Hit or Stand, Double, Split"
@@ -48,17 +49,17 @@ public class NarrationTemplates
     public string PlayerSplit { get; set; } = "{name} splits into two hands!";
 
     // Initial deal announcements (Deal phase)
-    public string DealDealerCard  { get; set; } = "Dealer's Card:";
+    public string DealDealerCard  { get; set; } = "{dealer}'s Card:";
     public string DealPlayerHand  { get; set; } = "{name}'s Hand:";
 
     // Deal summary (BeginPlayerTurns): prefix + one entry per player + dealer suffix
     public string DealSummaryPrefix { get; set; } = "Deal — ";
     public string DealSummaryPlayer { get; set; } = "{name}: {cards} ({score}){bj}";
-    public string DealSummaryDealer { get; set; } = " | Dealer shows {cards}";
+    public string DealSummaryDealer { get; set; } = " | {dealer} shows {cards}";
 
     // Payout
-    public string PayoutDealerBust   { get; set; } = "Dealer busts ({score})";
-    public string PayoutDealerStands { get; set; } = "Dealer {score}";
+    public string PayoutDealerBust   { get; set; } = "{dealer} busts ({score})";
+    public string PayoutDealerStands { get; set; } = "{dealer} {score}";
     // {bet} = " (bet: 100)" or ""; {amount} = " +150" or ""
     public string PayoutPlayer { get; set; } = "{name}: {result}{bet}{amount}";
 
