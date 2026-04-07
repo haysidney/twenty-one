@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.System.String;
@@ -205,9 +206,14 @@ public partial class MainWindow : Window, IDisposable
 
         var (isDealer, pi, hi, isPublic) = pendingHit.Value;
 
-        // Cross-world senders append world name with a special character after the player name
-        var localName = objectTable.LocalPlayer?.Name.TextValue;
-        if (!isPublic && (localName == null || !sender.TextValue.Contains(localName))) return;
+        if (!isPublic)
+        {
+            var local   = objectTable.LocalPlayer;
+            var payload = sender.Payloads.OfType<PlayerPayload>().FirstOrDefault();
+            if (payload == null || local == null) return;
+            if (payload.PlayerName != local.Name.TextValue) return;
+            if (payload.World.ValueNullable?.Name.ToString() != local.HomeWorld.Value.Name.ToString()) return;
+        }
 
         var msgText = message.TextValue;
         var match   = (isPublic ? RandomRollRegex() : DiceRollRegex()).Match(msgText);
