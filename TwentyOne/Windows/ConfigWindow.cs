@@ -35,7 +35,7 @@ public class ConfigWindow : Window, IDisposable
     [
         "/say", "/yell", "/shout", "/p", "/a", "/fc",
         "/cwl1", "/cwl2", "/cwl3", "/cwl4", "/cwl5", "/cwl6", "/cwl7", "/cwl8",
-        "/ls1", "/ls2", "/ls3", "/ls4", "/ls5", "/ls6", "/ls7", "/ls8",
+        "/l1", "/l2", "/l3", "/l4", "/l5", "/l6", "/l7", "/l8",
     ];
 
     public override void Draw()
