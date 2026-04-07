@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Numerics;
 using System.Text.Json;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using TwentyOne.Game;
 
@@ -26,6 +28,8 @@ public class ConfigWindow : Window, IDisposable
     private bool   _narrationDirty;
     private double _narrationDirtyAt;
 
+    private readonly FileDialogManager _fileDialogManager = new();
+
     private void MarkNarrationDirty()
     {
         _narrationDirty   = true;
@@ -41,6 +45,7 @@ public class ConfigWindow : Window, IDisposable
 
     public override void Draw()
     {
+        _fileDialogManager.Draw();
         if (_narrationDirty && ImGui.GetTime() - _narrationDirtyAt > 1.0)
         {
             config.Save();
@@ -171,33 +176,62 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
             ImGui.SetTooltip("Hold Ctrl to reset narration templates to defaults."u8);
 
+        var shiftHeld = ImGui.GetIO().KeyShift;
+
         ImGui.SameLine();
         if (ImGui.Button("Export##ntExport"))
         {
             var json = JsonSerializer.Serialize(config.NarrationTemplates, new JsonSerializerOptions { WriteIndented = true });
-            ImGui.SetClipboardText(json);
+            if (shiftHeld)
+            {
+                _fileDialogManager.SaveFileDialog(
+                    "Export Narration Templates", "JSON{.json}", "narration-templates", ".json",
+                    (ok, path) => { if (ok) File.WriteAllText(path, json); });
+            }
+            else
+            {
+                ImGui.SetClipboardText(json);
+            }
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Copy all narration templates to clipboard as JSON."u8);
+            ImGui.SetTooltip(shiftHeld
+                ? "Save narration templates to a file."u8
+                : "Copy narration templates to clipboard as JSON. Shift+click to save to file."u8);
 
         ImGui.SameLine();
         if (ImGui.Button("Import##ntImport"))
         {
-            try
+            if (shiftHeld)
             {
-                var json = ImGui.GetClipboardText();
-                var imported = JsonSerializer.Deserialize<NarrationTemplates>(json);
-                if (imported != null)
-                {
-                    config.NarrationTemplates = imported;
-                    _narrationDirty = false;
-                    config.Save();
-                }
+                _fileDialogManager.OpenFileDialog(
+                    "Import Narration Templates", "JSON{.json}",
+                    (ok, path) =>
+                    {
+                        if (!ok) return;
+                        try
+                        {
+                            var text = File.ReadAllText(path);
+                            var imported = JsonSerializer.Deserialize<NarrationTemplates>(text);
+                            if (imported != null) { config.NarrationTemplates = imported; _narrationDirty = false; config.Save(); }
+                        }
+                        catch { }
+                    });
             }
-            catch { /* invalid clipboard content — ignore */ }
+            else
+            {
+                try
+                {
+                    var json = ImGui.GetClipboardText();
+                    var imported = JsonSerializer.Deserialize<NarrationTemplates>(json);
+                    if (imported != null) { config.NarrationTemplates = imported; _narrationDirty = false; config.Save(); }
+                }
+                catch { }
+            }
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Load narration templates from clipboard JSON."u8);
+            ImGui.SetTooltip(shiftHeld
+                ? "Load narration templates from a file."u8
+                : "Load narration templates from clipboard JSON. Shift+click to load from file."u8);
 
         ImGui.Spacing();
         var t     = config.NarrationTemplates;
