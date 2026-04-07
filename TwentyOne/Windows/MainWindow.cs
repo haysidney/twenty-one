@@ -195,10 +195,8 @@ public partial class MainWindow : Window, IDisposable
         }
         else
         {
-            var savedChatType = shell->ChatType;
             SendChatMessage(channel);
             SendChatMessage("/dice 13");
-            shell->ChangeChatChannel(savedChatType, 0, null, true);
         }
     }
 
