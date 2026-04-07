@@ -855,7 +855,6 @@ private static unsafe void SendChatMessage(string message)
                 if (ImGui.Button("New Round"))
                 {
                     Apply(new NewRound());
-                    Apply(new AnnounceBettingOpen());
                 }
                 break;
         }
@@ -869,7 +868,6 @@ private static unsafe void SendChatMessage(string message)
             {
                 config.NarrationLog.Add("Round aborted.");
                 Apply(new NewRound());
-                Apply(new AnnounceBettingOpen());
             }
             if (!ctrlHeld) ImGui.EndDisabled();
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
