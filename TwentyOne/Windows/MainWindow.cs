@@ -45,9 +45,11 @@ public partial class MainWindow : Window, IDisposable
     private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex, bool IsFirstCard)> autoDealQueue = new();
 
     // rate-limited outgoing queue — narration strings and roll commands share a single FIFO and lastChatSent
-    // each entry: (IsRoll, Invoke) — narration passes through freely; rolls block until pendingHit is clear
-    private readonly Queue<(bool IsRoll, Action Invoke)> chatQueue = new();
-    private          DateTime                             lastChatSent = DateTime.MinValue;
+    // each entry: (IsRoll, Invoke, MinWaitMs) — narration passes through freely; rolls block until pendingHit is clear
+    // MinWaitMs: minimum ms to wait after the *previous* entry before sending this one (0 = use cooldownMs)
+    private readonly Queue<(bool IsRoll, Action Invoke, int MinWaitMs)> chatQueue = new();
+    private          DateTime                                             lastChatSent      = DateTime.MinValue;
+    private          int                                                  lastSentMinWaitMs = 0;
 
     // ── Convenience accessors ─────────────────────────────────────────────────
 
@@ -133,8 +135,19 @@ public partial class MainWindow : Window, IDisposable
                 config.NarrationLog.Add(chat.Text);
                 if (config.ChatEnabled)
                 {
-                    var msg = chat.Text.StartsWith('/') ? chat.Text : config.ChatChannel + " " + chat.Text;
-                    chatQueue.Enqueue((false, () => SendChatMessage(msg)));
+                    var raw      = chat.Text;
+                    int minWait  = 0;
+                    if (raw.StartsWith('/'))
+                    {
+                        var m = System.Text.RegularExpressions.Regex.Match(raw, @"<wait\.(\d+)>");
+                        if (m.Success)
+                        {
+                            minWait = int.Parse(m.Groups[1].Value) * 1000;
+                            raw     = raw.Replace(m.Value, "").Trim();
+                        }
+                    }
+                    var msg = raw.StartsWith('/') ? raw : config.ChatChannel + " " + raw;
+                    chatQueue.Enqueue((false, () => SendChatMessage(msg), minWait));
                 }
             }
             else if (effect is AutoHit ah)
@@ -189,7 +202,7 @@ private static unsafe void SendChatMessage(string message)
             deferredRoll = (isDealer, playerIndex, handIndex, simRoll);
             return;
         }
-        chatQueue.Enqueue((true, () => SendHitRoll(isDealer, playerIndex, handIndex)));
+        chatQueue.Enqueue((true, () => SendHitRoll(isDealer, playerIndex, handIndex), 0));
     }
 
     private unsafe void SendHitRoll(bool isDealer, int playerIndex, int handIndex)
@@ -311,14 +324,16 @@ private static unsafe void SendChatMessage(string message)
         // Drain outgoing queue — hold a roll entry until the previous roll's response has arrived
         var isPublicChannel = config.ChatChannel is "/say" or "/yell" or "/shout";
         var cooldownMs = isPublicChannel ? config.PublicChatCooldownMs : config.PrivateChatCooldownMs;
-        if (chatQueue.Count > 0 && (DateTime.UtcNow - lastChatSent).TotalMilliseconds >= cooldownMs)
+        var waitMs = Math.Max(cooldownMs, lastSentMinWaitMs);
+        if (chatQueue.Count > 0 && (DateTime.UtcNow - lastChatSent).TotalMilliseconds >= waitMs)
         {
-            var (isRoll, invoke) = chatQueue.Peek();
+            var (isRoll, invoke, minWaitMs) = chatQueue.Peek();
             if (!isRoll || pendingHit == null)
             {
                 chatQueue.Dequeue();
                 invoke();
-                lastChatSent = DateTime.UtcNow;
+                lastChatSent      = DateTime.UtcNow;
+                lastSentMinWaitMs = minWaitMs;
             }
         }
 

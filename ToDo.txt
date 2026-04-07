@@ -1,9 +1,3 @@
-- Investigate mapping RaptureShellModule->ChatType int values to the existing channel
-  command strings (/p, /say, /fc, /ls1, etc.) and use ChangeChatChannel for ALL channel
-  switching (narration and hit rolls), rather than sending channel switch commands via
-  ProcessChatBoxEntry. This would be cleaner and avoid any unwanted sending bare
-  channel commands through the chat box.
-
 - Trade help/automation.
 
 - Better payout screen.
@@ -38,28 +32,20 @@
 
 - Test with a player that has the same name as the dealer.
 
-- Add click to copy to the Bet field of players when it's disabled. Add a tooltip to the disabled Bet field to make it discoverable.
-
-- Add a copy button to the payout of each player.
-
 - Design a way to bank for players. Make it a player preference.
 
-- Add sounds to templates
+- Add sounds to templates.
+
+- Test sounds in party chat
 
 - Shouts during big game moments
 
-- Change order of settings
+- Send tell to player asking them if they'd like to play some blackjack. Optionally ask in a different channel?
 
---- Anouncements Needed
+- Add player from vicinity to game feature.
 
-- Nolla's turn
+- Add a bet confirmation button. "{name}, you're current bet is {amount}. If you want to change it let me know."
 
-- Double down template
+- Figure out if I need /facetarget in the templates
 
-- Ask what the player wants to do.
-
-- Dealer standing
-
-- Emotes
-
-- Require a button press to move on to the next player turn.
+- If a message starts with a / we need to respect <wait.X> in the command. The X represents an integer number of seconds to wait before sending the next message in the queue. Subtract the current rate-limit setting in the config window from this wait if the wait is longer than the rate-limit duration.
