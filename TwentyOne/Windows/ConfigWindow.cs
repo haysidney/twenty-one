@@ -63,6 +63,17 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.Spacing();
 
+        var autoTrade = config.AutoTradeEnabled;
+        if (ImGui.Checkbox("Auto-open trade for Double Down / Split", ref autoTrade))
+        {
+            config.AutoTradeEnabled = autoTrade;
+            config.Save();
+        }
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
         var chatEnabled = config.ChatEnabled;
         if (ImGui.Checkbox("Enable FFXIV chat (narration + rolls)", ref chatEnabled))
         {

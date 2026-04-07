@@ -24,6 +24,9 @@ public class Configuration : IPluginConfiguration
     public bool NarrationUseChannelCommand { get; set; } = false;
     public bool NarrationPanelOpen { get; set; } = true;
 
+    // ── Trade ──────────────────────────────────────────────────────────────────
+    public bool AutoTradeEnabled { get; set; } = false;
+
     // ── Chat ───────────────────────────────────────────────────────────────────
     public bool ChatEnabled { get; set; } = false;
     public string ChatChannel { get; set; } = "/p";

@@ -616,7 +616,7 @@ public partial class MainWindow : Window, IDisposable
                         {
                             pendingDouble = (pi, hi);
                             Apply(new AnnounceDouble(pi, hi));
-                            if (hasWorld) Plugin.TradePlayer(p.FullName, p.World);
+                            if (hasWorld && config.AutoTradeEnabled) Plugin.TradePlayer(p.FullName, p.World);
                         }
                         if (!canDouble) ImGui.EndDisabled();
 
@@ -628,7 +628,7 @@ public partial class MainWindow : Window, IDisposable
                         {
                             pendingSplit = (pi, hi);
                             Apply(new AnnounceSplit(pi, hi));
-                            if (hasWorld) Plugin.TradePlayer(p.FullName, p.World);
+                            if (hasWorld && config.AutoTradeEnabled) Plugin.TradePlayer(p.FullName, p.World);
                         }
                         if (!canSplit) ImGui.EndDisabled();
 
