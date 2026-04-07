@@ -209,10 +209,19 @@ public partial class MainWindow : Window, IDisposable
         if (!isPublic)
         {
             var local   = objectTable.LocalPlayer;
+            if (local == null) return;
             var payload = sender.Payloads.OfType<PlayerPayload>().FirstOrDefault();
-            if (payload == null || local == null) return;
-            if (payload.PlayerName != local.Name.TextValue) return;
-            if (payload.World.ValueNullable?.Name.ToString() != local.HomeWorld.Value.Name.ToString()) return;
+            if (payload != null)
+            {
+                // Cross-world sender: verify exact name and home world to prevent same-name collisions
+                if (payload.PlayerName != local.Name.TextValue) return;
+                if (payload.World.ValueNullable?.Name.ToString() != local.HomeWorld.Value.Name.ToString()) return;
+            }
+            else
+            {
+                // Home-world sender: no PlayerPayload; fall back to TextValue (names unique per world)
+                if (!sender.TextValue.Contains(local.Name.TextValue)) return;
+            }
         }
 
         var msgText = message.TextValue;
