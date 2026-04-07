@@ -150,6 +150,10 @@ public class ConfigWindow : Window, IDisposable
         var t     = config.NarrationTemplates;
         var flags = ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.BordersInnerV;
 
+        ImGui.Columns(2, "##ntColumns", false);
+
+        // ── LEFT COLUMN ───────────────────────────────────────────────────────
+
         // ── Betting open ──────────────────────────────────────────────────────
         ImGui.TextDisabled("Betting");
         if (ImGui.BeginTable("##ntBetting", 3, flags))
@@ -161,84 +165,6 @@ public class ConfigWindow : Window, IDisposable
             var vb0 = t.BettingOpen;
             NtRow("Open##ntBO", "", Defaults.BettingOpen, ctrlHeld, ref vb0);
             if (vb0 != t.BettingOpen) { t.BettingOpen = vb0; MarkNarrationDirty(); }
-
-            ImGui.EndTable();
-        }
-
-        ImGui.Spacing();
-
-        // ── Dealer ────────────────────────────────────────────────────────────
-        ImGui.TextDisabled("Dealer (dealer turn)");
-        if (ImGui.BeginTable("##ntDealer", 3, flags))
-        {
-            ImGui.TableSetupColumn("##ntDealerLabel", ImGuiTableColumnFlags.WidthFixed, 90);
-            ImGui.TableSetupColumn("##ntDealerValue", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("##ntDealerReset", ImGuiTableColumnFlags.WidthFixed, 48);
-
-            var vts = t.DealerTurnStart;
-            NtRow("Turn start##ntDTS", "{cards}  {score}", Defaults.DealerTurnStart, ctrlHeld, ref vts);
-            if (vts != t.DealerTurnStart) { t.DealerTurnStart = vts; MarkNarrationDirty(); }
-
-            var vh = t.DealerHitAnnounce;
-            NtRow("Hit##ntDHA",       "(no variables)",            Defaults.DealerHitAnnounce, ctrlHeld, ref vh);
-            if (vh != t.DealerHitAnnounce) { t.DealerHitAnnounce = vh; MarkNarrationDirty(); }
-
-            var v0 = t.DealerHit;
-            NtRow("Hit result##ntDH", "{card}  {cards}  {score}", Defaults.DealerHit,  ctrlHeld, ref v0);
-            if (v0 != t.DealerHit)   { t.DealerHit  = v0; MarkNarrationDirty(); }
-
-            var v1 = t.DealerBust;
-            NtRow("Bust##ntDB",       "{card}  {cards}  {score}", Defaults.DealerBust, ctrlHeld, ref v1);
-            if (v1 != t.DealerBust)  { t.DealerBust = v1; MarkNarrationDirty(); }
-
-            var v2 = t.DealerBJ;
-            NtRow("Blackjack##ntDBJ", "{card}  {cards}",          Defaults.DealerBJ,   ctrlHeld, ref v2);
-            if (v2 != t.DealerBJ)   { t.DealerBJ   = v2; MarkNarrationDirty(); }
-
-            var v3 = t.DealerStand;
-            NtRow("Stand##ntDST",     "{cards}  {score}",         Defaults.DealerStand, ctrlHeld, ref v3);
-            if (v3 != t.DealerStand) { t.DealerStand = v3; MarkNarrationDirty(); }
-
-            ImGui.EndTable();
-        }
-
-        ImGui.Spacing();
-
-        // ── Players ───────────────────────────────────────────────────────────
-        ImGui.TextDisabled("Players (player turns)");
-        if (ImGui.BeginTable("##ntPlayers", 3, flags))
-        {
-            ImGui.TableSetupColumn("##ntPlayersLabel", ImGuiTableColumnFlags.WidthFixed, 90);
-            ImGui.TableSetupColumn("##ntPlayersValue", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("##ntPlayersReset", ImGuiTableColumnFlags.WidthFixed, 48);
-
-            var v0 = t.PlayerTurnStart;
-            NtRow("Turn start##ntPTS",  "{name}  {dealerCards}  {dealerScore}  {actions}", Defaults.PlayerTurnStart, ctrlHeld, ref v0);
-            if (v0 != t.PlayerTurnStart) { t.PlayerTurnStart = v0; MarkNarrationDirty(); }
-
-            var v1 = t.PlayerHitAnnounce;
-            NtRow("Hit##ntPHA",         "{name}",                                           Defaults.PlayerHitAnnounce, ctrlHeld, ref v1);
-            if (v1 != t.PlayerHitAnnounce) { t.PlayerHitAnnounce = v1; MarkNarrationDirty(); }
-
-            var v2 = t.PlayerHit;
-            NtRow("Hit result##ntPH",   "{name}  {card}  {cards}  {score}",                Defaults.PlayerHit,      ctrlHeld, ref v2);
-            if (v2 != t.PlayerHit)   { t.PlayerHit   = v2; MarkNarrationDirty(); }
-
-            var v2b = t.PlayerAfterHit;
-            NtRow("After hit##ntPAH",   "{name}  {cards}  {score}  {actions}",             Defaults.PlayerAfterHit, ctrlHeld, ref v2b);
-            if (v2b != t.PlayerAfterHit) { t.PlayerAfterHit = v2b; MarkNarrationDirty(); }
-
-            var v3 = t.PlayerBust;
-            NtRow("Bust##ntPB",         "{name}  {cards}  {score}",                        Defaults.PlayerBust,  ctrlHeld, ref v3);
-            if (v3 != t.PlayerBust)  { t.PlayerBust  = v3; MarkNarrationDirty(); }
-
-            var v4 = t.PlayerBJ;
-            NtRow("Blackjack##ntPBJ",   "{name}  {cards}",                                 Defaults.PlayerBJ,    ctrlHeld, ref v4);
-            if (v4 != t.PlayerBJ)   { t.PlayerBJ    = v4; MarkNarrationDirty(); }
-
-            var v5 = t.PlayerStand;
-            NtRow("Stand##ntPS",        "{name}  {cards}  {score}",                        Defaults.PlayerStand, ctrlHeld, ref v5);
-            if (v5 != t.PlayerStand) { t.PlayerStand = v5; MarkNarrationDirty(); }
 
             ImGui.EndTable();
         }
@@ -291,6 +217,48 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.Spacing();
 
+        // ── Players ───────────────────────────────────────────────────────────
+        ImGui.TextDisabled("Players (player turns)");
+        if (ImGui.BeginTable("##ntPlayers", 3, flags))
+        {
+            ImGui.TableSetupColumn("##ntPlayersLabel", ImGuiTableColumnFlags.WidthFixed, 90);
+            ImGui.TableSetupColumn("##ntPlayersValue", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("##ntPlayersReset", ImGuiTableColumnFlags.WidthFixed, 48);
+
+            var v0 = t.PlayerTurnStart;
+            NtRow("Turn start##ntPTS",  "{name}  {dealerCards}  {dealerScore}  {actions}", Defaults.PlayerTurnStart, ctrlHeld, ref v0);
+            if (v0 != t.PlayerTurnStart) { t.PlayerTurnStart = v0; MarkNarrationDirty(); }
+
+            var v1 = t.PlayerHitAnnounce;
+            NtRow("Hit##ntPHA",         "{name}",                                           Defaults.PlayerHitAnnounce, ctrlHeld, ref v1);
+            if (v1 != t.PlayerHitAnnounce) { t.PlayerHitAnnounce = v1; MarkNarrationDirty(); }
+
+            var v2 = t.PlayerHit;
+            NtRow("Hit result##ntPH",   "{name}  {card}  {cards}  {score}",                Defaults.PlayerHit,      ctrlHeld, ref v2);
+            if (v2 != t.PlayerHit)   { t.PlayerHit   = v2; MarkNarrationDirty(); }
+
+            var v2b = t.PlayerAfterHit;
+            NtRow("After hit##ntPAH",   "{name}  {cards}  {score}  {actions}",             Defaults.PlayerAfterHit, ctrlHeld, ref v2b);
+            if (v2b != t.PlayerAfterHit) { t.PlayerAfterHit = v2b; MarkNarrationDirty(); }
+
+            var v3 = t.PlayerBust;
+            NtRow("Bust##ntPB",         "{name}  {cards}  {score}",                        Defaults.PlayerBust,  ctrlHeld, ref v3);
+            if (v3 != t.PlayerBust)  { t.PlayerBust  = v3; MarkNarrationDirty(); }
+
+            var v4 = t.PlayerBJ;
+            NtRow("Blackjack##ntPBJ",   "{name}  {cards}",                                 Defaults.PlayerBJ,    ctrlHeld, ref v4);
+            if (v4 != t.PlayerBJ)   { t.PlayerBJ    = v4; MarkNarrationDirty(); }
+
+            var v5 = t.PlayerStand;
+            NtRow("Stand##ntPS",        "{name}  {cards}  {score}",                        Defaults.PlayerStand, ctrlHeld, ref v5);
+            if (v5 != t.PlayerStand) { t.PlayerStand = v5; MarkNarrationDirty(); }
+
+            ImGui.EndTable();
+        }
+
+        // ── RIGHT COLUMN ──────────────────────────────────────────────────────
+        ImGui.NextColumn();
+
         // ── Double / Split ────────────────────────────────────────────────────
         ImGui.TextDisabled("Double / Split");
         if (ImGui.BeginTable("##ntDblSpl", 3, flags))
@@ -324,6 +292,43 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.Spacing();
 
+        // ── Dealer ────────────────────────────────────────────────────────────
+        ImGui.TextDisabled("Dealer (dealer turn)");
+        if (ImGui.BeginTable("##ntDealer", 3, flags))
+        {
+            ImGui.TableSetupColumn("##ntDealerLabel", ImGuiTableColumnFlags.WidthFixed, 90);
+            ImGui.TableSetupColumn("##ntDealerValue", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("##ntDealerReset", ImGuiTableColumnFlags.WidthFixed, 48);
+
+            var vts = t.DealerTurnStart;
+            NtRow("Turn start##ntDTS", "{cards}  {score}", Defaults.DealerTurnStart, ctrlHeld, ref vts);
+            if (vts != t.DealerTurnStart) { t.DealerTurnStart = vts; MarkNarrationDirty(); }
+
+            var vh = t.DealerHitAnnounce;
+            NtRow("Hit##ntDHA",       "(no variables)",            Defaults.DealerHitAnnounce, ctrlHeld, ref vh);
+            if (vh != t.DealerHitAnnounce) { t.DealerHitAnnounce = vh; MarkNarrationDirty(); }
+
+            var v0 = t.DealerHit;
+            NtRow("Hit result##ntDH", "{card}  {cards}  {score}", Defaults.DealerHit,  ctrlHeld, ref v0);
+            if (v0 != t.DealerHit)   { t.DealerHit  = v0; MarkNarrationDirty(); }
+
+            var v1 = t.DealerBust;
+            NtRow("Bust##ntDB",       "{card}  {cards}  {score}", Defaults.DealerBust, ctrlHeld, ref v1);
+            if (v1 != t.DealerBust)  { t.DealerBust = v1; MarkNarrationDirty(); }
+
+            var v2 = t.DealerBJ;
+            NtRow("Blackjack##ntDBJ", "{card}  {cards}",          Defaults.DealerBJ,   ctrlHeld, ref v2);
+            if (v2 != t.DealerBJ)   { t.DealerBJ   = v2; MarkNarrationDirty(); }
+
+            var v3 = t.DealerStand;
+            NtRow("Stand##ntDST",     "{cards}  {score}",         Defaults.DealerStand, ctrlHeld, ref v3);
+            if (v3 != t.DealerStand) { t.DealerStand = v3; MarkNarrationDirty(); }
+
+            ImGui.EndTable();
+        }
+
+        ImGui.Spacing();
+
         // ── Payout ────────────────────────────────────────────────────────────
         ImGui.TextDisabled("Payout");
         if (ImGui.BeginTable("##ntPayout", 3, flags))
@@ -346,6 +351,8 @@ public class ConfigWindow : Window, IDisposable
 
             ImGui.EndTable();
         }
+
+        ImGui.Columns(1);
     }
 
     private static void NtRow(string id, string hint, string defaultValue, bool ctrlHeld, ref string value)
