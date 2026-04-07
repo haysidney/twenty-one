@@ -195,6 +195,10 @@ public class ConfigWindow : Window, IDisposable
             NtRow("Blackjack##ntDBJ", "{card}  {cards}",          Defaults.DealerBJ,   ctrlHeld, ref v2);
             if (v2 != t.DealerBJ)   { t.DealerBJ   = v2; MarkNarrationDirty(); }
 
+            var v3 = t.DealerStand;
+            NtRow("Stand##ntDST",     "{cards}  {score}",         Defaults.DealerStand, ctrlHeld, ref v3);
+            if (v3 != t.DealerStand) { t.DealerStand = v3; MarkNarrationDirty(); }
+
             ImGui.EndTable();
         }
 

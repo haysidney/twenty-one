@@ -348,8 +348,13 @@ public static class GameEngine
                         Narrate(NarrationTemplates.Fmt(t.DealerBJ,
                             ("card", cardLbl), ("cards", cards)));
                     else
+                    {
                         Narrate(NarrationTemplates.Fmt(t.DealerHit,
                             ("card", cardLbl), ("cards", cards), ("score", score)));
+                        if (DealerRecommendation(newHand) == "STAND")
+                            Narrate(NarrationTemplates.Fmt(t.DealerStand,
+                                ("cards", cards), ("score", score)));
+                    }
                 }
                 var newStateD = With(state, dealerHand: newHand);
                 if (state.Phase == GamePhase.Deal && IsDealComplete(newStateD))

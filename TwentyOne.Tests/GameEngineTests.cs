@@ -138,9 +138,10 @@ public class ApplyAddDealerCardTests
     [Fact]
     public void AddDealerCard_DealerTurn_NarratesNormalDraw()
     {
-        var (newState, effects) = GameEngine.Apply(DealerTurnState(), new AddDealerCard(7));
+        // Draw a 4 → total 14, dealer must still hit — only one narration line
+        var (newState, effects) = GameEngine.Apply(DealerTurnState(), new AddDealerCard(4));
         Assert.Single(effects);
-        Assert.Contains("Dealer draws 7", ((SendChat)effects[0]).Text);
+        Assert.Contains("Dealer draws 4", ((SendChat)effects[0]).Text);
         Assert.Equal(2, newState.DealerHand.Cards.Count);
     }
 
@@ -650,6 +651,21 @@ public class NarrationTemplateTests
         };
         var (_, effects) = GameEngine.Apply(state, new AddDealerCard(7), t);
         Assert.Equal("D+7=17", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void DealerStand_NarratedAfterFinalHit()
+    {
+        var t = new NarrationTemplates { DealerStand = "DS:{cards}={score}" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
+        };
+        var (_, effects) = GameEngine.Apply(state, new AddDealerCard(7), t);
+        // effects[0] = DealerHit, effects[1] = DealerStand
+        Assert.Equal(2, effects.Count);
+        Assert.Equal("DS:10 7=17", ((SendChat)effects[1]).Text);
     }
 
     [Fact]

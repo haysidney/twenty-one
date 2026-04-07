@@ -12,8 +12,9 @@ public class NarrationTemplates
     public string DealerTurnStart   { get; set; } = "Dealer's turn — showing {cards} ({score}).";
     public string DealerHitAnnounce { get; set; } = "Dealer hits!";
     public string DealerHit  { get; set; } = "Dealer draws {card} → {cards} = {score}";
-    public string DealerBust { get; set; } = "Dealer draws {card} → {cards} = {score} — Bust!";
-    public string DealerBJ   { get; set; } = "Dealer draws {card} → {cards} — Blackjack!";
+    public string DealerBust  { get; set; } = "Dealer draws {card} → {cards} = {score} — Bust!";
+    public string DealerBJ    { get; set; } = "Dealer draws {card} → {cards} — Blackjack!";
+    public string DealerStand { get; set; } = "Dealer stands. {cards} = {score}";
 
     // Player actions (PlayerTurns phase)
     // {actions} = e.g. "Hit or Stand" or "Hit or Stand, Double, Split"
