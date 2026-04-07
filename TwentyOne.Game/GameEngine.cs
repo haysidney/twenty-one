@@ -94,8 +94,9 @@ public static class GameEngine
             return dc.Count >= 2 || !couldHaveBJ;
         }
 
-        return DealerRecommendation(state.DealerHand) == "STAND"
-            && state.DealerHand.Cards.Count > 0;
+        var dc2 = state.DealerHand.Cards;
+        return dc2.Count > 0
+            && (HandValue(dc2) > 21 || DealerRecommendation(state.DealerHand) == "STAND");
     }
 
     // ── Action eligibility helpers (public for UI use) ────────────────────────

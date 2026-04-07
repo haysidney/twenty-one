@@ -798,6 +798,18 @@ public class CanGoToPayoutTests
         };
         Assert.False(GameEngine.CanGoToPayout(state));
     }
+
+    [Fact]
+    public void DealerBust_CanGoToPayout()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Stand }] }],
+            DealerHand = new Hand { Cards = [6, 8, 13] },
+        };
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
 }
 
 public class DoubleDownTests
