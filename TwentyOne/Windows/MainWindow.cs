@@ -519,6 +519,12 @@ private static unsafe void SendChatMessage(string message)
                             betEdits[pi] = betVal;
                         }
                         if (Phase != GamePhase.Betting) ImGui.EndDisabled();
+                        if (Phase != GamePhase.Betting && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                        {
+                            ImGui.SetTooltip("Click to copy bet");
+                            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                                ImGui.SetClipboardText(betVal);
+                        }
                         if (hasWorld)
                         {
                             ImGui.SameLine();
@@ -569,6 +575,10 @@ private static unsafe void SendChatMessage(string message)
                             var amount  = GameEngine.PayoutAmountString(State, pi, hi);
                             var display = amount.Length > 0 ? $"{label} {amount}" : label;
                             ImGui.TextColored(color, display);
+                            ImGui.SameLine();
+                            if (ImGui.SmallButton($"##copy{pi}_{hi}payout"))
+                                ImGui.SetClipboardText(display);
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Copy: {display}");
                         }
                     }
                     else
