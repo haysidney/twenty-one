@@ -530,10 +530,13 @@ private static unsafe void SendChatMessage(string message)
                     ImGui.TableSetColumnIndex(1);
                     if (isFirstHand)
                     {
+                        var confirmButtonW = Phase == GamePhase.Betting
+                            ? ImGui.CalcTextSize("Confirm").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X
+                            : 0;
                         var tradeButtonW = hasWorld
                             ? ImGui.CalcTextSize("Trade").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X
                             : 0;
-                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - tradeButtonW);
+                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - tradeButtonW - confirmButtonW);
                         if (Phase != GamePhase.Betting) ImGui.BeginDisabled();
                         var betVal = betEdits.TryGetValue(pi, out var e) ? e : p.Bet;
                         if (ImGui.InputText($"##bet{pi}", ref betVal, 16, ImGuiInputTextFlags.EnterReturnsTrue))
@@ -567,6 +570,7 @@ private static unsafe void SendChatMessage(string message)
                         }
                         if (Phase == GamePhase.Betting)
                         {
+                            ImGui.SameLine();
                             var betForConfirm = betEdits.TryGetValue(pi, out var bec) ? bec : p.Bet;
                             var canConfirm = !string.IsNullOrWhiteSpace(betForConfirm);
                             if (!canConfirm) ImGui.BeginDisabled();
