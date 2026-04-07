@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using System.Text.Json;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using TwentyOne.Game;
@@ -169,6 +170,34 @@ public class ConfigWindow : Window, IDisposable
         if (!ctrlHeld) ImGui.EndDisabled();
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
             ImGui.SetTooltip("Hold Ctrl to reset narration templates to defaults."u8);
+
+        ImGui.SameLine();
+        if (ImGui.Button("Export##ntExport"))
+        {
+            var json = JsonSerializer.Serialize(config.NarrationTemplates, new JsonSerializerOptions { WriteIndented = true });
+            ImGui.SetClipboardText(json);
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Copy all narration templates to clipboard as JSON."u8);
+
+        ImGui.SameLine();
+        if (ImGui.Button("Import##ntImport"))
+        {
+            try
+            {
+                var json = ImGui.GetClipboardText();
+                var imported = JsonSerializer.Deserialize<NarrationTemplates>(json);
+                if (imported != null)
+                {
+                    config.NarrationTemplates = imported;
+                    _narrationDirty = false;
+                    config.Save();
+                }
+            }
+            catch { /* invalid clipboard content — ignore */ }
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Load narration templates from clipboard JSON."u8);
 
         ImGui.Spacing();
         var t     = config.NarrationTemplates;
