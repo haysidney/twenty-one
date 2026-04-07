@@ -13,6 +13,7 @@ using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.System.String;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Shell;
+using FFXIVClientStructs.FFXIV.Component.Shell;
 using TwentyOne.Game;
 
 namespace TwentyOne.Windows;
@@ -204,11 +205,12 @@ public partial class MainWindow : Window, IDisposable
         }
         else
         {
-            var savedChatType = shell->ChatType;
-            var savedLsIndex  = LinkshellIndexForChatType(savedChatType);
+            var savedChannel = ((ShellCommandModule*)shell)->CurrentChannel.ToString();
+            Plugin.Log.Debug($"[TwentyOne] SavedChannel='{savedChannel}' ChatType={shell->ChatType}");
             SendChatMessage(channel);
             SendChatMessage("/dice 13");
-            shell->ChangeChatChannel(savedChatType, savedLsIndex, null, true);
+            if (!string.IsNullOrEmpty(savedChannel))
+                SendChatMessage(savedChannel);
         }
     }
 
