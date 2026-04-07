@@ -257,6 +257,10 @@ public class ConfigWindow : Window, IDisposable
             NtRow("Bet req##ntBR", "{name}", Defaults.PlayerBetRequest, ctrlHeld, ref vb1);
             if (vb1 != t.PlayerBetRequest) { t.PlayerBetRequest = vb1; MarkNarrationDirty(); }
 
+            var vb2 = t.PlayerBetConfirm;
+            NtRow("Bet confirm##ntBC", "{name}  {amount}", Defaults.PlayerBetConfirm, ctrlHeld, ref vb2);
+            if (vb2 != t.PlayerBetConfirm) { t.PlayerBetConfirm = vb2; MarkNarrationDirty(); }
+
             ImGui.EndTable();
         }
 

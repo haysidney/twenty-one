@@ -102,6 +102,7 @@ public partial class MainWindow : Window, IDisposable
         }
         else if (action is not AnnounceBettingOpen
                          and not AnnounceBetRequest
+                         and not AnnounceBetConfirm
                          and not AnnounceDouble
                          and not AnnounceSplit
                          and not AnnounceDealerHit
@@ -563,6 +564,17 @@ private static unsafe void SendChatMessage(string message)
                             }
                             if (ImGui.IsItemHovered())
                                 ImGui.SetTooltip($"Trade {p.FullName}@{p.World}\nShift+Click to announce bet request in chat");
+                        }
+                        if (Phase == GamePhase.Betting)
+                        {
+                            var betForConfirm = betEdits.TryGetValue(pi, out var bec) ? bec : p.Bet;
+                            var canConfirm = !string.IsNullOrWhiteSpace(betForConfirm);
+                            if (!canConfirm) ImGui.BeginDisabled();
+                            if (ImGui.SmallButton($"Confirm##{pi}confirm"))
+                                Apply(new AnnounceBetConfirm(pi));
+                            if (!canConfirm) ImGui.EndDisabled();
+                            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                                ImGui.SetTooltip("Announce confirmed bet in chat");
                         }
                     }
                     else

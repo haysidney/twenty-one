@@ -40,6 +40,10 @@ public class NarrationTemplates
     // {name} = player display name
     public string PlayerBetRequest { get; set; } = "{name}, please trade your bet to me.";
 
+    // Bet-confirm announcement (sent when dealer clicks Confirm in the Bet cell during Betting)
+    // {name} = player display name, {amount} = bet amount
+    public string PlayerBetConfirm { get; set; } = "{name}, your current bet is {amount}. If you want to change it let me know.";
+
     // Trade-request announcements (sent when dealer clicks Double/Split, before confirming trade)
     // {amount} = the extra chips required
     public string PlayerDoubleRequest { get; set; } = "{name} would like to double down! Please trade {amount} gil to the dealer.";

@@ -27,6 +27,9 @@ public record AnnounceBettingOpen : GameAction;
 // Bet-request announcement — sent when dealer shift+clicks Trade during Betting phase
 public record AnnounceBetRequest(int PlayerIndex) : GameAction;
 
+// Bet-confirm announcement — sent when dealer clicks Confirm in the Bet cell during Betting phase
+public record AnnounceBetConfirm(int PlayerIndex) : GameAction;
+
 // Phase transitions
 public record StartDeal : GameAction;
 public record BeginPlayerTurns : GameAction;

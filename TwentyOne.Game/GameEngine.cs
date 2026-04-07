@@ -626,6 +626,14 @@ public static class GameEngine
                 return (state, effects);
             }
 
+            // ── AnnounceBetConfirm ───────────────────────────────────────────
+            case AnnounceBetConfirm a:
+            {
+                var player = state.Players[a.PlayerIndex];
+                Narrate(NarrationTemplates.Fmt(t.PlayerBetConfirm, ("name", player.DisplayName), ("amount", player.Bet)));
+                return (state, effects);
+            }
+
             // ── AnnounceDealerDeal / AnnouncePlayerDeal ──────────────────────
             case AnnounceDealerDeal:
                 Narrate(NarrationTemplates.Fmt(t.DealDealerCard, ("dealer", dealerName)));
