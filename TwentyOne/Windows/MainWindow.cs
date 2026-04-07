@@ -575,10 +575,13 @@ private static unsafe void SendChatMessage(string message)
                             var amount  = GameEngine.PayoutAmountString(State, pi, hi);
                             var display = amount.Length > 0 ? $"{label} {amount}" : label;
                             ImGui.TextColored(color, display);
-                            ImGui.SameLine();
-                            if (ImGui.SmallButton($"##copy{pi}_{hi}payout"))
-                                ImGui.SetClipboardText(display);
-                            if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Copy: {display}");
+                            if (amount.Length > 0)
+                            {
+                                ImGui.SameLine();
+                                if (ImGui.SmallButton($"Copy##{pi}_{hi}payout"))
+                                    ImGui.SetClipboardText(amount.TrimStart('+'));
+                                if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Copy: {amount.TrimStart('+')}");
+                            }
                         }
                     }
                     else
