@@ -575,7 +575,8 @@ private static unsafe void SendChatMessage(string message)
                             var amount  = GameEngine.PayoutAmountString(State, pi, hi);
                             var display = amount.Length > 0 ? $"{label} {amount}" : label;
                             ImGui.TextColored(color, display);
-                            if (amount.Length > 0)
+                            var result = GameEngine.GetPayoutResult(State, pi, hi);
+                            if (amount.Length > 0 && (result == PayoutResult.Win || result == PayoutResult.BjWin))
                             {
                                 ImGui.SameLine();
                                 if (ImGui.SmallButton($"Copy##{pi}_{hi}payout"))
