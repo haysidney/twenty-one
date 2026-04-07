@@ -99,7 +99,9 @@ public partial class MainWindow : Window, IDisposable
         }
         else if (action is not AnnounceBettingOpen
                          and not AnnounceDouble
-                         and not AnnounceSplit)
+                         and not AnnounceSplit
+                         and not AnnounceDealerHit
+                         and not AnnouncePlayerHit)
         {
             // GameEngine is pure — it never mutates state, so pushing the current
             // reference is safe; future Apply calls create entirely new objects.
@@ -374,7 +376,11 @@ public partial class MainWindow : Window, IDisposable
         if (dealerHitActive)
         {
             if (State.DealerHand.Cards.Count > 0) ImGui.SameLine();
-            if (ImGui.SmallButton("Hit##dealer")) QueueHitRoll(isDealer: true, -1, -1);
+            if (ImGui.SmallButton("Hit##dealer"))
+            {
+                Apply(new AnnounceDealerHit());
+                QueueHitRoll(isDealer: true, -1, -1);
+            }
         }
 
         // ── Player table ──────────────────────────────────────────────────────
@@ -605,7 +611,11 @@ public partial class MainWindow : Window, IDisposable
                         ImGui.SameLine();
                         var hitActive = PlayerHitActive(pi, hi);
                         if (!hitActive) ImGui.BeginDisabled();
-                        if (ImGui.SmallButton($"Hit##{pi}_{hi}")) QueueHitRoll(isDealer: false, pi, hi);
+                        if (ImGui.SmallButton($"Hit##{pi}_{hi}"))
+                        {
+                            Apply(new AnnouncePlayerHit(pi, hi));
+                            QueueHitRoll(isDealer: false, pi, hi);
+                        }
                         if (!hitActive) ImGui.EndDisabled();
 
                         ImGui.SameLine();

@@ -493,6 +493,19 @@ public static class GameEngine
                 return (With(state, players: newPlayers, activePlayerIndex: pi, activeHandIndex: hi), effects);
             }
 
+            // ── AnnounceDealerHit / AnnouncePlayerHit ───────────────────────
+            case AnnounceDealerHit:
+                Narrate(t.DealerHitAnnounce);
+                return (state, effects);
+
+            case AnnouncePlayerHit a:
+            {
+                var player = state.Players[a.PlayerIndex];
+                var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
+                Narrate(NarrationTemplates.Fmt(t.PlayerHitAnnounce, ("name", name)));
+                return (state, effects);
+            }
+
             // ── AnnounceDouble / AnnounceSplit ───────────────────────────────
             case AnnounceDouble a:
             {
