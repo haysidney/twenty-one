@@ -598,10 +598,9 @@ public static class GameEngine
             case BeginPlayerTurns:
             {
                 var (nextPi, nextHi, nextPhase) = AdvanceFrom(-1, -1, state.Players);
-                var waiting = nextPhase == GamePhase.PlayerTurns
-                    && state.Players[nextPi].Hands[nextHi].Cards.Count >= 2;
-                return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
-                    waitingForNextPlayer: waiting), effects);
+                if (nextPhase == GamePhase.PlayerTurns)
+                    NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
+                return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi), effects);
             }
 
             // ── AdvanceToNextPlayer ──────────────────────────────────────────
