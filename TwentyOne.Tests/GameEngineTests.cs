@@ -797,7 +797,7 @@ public class AnnounceBettingOpenTests
         var state = new GameState { Phase = GamePhase.Betting };
         var (newState, effects) = GameEngine.Apply(state, new AnnounceBettingOpen());
         Assert.Same(state, newState);
-        Assert.Single(effects);
+        Assert.Equal(2, effects.Count); // default template: narration line + /wringhands emote
     }
 
     [Fact]

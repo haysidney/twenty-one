@@ -132,7 +132,7 @@ public partial class MainWindow : Window, IDisposable
                 config.NarrationLog.Add(chat.Text);
                 if (config.ChatEnabled)
                 {
-                    var msg = config.ChatChannel + " " + chat.Text;
+                    var msg = chat.Text.StartsWith('/') ? chat.Text : config.ChatChannel + " " + chat.Text;
                     chatQueue.Enqueue((false, () => SendChatMessage(msg)));
                 }
             }
