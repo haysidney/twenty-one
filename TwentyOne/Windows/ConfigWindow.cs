@@ -70,6 +70,13 @@ public class ConfigWindow : Window, IDisposable
             config.Save();
         }
 
+        var autoTarget = config.AutoTargetEnabled;
+        if (ImGui.Checkbox("Auto-target active player on their turn", ref autoTarget))
+        {
+            config.AutoTargetEnabled = autoTarget;
+            config.Save();
+        }
+
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();

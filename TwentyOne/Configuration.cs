@@ -27,6 +27,9 @@ public class Configuration : IPluginConfiguration
     // ── Trade ──────────────────────────────────────────────────────────────────
     public bool AutoTradeEnabled { get; set; } = false;
 
+    // ── Targeting ──────────────────────────────────────────────────────────────
+    public bool AutoTargetEnabled { get; set; } = false;
+
     // ── Chat ───────────────────────────────────────────────────────────────────
     public bool ChatEnabled { get; set; } = false;
     public string ChatChannel { get; set; } = "/p";

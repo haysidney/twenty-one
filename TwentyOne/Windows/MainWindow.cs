@@ -115,6 +115,16 @@ public partial class MainWindow : Window, IDisposable
         var (newState, effects) = GameEngine.Apply(config.GameState, action, config.NarrationTemplates);
         config.GameState = newState;
 
+        if (config.AutoTargetEnabled
+            && action is BeginPlayerTurns or AdvanceToNextPlayer
+            && newState.Phase == GamePhase.PlayerTurns
+            && newState.ActivePlayerIndex >= 0
+            && newState.ActivePlayerIndex < newState.Players.Count)
+        {
+            var ap = newState.Players[newState.ActivePlayerIndex];
+            Plugin.TargetPlayer(ap.FullName, ap.World);
+        }
+
         foreach (var effect in effects)
         {
             if (effect is SendChat chat)
