@@ -676,6 +676,33 @@ public class NarrationTemplateTests
         var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3));
         Assert.Contains("Lorah hits", ((SendChat)effects[0]).Text);
     }
+
+    [Fact]
+    public void CustomPlayerAfterHit_UsesTemplate()
+    {
+        var t = new NarrationTemplates { PlayerAfterHit = "SCORE:{score} DO:{actions}" };
+        var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3), t);
+        // effects[0] = PlayerHit, effects[1] = PlayerAfterHit
+        Assert.Equal(2, effects.Count);
+        Assert.Contains("SCORE:14", ((SendChat)effects[1]).Text);
+        Assert.Contains("DO:", ((SendChat)effects[1]).Text);
+    }
+
+    [Fact]
+    public void PlayerTurnStart_IncludesScore()
+    {
+        // BeginPlayerTurns triggers NarratePlayerTurn; verify {score} is substituted
+        var state = new GameState
+        {
+            Phase      = GamePhase.Deal,
+            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
+            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
+        // effects[0] = deal summary, effects[1] = PlayerTurnStart
+        var turnStart = ((SendChat)effects[1]).Text;
+        Assert.Contains("13", turnStart); // score of 5+8
+    }
 }
 
 public class ImmutabilityTests
