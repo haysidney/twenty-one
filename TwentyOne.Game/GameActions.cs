@@ -27,6 +27,7 @@ public record AnnounceBettingOpen : GameAction;
 // Phase transitions
 public record StartDeal : GameAction;
 public record BeginPlayerTurns : GameAction;
+public record AdvanceToNextPlayer : GameAction;
 public record GoToPayout : GameAction;
 public record NewRound : GameAction;
 

@@ -48,5 +48,6 @@ public class GameState
     public GamePhase Phase { get; set; } = GamePhase.Betting;
     public int ActivePlayerIndex { get; set; } = -1;
     public int ActiveHandIndex { get; set; } = -1;
+    public bool WaitingForNextPlayer { get; set; } = false;
     public BlackjackPayout BjPayout { get; set; } = BlackjackPayout.ThreeToTwo;
 }

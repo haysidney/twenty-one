@@ -30,10 +30,36 @@
 
 - Make sure we have a test for re-splitting.
 
-- Don't bother switching channels for /random rolls.
+- Don't bother switching channels for /random rolls. !Need to test this now
 
-- Fix the bug with /l1 instead of /ls1. It's using the wrong command and the rolls are not picked up.
+- Test /l1
 
 - Test all channels on homeworld and not.
 
 - Test with a player that has the same name as the dealer.
+
+- Add click to copy to the Bet field of players when it's disabled. Add a tooltip to the disabled Bet field to make it discoverable.
+
+- Add a copy button to the payout of each player.
+
+- Design a way to bank for players. Make it a player preference.
+
+- Add sounds to templates
+
+- Shouts during big game moments
+
+- Change order of settings
+
+--- Anouncements Needed
+
+- Nolla's turn
+
+- Double down template
+
+- Ask what the player wants to do.
+
+- Dealer standing
+
+- Emotes
+
+- Require a button press to move on to the next player turn.

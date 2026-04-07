@@ -101,7 +101,8 @@ public partial class MainWindow : Window, IDisposable
                          and not AnnounceDouble
                          and not AnnounceSplit
                          and not AnnounceDealerHit
-                         and not AnnouncePlayerHit)
+                         and not AnnouncePlayerHit
+                         and not AdvanceToNextPlayer)
         {
             // GameEngine is pure — it never mutates state, so pushing the current
             // reference is safe; future Apply calls create entirely new objects.
@@ -766,9 +767,16 @@ public partial class MainWindow : Window, IDisposable
                 break;
 
             case GamePhase.PlayerTurns:
-                ImGui.BeginDisabled();
-                ImGui.Button("Go to Payout →");
-                ImGui.EndDisabled();
+                if (State.WaitingForNextPlayer)
+                {
+                    if (ImGui.Button("Next Player →")) Apply(new AdvanceToNextPlayer());
+                }
+                else
+                {
+                    ImGui.BeginDisabled();
+                    ImGui.Button("Go to Payout →");
+                    ImGui.EndDisabled();
+                }
                 break;
 
             case GamePhase.DealerTurn:

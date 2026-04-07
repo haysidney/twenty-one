@@ -388,10 +388,14 @@ public class ApplyPhaseTransitionTests
             ],
         };
         var (newState, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
-        Assert.Single(effects);
-        Assert.Contains("Lorah's turn", ((SendChat)effects[0]).Text);
+        Assert.Empty(effects);
+        Assert.True(newState.WaitingForNextPlayer);
         Assert.Equal(0, newState.ActivePlayerIndex);
         Assert.Equal(GamePhase.PlayerTurns, newState.Phase);
+
+        var (_, effects2) = GameEngine.Apply(newState, new AdvanceToNextPlayer());
+        Assert.Single(effects2);
+        Assert.Contains("Lorah's turn", ((SendChat)effects2[0]).Text);
     }
 
     [Fact]
@@ -717,9 +721,10 @@ public class NarrationTemplateTests
             DealerHand = new Hand { Cards = [10], State = HandState.Playing },
             Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
         };
-        var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
-        // effects[0] = PlayerTurnStart (deal summary is emitted when the last card is dealt)
-        var turnStart = ((SendChat)effects[0]).Text;
+        var (newState2, _) = GameEngine.Apply(state, new BeginPlayerTurns());
+        var (_, effects2) = GameEngine.Apply(newState2, new AdvanceToNextPlayer());
+        // PlayerTurnStart narrated after AdvanceToNextPlayer
+        var turnStart = ((SendChat)effects2[0]).Text;
         Assert.Contains("13", turnStart); // score of 5+8
     }
 }

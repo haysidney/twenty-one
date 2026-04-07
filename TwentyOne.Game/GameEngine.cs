@@ -234,20 +234,22 @@ public static class GameEngine
         players.Select((p, i) => i == pi ? newPlayer : p).ToList();
 
     private static GameState With(GameState s,
-        List<Player>?    players           = null,
-        Hand?            dealerHand        = null,
-        GamePhase?       phase             = null,
-        int?             activePlayerIndex = null,
-        int?             activeHandIndex   = null,
-        BlackjackPayout? bjPayout          = null) =>
+        List<Player>?    players               = null,
+        Hand?            dealerHand            = null,
+        GamePhase?       phase                 = null,
+        int?             activePlayerIndex     = null,
+        int?             activeHandIndex       = null,
+        bool?            waitingForNextPlayer  = null,
+        BlackjackPayout? bjPayout              = null) =>
         new GameState
         {
-            Players           = players           ?? s.Players,
-            DealerHand        = dealerHand        ?? s.DealerHand,
-            Phase             = phase             ?? s.Phase,
-            ActivePlayerIndex = activePlayerIndex ?? s.ActivePlayerIndex,
-            ActiveHandIndex   = activeHandIndex   ?? s.ActiveHandIndex,
-            BjPayout          = bjPayout          ?? s.BjPayout,
+            Players              = players           ?? s.Players,
+            DealerHand           = dealerHand        ?? s.DealerHand,
+            Phase                = phase             ?? s.Phase,
+            ActivePlayerIndex    = activePlayerIndex ?? s.ActivePlayerIndex,
+            ActiveHandIndex      = activeHandIndex   ?? s.ActiveHandIndex,
+            WaitingForNextPlayer = waitingForNextPlayer ?? s.WaitingForNextPlayer,
+            BjPayout             = bjPayout          ?? s.BjPayout,
         };
 
     /// <summary>
@@ -373,8 +375,9 @@ public static class GameEngine
 
                 var newPlayers = WithPlayer(state.Players, pi, WithHand(state.Players[pi], hi, newHand));
                 var newPhase   = state.Phase;
-                var newActivePi = state.ActivePlayerIndex;
-                var newActiveHi = state.ActiveHandIndex;
+                var newActivePi            = state.ActivePlayerIndex;
+                var newActiveHi            = state.ActiveHandIndex;
+                var newWaitingForNextPlayer = false;
 
                 if (state.Phase == GamePhase.Deal)
                 {
@@ -436,7 +439,7 @@ public static class GameEngine
                                 if (newPlayers[newActivePi].Hands[newActiveHi].Cards.Count == 1)
                                     effects.Add(new AutoHit(newActivePi, newActiveHi));
                                 else
-                                    NarratePlayerTurn(newActivePi, newActiveHi, newPlayers, state.DealerHand);
+                                    newWaitingForNextPlayer = true;
                             }
                         }
                         else if (prevCardCount == 1)
@@ -448,7 +451,8 @@ public static class GameEngine
                 }
 
                 return (With(state, players: newPlayers, phase: newPhase,
-                    activePlayerIndex: newActivePi, activeHandIndex: newActiveHi), effects);
+                    activePlayerIndex: newActivePi, activeHandIndex: newActiveHi,
+                    waitingForNextPlayer: newWaitingForNextPlayer), effects);
             }
 
             // ── StandPlayer ──────────────────────────────────────────────────
@@ -461,9 +465,10 @@ public static class GameEngine
 
                 var newHand    = SetHandState(hand, HandState.Stand);
                 var newPlayers = WithPlayer(state.Players, pi, WithHand(state.Players[pi], hi, newHand));
-                var newPhase   = state.Phase;
-                var newActivePi = state.ActivePlayerIndex;
-                var newActiveHi = state.ActiveHandIndex;
+                var newPhase              = state.Phase;
+                var newActivePi            = state.ActivePlayerIndex;
+                var newActiveHi            = state.ActiveHandIndex;
+                var newWaitingForNextPlayer = false;
 
                 if (state.Phase == GamePhase.PlayerTurns)
                 {
@@ -484,13 +489,14 @@ public static class GameEngine
                             if (newPlayers[newActivePi].Hands[newActiveHi].Cards.Count == 1)
                                 effects.Add(new AutoHit(newActivePi, newActiveHi));
                             else
-                                NarratePlayerTurn(newActivePi, newActiveHi, newPlayers, state.DealerHand);
+                                newWaitingForNextPlayer = true;
                         }
                     }
                 }
 
                 return (With(state, players: newPlayers, phase: newPhase,
-                    activePlayerIndex: newActivePi, activeHandIndex: newActiveHi), effects);
+                    activePlayerIndex: newActivePi, activeHandIndex: newActiveHi,
+                    waitingForNextPlayer: newWaitingForNextPlayer), effects);
             }
 
             // ── DoubleDown ───────────────────────────────────────────────────
@@ -592,9 +598,19 @@ public static class GameEngine
             case BeginPlayerTurns:
             {
                 var (nextPi, nextHi, nextPhase) = AdvanceFrom(-1, -1, state.Players);
-                if (nextPhase == GamePhase.PlayerTurns)
-                    NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
-                return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi), effects);
+                var waiting = nextPhase == GamePhase.PlayerTurns
+                    && state.Players[nextPi].Hands[nextHi].Cards.Count >= 2;
+                return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+                    waitingForNextPlayer: waiting), effects);
+            }
+
+            // ── AdvanceToNextPlayer ──────────────────────────────────────────
+            case AdvanceToNextPlayer:
+            {
+                if (state.Phase == GamePhase.PlayerTurns && state.WaitingForNextPlayer)
+                    NarratePlayerTurn(state.ActivePlayerIndex, state.ActiveHandIndex,
+                        state.Players, state.DealerHand);
+                return (With(state, waitingForNextPlayer: false), effects);
             }
 
             // ── GoToPayout ───────────────────────────────────────────────────
