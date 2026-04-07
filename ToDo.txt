@@ -22,4 +22,18 @@
 
 - Figure out what the other plugin supports.
 
+- Auto trading should be an option maybe? At least for testing.
+
 - Edit game state directly (move cards around and whatnot for testing and/or unsupported house rules)
+
+- Make sure we have a test for splitting aces.
+
+- Make sure we have a test for re-splitting.
+
+- Don't bother switching channels for /random rolls.
+
+- Fix the bug with /l1 instead of /ls1. It's using the wrong command and the rolls are not picked up.
+
+- Test all channels on homeworld and not.
+
+- Test with a player that has the same name as the dealer.

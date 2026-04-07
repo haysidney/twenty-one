@@ -185,10 +185,17 @@ public partial class MainWindow : Window, IDisposable
         if (shell == null) return;
 
         pendingHit = (isDealer, playerIndex, handIndex, isPublic);
-        var savedChatType = shell->ChatType;
-        SendChatMessage(channel);
-        SendChatMessage(isPublic ? "/random 13" : "/dice 13");
-        shell->ChangeChatChannel(savedChatType, 0, null, true);
+        if (isPublic)
+        {
+            SendChatMessage("/random 13");
+        }
+        else
+        {
+            var savedChatType = shell->ChatType;
+            SendChatMessage(channel);
+            SendChatMessage("/dice 13");
+            shell->ChangeChatChannel(savedChatType, 0, null, true);
+        }
     }
 
     // "You roll a [icon] 7 (out of 13)." — response to /random in public channels
