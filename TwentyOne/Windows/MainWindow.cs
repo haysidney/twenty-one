@@ -207,7 +207,7 @@ public partial class MainWindow : Window, IDisposable
 
         // Cross-world senders append world name with a special character after the player name
         var localName = objectTable.LocalPlayer?.Name.TextValue;
-        if (!isPublic && (localName == null || !sender.TextValue.StartsWith(localName))) return;
+        if (!isPublic && (localName == null || !sender.TextValue.Contains(localName))) return;
 
         var msgText = message.TextValue;
         var match   = (isPublic ? RandomRollRegex() : DiceRollRegex()).Match(msgText);
