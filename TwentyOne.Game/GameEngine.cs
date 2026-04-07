@@ -131,6 +131,7 @@ public static class GameEngine
     public static bool CanHitDealer(GameState state) =>
         (state.Phase == GamePhase.Deal && state.DealerHand.Cards.Count < 1)
         || (state.Phase == GamePhase.DealerTurn
+            && !state.WaitingForDealer
             && DealerRecommendation(state.DealerHand) == "HIT"
             && GameEngine.HandValue(state.DealerHand.Cards) <= 21);
 
