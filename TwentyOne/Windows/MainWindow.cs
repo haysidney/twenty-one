@@ -102,7 +102,8 @@ public partial class MainWindow : Window, IDisposable
                          and not AnnounceSplit
                          and not AnnounceDealerHit
                          and not AnnouncePlayerHit
-                         and not AdvanceToNextPlayer)
+                         and not AdvanceToNextPlayer
+                         and not BeginDealerTurn)
         {
             // GameEngine is pure — it never mutates state, so pushing the current
             // reference is safe; future Apply calls create entirely new objects.
@@ -781,12 +782,19 @@ public partial class MainWindow : Window, IDisposable
                 break;
 
             case GamePhase.DealerTurn:
-                var canPayout = GameEngine.CanGoToPayout(State);
-                if (!canPayout) ImGui.BeginDisabled();
-                if (ImGui.Button("Go to Payout →")) Apply(new GoToPayout());
-                if (!canPayout) ImGui.EndDisabled();
-                if (!canPayout && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                    ImGui.SetTooltip("Dealer must finish their hand first."u8);
+                if (State.WaitingForDealer)
+                {
+                    if (ImGui.Button("Begin Dealer Turn →")) Apply(new BeginDealerTurn());
+                }
+                else
+                {
+                    var canPayout = GameEngine.CanGoToPayout(State);
+                    if (!canPayout) ImGui.BeginDisabled();
+                    if (ImGui.Button("Go to Payout →")) Apply(new GoToPayout());
+                    if (!canPayout) ImGui.EndDisabled();
+                    if (!canPayout && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                        ImGui.SetTooltip("Dealer must finish their hand first."u8);
+                }
                 break;
 
             case GamePhase.Payout:

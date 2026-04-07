@@ -240,16 +240,18 @@ public static class GameEngine
         int?             activePlayerIndex     = null,
         int?             activeHandIndex       = null,
         bool?            waitingForNextPlayer  = null,
+        bool?            waitingForDealer      = null,
         BlackjackPayout? bjPayout              = null) =>
         new GameState
         {
-            Players              = players           ?? s.Players,
-            DealerHand           = dealerHand        ?? s.DealerHand,
-            Phase                = phase             ?? s.Phase,
-            ActivePlayerIndex    = activePlayerIndex ?? s.ActivePlayerIndex,
-            ActiveHandIndex      = activeHandIndex   ?? s.ActiveHandIndex,
+            Players              = players              ?? s.Players,
+            DealerHand           = dealerHand           ?? s.DealerHand,
+            Phase                = phase                ?? s.Phase,
+            ActivePlayerIndex    = activePlayerIndex    ?? s.ActivePlayerIndex,
+            ActiveHandIndex      = activeHandIndex      ?? s.ActiveHandIndex,
             WaitingForNextPlayer = waitingForNextPlayer ?? s.WaitingForNextPlayer,
-            BjPayout             = bjPayout          ?? s.BjPayout,
+            WaitingForDealer     = waitingForDealer     ?? s.WaitingForDealer,
+            BjPayout             = bjPayout             ?? s.BjPayout,
         };
 
     /// <summary>
@@ -374,10 +376,11 @@ public static class GameEngine
                 }
 
                 var newPlayers = WithPlayer(state.Players, pi, WithHand(state.Players[pi], hi, newHand));
-                var newPhase   = state.Phase;
+                var newPhase               = state.Phase;
                 var newActivePi            = state.ActivePlayerIndex;
                 var newActiveHi            = state.ActiveHandIndex;
                 var newWaitingForNextPlayer = false;
+                var newWaitingForDealer     = false;
 
                 if (state.Phase == GamePhase.Deal)
                 {
@@ -441,14 +444,17 @@ public static class GameEngine
                                 (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
                                 effects.Add(new AutoHit(newActivePi, newActiveHi));
                             }
+                            else if (peekPhase == GamePhase.DealerTurn)
+                            {
+                                newPhase = GamePhase.DealerTurn;
+                                newWaitingForDealer = true;
+                            }
                             else if (peekPhase != GamePhase.PlayerTurns)
                             {
-                                // No more players — go straight to DealerTurn/Payout.
                                 (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
                             }
                             else
                             {
-                                // Another player waiting — pause for button press.
                                 newWaitingForNextPlayer = true;
                             }
                         }
@@ -462,7 +468,8 @@ public static class GameEngine
 
                 return (With(state, players: newPlayers, phase: newPhase,
                     activePlayerIndex: newActivePi, activeHandIndex: newActiveHi,
-                    waitingForNextPlayer: newWaitingForNextPlayer), effects);
+                    waitingForNextPlayer: newWaitingForNextPlayer,
+                    waitingForDealer: newWaitingForDealer), effects);
             }
 
             // ── StandPlayer ──────────────────────────────────────────────────
@@ -475,10 +482,11 @@ public static class GameEngine
 
                 var newHand    = SetHandState(hand, HandState.Stand);
                 var newPlayers = WithPlayer(state.Players, pi, WithHand(state.Players[pi], hi, newHand));
-                var newPhase              = state.Phase;
+                var newPhase               = state.Phase;
                 var newActivePi            = state.ActivePlayerIndex;
                 var newActiveHi            = state.ActiveHandIndex;
                 var newWaitingForNextPlayer = false;
+                var newWaitingForDealer     = false;
 
                 if (state.Phase == GamePhase.PlayerTurns)
                 {
@@ -500,6 +508,11 @@ public static class GameEngine
                             (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
                             effects.Add(new AutoHit(newActivePi, newActiveHi));
                         }
+                        else if (peekPhase == GamePhase.DealerTurn)
+                        {
+                            newPhase = GamePhase.DealerTurn;
+                            newWaitingForDealer = true;
+                        }
                         else if (peekPhase != GamePhase.PlayerTurns)
                         {
                             (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
@@ -513,7 +526,8 @@ public static class GameEngine
 
                 return (With(state, players: newPlayers, phase: newPhase,
                     activePlayerIndex: newActivePi, activeHandIndex: newActiveHi,
-                    waitingForNextPlayer: newWaitingForNextPlayer), effects);
+                    waitingForNextPlayer: newWaitingForNextPlayer,
+                    waitingForDealer: newWaitingForDealer), effects);
             }
 
             // ── DoubleDown ───────────────────────────────────────────────────
@@ -617,7 +631,10 @@ public static class GameEngine
                 var (nextPi, nextHi, nextPhase) = AdvanceFrom(-1, -1, state.Players);
                 if (nextPhase == GamePhase.PlayerTurns)
                     NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
-                return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi), effects);
+                var waitDealer = nextPhase == GamePhase.DealerTurn;
+                if (waitDealer) nextPhase = GamePhase.DealerTurn; // keep phase, show button
+                return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+                    waitingForDealer: waitDealer), effects);
             }
 
             // ── AdvanceToNextPlayer ──────────────────────────────────────────
@@ -628,8 +645,21 @@ public static class GameEngine
                     state.ActivePlayerIndex, state.ActiveHandIndex, state.Players);
                 if (nextPhase == GamePhase.PlayerTurns)
                     NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
+                else if (nextPhase == GamePhase.DealerTurn)
+                    return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+                        waitingForNextPlayer: false, waitingForDealer: true), effects);
                 return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
                     waitingForNextPlayer: false), effects);
+            }
+
+            // ── BeginDealerTurn ──────────────────────────────────────────────
+            case BeginDealerTurn:
+            {
+                if (!state.WaitingForDealer) return (state, effects);
+                Narrate(NarrationTemplates.Fmt(t.DealerTurnStart,
+                    ("cards", HandString(state.DealerHand.Cards)),
+                    ("score", ScoreString(state.DealerHand.Cards))));
+                return (With(state, waitingForDealer: false), effects);
             }
 
             // ── GoToPayout ───────────────────────────────────────────────────

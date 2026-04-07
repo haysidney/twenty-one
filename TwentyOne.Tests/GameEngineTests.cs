@@ -730,6 +730,23 @@ public class NarrationTemplateTests
         var turnStart = ((SendChat)effects[0]).Text;
         Assert.Contains("13", turnStart); // score of 5+8
     }
+
+    [Fact]
+    public void DealerTurnStart_SubstitutesCardsAndScore()
+    {
+        var state = new GameState
+        {
+            Phase             = GamePhase.DealerTurn,
+            WaitingForDealer  = true,
+            DealerHand        = new Hand { Cards = [10, 7], State = HandState.Playing },
+            Players           = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Stand }] }],
+        };
+        var t = new NarrationTemplates { DealerTurnStart = "Dealer: {cards} ({score})" };
+        var (_, effects) = GameEngine.Apply(state, new BeginDealerTurn(), t);
+        var text = ((SendChat)effects[0]).Text;
+        Assert.Contains("10", text);  // cards
+        Assert.Contains("17", text);  // score of 10+7
+    }
 }
 
 public class ImmutabilityTests

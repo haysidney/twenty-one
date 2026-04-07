@@ -9,6 +9,7 @@ public class NarrationTemplates
     public string BettingOpen { get; set; } = "Betting is now open! Min: 50,000 / Max: 250,000 — I'll initiate a trade with you, please be patient!";
 
     // Dealer card draws (DealerTurn phase)
+    public string DealerTurnStart   { get; set; } = "Dealer's turn — showing {cards} ({score}).";
     public string DealerHitAnnounce { get; set; } = "Dealer hits!";
     public string DealerHit  { get; set; } = "Dealer draws {card} → {cards} = {score}";
     public string DealerBust { get; set; } = "Dealer draws {card} → {cards} = {score} — Bust!";

@@ -49,5 +49,6 @@ public class GameState
     public int ActivePlayerIndex { get; set; } = -1;
     public int ActiveHandIndex { get; set; } = -1;
     public bool WaitingForNextPlayer { get; set; } = false;
+    public bool WaitingForDealer { get; set; } = false;
     public BlackjackPayout BjPayout { get; set; } = BlackjackPayout.ThreeToTwo;
 }

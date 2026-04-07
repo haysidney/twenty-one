@@ -175,6 +175,10 @@ public class ConfigWindow : Window, IDisposable
             ImGui.TableSetupColumn("##ntDealerValue", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("##ntDealerReset", ImGuiTableColumnFlags.WidthFixed, 48);
 
+            var vts = t.DealerTurnStart;
+            NtRow("Turn start##ntDTS", "{cards}  {score}", Defaults.DealerTurnStart, ctrlHeld, ref vts);
+            if (vts != t.DealerTurnStart) { t.DealerTurnStart = vts; MarkNarrationDirty(); }
+
             var vh = t.DealerHitAnnounce;
             NtRow("Hit##ntDHA",       "(no variables)",            Defaults.DealerHitAnnounce, ctrlHeld, ref vh);
             if (vh != t.DealerHitAnnounce) { t.DealerHitAnnounce = vh; MarkNarrationDirty(); }
