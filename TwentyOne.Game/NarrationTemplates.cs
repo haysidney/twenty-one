@@ -35,6 +35,10 @@ public class NarrationTemplates
     // Split ace mandatory card — card dealt, hand auto-stood per split-ace rule
     public string PlayerSplitAce { get; set; } = "{name} draws {card} — {cards} = {score} (split aces, auto-stand)";
 
+    // Bet-collection request (sent when dealer shift+clicks Trade during Betting)
+    // {name} = player display name
+    public string PlayerBetRequest { get; set; } = "{name}, please trade your bet to me.";
+
     // Trade-request announcements (sent when dealer clicks Double/Split, before confirming trade)
     // {amount} = the extra chips required
     public string PlayerDoubleRequest { get; set; } = "{name} would like to double down! Please trade {amount} gil to the dealer.";

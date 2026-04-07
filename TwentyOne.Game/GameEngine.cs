@@ -618,6 +618,14 @@ public static class GameEngine
                 Narrate(t.BettingOpen);
                 return (state, effects);
 
+            // ── AnnounceBetRequest ───────────────────────────────────────────
+            case AnnounceBetRequest a:
+            {
+                var player = state.Players[a.PlayerIndex];
+                Narrate(NarrationTemplates.Fmt(t.PlayerBetRequest, ("name", player.DisplayName)));
+                return (state, effects);
+            }
+
             // ── AnnounceDealerDeal / AnnouncePlayerDeal ──────────────────────
             case AnnounceDealerDeal:
                 Narrate(t.DealDealerCard);

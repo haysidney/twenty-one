@@ -24,6 +24,9 @@ public record AnnouncePlayerHit(int PlayerIndex, int HandIndex) : GameAction;
 // Betting phase announcement (narration only)
 public record AnnounceBettingOpen : GameAction;
 
+// Bet-request announcement — sent when dealer shift+clicks Trade during Betting phase
+public record AnnounceBetRequest(int PlayerIndex) : GameAction;
+
 // Phase transitions
 public record StartDeal : GameAction;
 public record BeginPlayerTurns : GameAction;

@@ -99,6 +99,7 @@ public partial class MainWindow : Window, IDisposable
             pendingSplit  = null;
         }
         else if (action is not AnnounceBettingOpen
+                         and not AnnounceBetRequest
                          and not AnnounceDouble
                          and not AnnounceSplit
                          and not AnnounceDealerHit
@@ -539,8 +540,14 @@ private static unsafe void SendChatMessage(string message)
                         {
                             ImGui.SameLine();
                             if (ImGui.SmallButton($"Trade##{pi}trade"))
-                                Plugin.TradePlayer(p.FullName, p.World);
-                            if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Trade {p.FullName}@{p.World}");
+                            {
+                                if (ImGui.GetIO().KeyShift)
+                                    Apply(new AnnounceBetRequest(pi));
+                                else
+                                    Plugin.TradePlayer(p.FullName, p.World);
+                            }
+                            if (ImGui.IsItemHovered())
+                                ImGui.SetTooltip($"Trade {p.FullName}@{p.World}\nShift+Click to announce bet request in chat");
                         }
                     }
                     else

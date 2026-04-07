@@ -173,6 +173,10 @@ public class ConfigWindow : Window, IDisposable
             NtRow("Open##ntBO", "", Defaults.BettingOpen, ctrlHeld, ref vb0);
             if (vb0 != t.BettingOpen) { t.BettingOpen = vb0; MarkNarrationDirty(); }
 
+            var vb1 = t.PlayerBetRequest;
+            NtRow("Bet req##ntBR", "{name}", Defaults.PlayerBetRequest, ctrlHeld, ref vb1);
+            if (vb1 != t.PlayerBetRequest) { t.PlayerBetRequest = vb1; MarkNarrationDirty(); }
+
             ImGui.EndTable();
         }
 

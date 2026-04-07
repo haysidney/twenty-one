@@ -1351,4 +1351,17 @@ public class SplitHandTests
         Assert.Contains("100", ((SendChat)effects[0]).Text);
         Assert.Contains("split", ((SendChat)effects[0]).Text.ToLower());
     }
+
+    [Fact]
+    public void AnnounceBetRequest_NarratesPlayerName()
+    {
+        var state = new GameState
+        {
+            Phase   = GamePhase.Betting,
+            Players = [new Player { Nickname = "Lorah" }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceBetRequest(0));
+        Assert.Single(effects);
+        Assert.Contains("Lorah", ((SendChat)effects[0]).Text);
+    }
 }
