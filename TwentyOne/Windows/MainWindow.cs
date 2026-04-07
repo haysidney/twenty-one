@@ -579,9 +579,15 @@ private static unsafe void SendChatMessage(string message)
                             if (amount.Length > 0 && (result == PayoutResult.Win || result == PayoutResult.BjWin))
                             {
                                 ImGui.SameLine();
+                                var shiftHeld  = ImGui.GetIO().KeyShift;
+                                var winnings   = amount.TrimStart('+');
+                                var bet        = GameEngine.GetEffectiveBet(p, hand);
+                                var total      = (decimal.TryParse(winnings, out var w) && bet > 0)
+                                                 ? $"{w + bet:0.##}" : winnings;
+                                var copyVal    = shiftHeld ? total : winnings;
                                 if (ImGui.SmallButton($"Copy##{pi}_{hi}payout"))
-                                    ImGui.SetClipboardText(amount.TrimStart('+'));
-                                if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Copy: {amount.TrimStart('+')}");
+                                    ImGui.SetClipboardText(copyVal);
+                                if (ImGui.IsItemHovered()) ImGui.SetTooltip(shiftHeld ? $"Copy with bet: {total}" : $"Copy: {winnings}\nShift+Click to copy with bet: {total}");
                             }
                         }
                     }
