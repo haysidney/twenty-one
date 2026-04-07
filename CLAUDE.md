@@ -62,6 +62,12 @@ All cards come from FFXIV chat rolls (`/random 13` or `/dice 13`). There are no 
 
 Use only these player names in test cases: Lorah, Bekki, Nolla. If more than 3 names are needed, invent new ones. When a test requires a winning player, that player must always be Lorah. Write tests for all new features.
 
+## Narration Templates
+
+Every narration string emitted via `SendChat` must have a corresponding property in `NarrationTemplates` and a row in `ConfigWindow.DrawNarrationTemplates`. When adding a new `Narrate(...)` call in `GameEngine`, always:
+1. Add a property to `NarrationTemplates` with a sensible default.
+2. Add an `NtRow(...)` entry in the appropriate `ConfigWindow` section (or a new section if needed).
+
 ## Design Decisions
 
 - Dealer hits on soft 17.
