@@ -213,8 +213,12 @@ public class ConfigWindow : Window, IDisposable
             if (v1 != t.PlayerHitAnnounce) { t.PlayerHitAnnounce = v1; MarkNarrationDirty(); }
 
             var v2 = t.PlayerHit;
-            NtRow("Hit result##ntPH",   "{name}  {card}  {cards}  {score}",                Defaults.PlayerHit,   ctrlHeld, ref v2);
+            NtRow("Hit result##ntPH",   "{name}  {card}  {cards}  {score}",                Defaults.PlayerHit,      ctrlHeld, ref v2);
             if (v2 != t.PlayerHit)   { t.PlayerHit   = v2; MarkNarrationDirty(); }
+
+            var v2b = t.PlayerAfterHit;
+            NtRow("After hit##ntPAH",   "{name}  {cards}  {score}  {actions}",             Defaults.PlayerAfterHit, ctrlHeld, ref v2b);
+            if (v2b != t.PlayerAfterHit) { t.PlayerAfterHit = v2b; MarkNarrationDirty(); }
 
             var v3 = t.PlayerBust;
             NtRow("Bust##ntPB",         "{name}  {cards}  {score}",                        Defaults.PlayerBust,  ctrlHeld, ref v3);

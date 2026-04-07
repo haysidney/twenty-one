@@ -299,6 +299,7 @@ public static class GameEngine
             var name = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
             Narrate(NarrationTemplates.Fmt(t.PlayerTurnStart,
                 ("name",        name),
+                ("score",       ScoreString(hand.Cards)),
                 ("dealerCards", HandString(dealerHand.Cards)),
                 ("dealerScore", ScoreString(dealerHand.Cards)),
                 ("actions",     actions)));
@@ -382,8 +383,20 @@ public static class GameEngine
                         Narrate(NarrationTemplates.Fmt(t.PlayerDouble,
                             ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score)));
                     else
+                    {
                         Narrate(NarrationTemplates.Fmt(t.PlayerHit,
                             ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score)));
+                        if (newHand.State == HandState.Playing && pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
+                        {
+                            var cd2 = CanDouble(newHand, state.Players[pi].Bet);
+                            var cs2 = CanSplit(newHand);
+                            Narrate(NarrationTemplates.Fmt(t.PlayerAfterHit,
+                                ("name",    displayName),
+                                ("cards",   cards),
+                                ("score",   score),
+                                ("actions", ValidActionsString(newHand, cd2, cs2))));
+                        }
+                    }
 
                     if (pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
                     {

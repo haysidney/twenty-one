@@ -17,7 +17,10 @@ public class NarrationTemplates
     // Player actions (PlayerTurns phase)
     // {actions} = e.g. "Hit or Stand" or "Hit or Stand, Double, Split"
     public string PlayerHitAnnounce { get; set; } = "{name} hits!";
-    public string PlayerTurnStart { get; set; } = "{name}'s turn — Dealer shows {dealerCards} ({dealerScore}). {actions}";
+    public string PlayerTurnStart { get; set; } = "{name}'s turn ({score}) — Dealer shows {dealerCards} ({dealerScore}). {actions}";
+    // After a hit that leaves the hand still Playing: show score and ask what to do next
+    // {name} {cards} {score} {actions}
+    public string PlayerAfterHit { get; set; } = "{name} — {cards} = {score}. {actions}?";
     public string PlayerHit   { get; set; } = "{name} hits → {card} | {cards} = {score}";
     public string PlayerBust  { get; set; } = "{name} busts! {cards} = {score}";
     public string PlayerBJ    { get; set; } = "{name} — Blackjack! {cards}";

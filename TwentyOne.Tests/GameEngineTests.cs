@@ -192,8 +192,9 @@ public class ApplyAddPlayerCardTests
     public void AddPlayerCard_NarratesHit()
     {
         var (_, effects) = GameEngine.Apply(ActivePlayerState(), new AddPlayerCard(0, 0, 3));
-        Assert.Single(effects);
+        Assert.Equal(2, effects.Count);
         Assert.Contains("Lorah hits", ((SendChat)effects[0]).Text);
+        Assert.Contains("Lorah", ((SendChat)effects[1]).Text);
     }
 
     [Fact]
