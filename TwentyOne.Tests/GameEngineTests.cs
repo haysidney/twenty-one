@@ -213,8 +213,12 @@ public class ApplyAddPlayerCardTests
         };
         var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
         Assert.Contains("busts", ((SendChat)effects[0]).Text);
-        Assert.Equal(1, newState.ActivePlayerIndex); // advanced to Bekki
-        Assert.Equal(GamePhase.PlayerTurns, newState.Phase);
+        Assert.True(newState.WaitingForNextPlayer);
+        Assert.Equal(0, newState.ActivePlayerIndex); // stays on Lorah until Next Player clicked
+
+        var (advState, _) = GameEngine.Apply(newState, new AdvanceToNextPlayer());
+        Assert.Equal(1, advState.ActivePlayerIndex);
+        Assert.Equal(GamePhase.PlayerTurns, advState.Phase);
     }
 
     [Fact]
@@ -314,7 +318,11 @@ public class ApplyStandPlayerTests
         var (newState, effects) = GameEngine.Apply(state, new StandPlayer(0, 0));
         Assert.Contains("Lorah stands", ((SendChat)effects[0]).Text);
         Assert.Equal(HandState.Stand, newState.Players[0].Hands[0].State);
-        Assert.Equal(1, newState.ActivePlayerIndex);
+        Assert.True(newState.WaitingForNextPlayer);
+        Assert.Equal(0, newState.ActivePlayerIndex); // stays on Lorah until Next Player clicked
+
+        var (advState, _) = GameEngine.Apply(newState, new AdvanceToNextPlayer());
+        Assert.Equal(1, advState.ActivePlayerIndex);
     }
 
     [Fact]

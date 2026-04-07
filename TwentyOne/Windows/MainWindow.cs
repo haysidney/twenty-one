@@ -244,7 +244,8 @@ public partial class MainWindow : Window, IDisposable
             GamePhase.Deal        => hand.State == HandState.Playing && hand.Cards.Count < 2,
             GamePhase.PlayerTurns => pi == ActivePlayerIndex && hi == ActiveHandIndex
                                   && GameEngine.CanHit(hand)
-                                  && !pendingDouble.HasValue && !pendingSplit.HasValue,
+                                  && !pendingDouble.HasValue && !pendingSplit.HasValue
+                                  && !State.WaitingForNextPlayer,
             _ => false,
         };
     }
