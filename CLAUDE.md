@@ -67,6 +67,7 @@ Use only these player names in test cases: Lorah, Bekki, Nolla. If more than 3 n
 Every narration string emitted via `SendChat` must have a corresponding property in `NarrationTemplates` and a row in `ConfigWindow.DrawNarrationTemplates`. When adding a new `Narrate(...)` call in `GameEngine`, always:
 1. Add a property to `NarrationTemplates` with a sensible default.
 2. Add an `NtRow(...)` entry in the appropriate `ConfigWindow` section (or a new section if needed).
+3. Add a test in `NarrationTemplateTests` verifying the new template variable(s) are substituted.
 
 ## Design Decisions
 
