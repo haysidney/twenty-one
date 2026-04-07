@@ -195,7 +195,7 @@ public partial class MainWindow : Window, IDisposable
     private static partial Regex RandomRollRegex();
 
     // "Random! (1-13)[icon] 7" — response to /dice in private channels
-    [GeneratedRegex(@"Random! \(1-13\)\D+(\d+)")]
+    [GeneratedRegex(@"Random! \(1-13\)\D*(\d+)")]
     private static partial Regex DiceRollRegex();
 
     private void OnChatMessage(XivChatType type, int timestamp,
@@ -205,7 +205,9 @@ public partial class MainWindow : Window, IDisposable
 
         var (isDealer, pi, hi, isPublic) = pendingHit.Value;
 
-        if (!isPublic && sender.TextValue != objectTable.LocalPlayer?.Name.TextValue) return;
+        // Cross-world senders append world name with a special character after the player name
+        var localName = objectTable.LocalPlayer?.Name.TextValue;
+        if (!isPublic && (localName == null || !sender.TextValue.StartsWith(localName))) return;
 
         var msgText = message.TextValue;
         var match   = (isPublic ? RandomRollRegex() : DiceRollRegex()).Match(msgText);
