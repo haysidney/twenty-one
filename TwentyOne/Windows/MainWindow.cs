@@ -154,6 +154,15 @@ public partial class MainWindow : Window, IDisposable
 
     // ── Chat / roll ───────────────────────────────────────────────────────────
 
+    // LS1-8 = types 16-23; CWL1 = type 37, index 0; CWL2-8 = types 101-107, index = type-100
+    private static uint LinkshellIndexForChatType(int chatType) => chatType switch
+    {
+        >= 16 and <= 23 => (uint)(chatType - 16),
+        37              => 0u,
+        >= 101 and <= 107 => (uint)(chatType - 100),
+        _               => 0u,
+    };
+
     private static unsafe void SendChatMessage(string message)
     {
         var uiModule = UIModule.Instance();
@@ -195,8 +204,11 @@ public partial class MainWindow : Window, IDisposable
         }
         else
         {
+            var savedChatType = shell->ChatType;
+            var savedLsIndex  = LinkshellIndexForChatType(savedChatType);
             SendChatMessage(channel);
             SendChatMessage("/dice 13");
+            shell->ChangeChatChannel(savedChatType, savedLsIndex, null, true);
         }
     }
 
