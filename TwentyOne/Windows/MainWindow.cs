@@ -674,7 +674,14 @@ private static unsafe void SendChatMessage(string message)
                     var isPendingDouble = pendingDouble.HasValue && pendingDouble.Value == (pi, hi);
                     var isPendingSplit  = pendingSplit.HasValue  && pendingSplit.Value  == (pi, hi);
 
-                    if (isPendingDouble)
+                    if (Phase == GamePhase.PlayerTurns && State.WaitingForNextPlayer
+                        && pi == ActivePlayerIndex && hi == ActiveHandIndex)
+                    {
+                        var moreHands = p.Hands.Skip(hi + 1).Any(h => h.State == HandState.Playing);
+                        var advLabel  = moreHands ? $"Next Hand ↓##{pi}_{hi}" : $"Next Player ↓##{pi}_{hi}";
+                        if (ImGui.SmallButton(advLabel)) Apply(new AdvanceToNextPlayer());
+                    }
+                    else if (isPendingDouble)
                     {
                         if (ImGui.SmallButton($"Confirm Dbl##{pi}_{hi}"))
                         {
@@ -864,16 +871,6 @@ private static unsafe void SendChatMessage(string message)
                 break;
 
             case GamePhase.PlayerTurns:
-                if (State.WaitingForNextPlayer)
-                {
-                    if (ImGui.Button("Next Player →")) Apply(new AdvanceToNextPlayer());
-                }
-                else
-                {
-                    ImGui.BeginDisabled();
-                    ImGui.Button("Go to Payout →");
-                    ImGui.EndDisabled();
-                }
                 break;
 
             case GamePhase.DealerTurn:
