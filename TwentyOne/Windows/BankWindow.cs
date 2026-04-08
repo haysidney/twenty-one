@@ -32,14 +32,16 @@ public class BankWindow : Window, IDisposable
 
     public override void Draw()
     {
+        ImGui.Text("Starting Gil"); ImGui.SameLine();
         ImGui.SetNextItemWidth(160);
-        if (ImGui.InputText("Starting Gil", ref gilStartBuf, 20))
+        if (ImGui.InputText("##gilstart", ref gilStartBuf, 20))
         {
             if (long.TryParse(gilStartBuf, out var v)) { config.GilStart = v; config.Save(); }
         }
 
+        ImGui.Text("Ending Gil"); ImGui.SameLine();
         ImGui.SetNextItemWidth(160);
-        if (ImGui.InputText("Ending Gil", ref gilEndBuf, 20))
+        if (ImGui.InputText("##gilend", ref gilEndBuf, 20))
         {
             if (long.TryParse(gilEndBuf, out var v)) { config.GilEnd = v; config.Save(); }
         }
@@ -49,9 +51,10 @@ public class BankWindow : Window, IDisposable
 
         ImGui.Separator();
 
+        ImGui.Text("Dealer Cut %"); ImGui.SameLine();
         ImGui.SetNextItemWidth(100);
         var cut = config.DealerCutPct;
-        if (ImGui.InputInt("Dealer Cut %%", ref cut))
+        if (ImGui.InputInt("##dealercut", ref cut))
         {
             config.DealerCutPct = Math.Clamp(cut, 0, 100);
             config.Save();
@@ -59,10 +62,10 @@ public class BankWindow : Window, IDisposable
 
         var dealerKeeps = profit > 0 ? (long)Math.Floor(profit * config.DealerCutPct / 100.0) : 0;
         var venueOwes   = profit > 0 ? profit - dealerKeeps : 0;
-        ImGui.Text($"Venue receives: {venueOwes:N0} gil");
 
         ImGui.Separator();
         ImGui.Text("Tips");
+
 
         long tipTotal = 0;
         for (int i = 0; i < config.Tips.Count; i++)
@@ -95,5 +98,9 @@ public class BankWindow : Window, IDisposable
                 tipBuf = string.Empty;
             }
         }
+
+        ImGui.Separator();
+        ImGui.Text($"Dealer receives: {dealerKeeps:N0} gil");
+        ImGui.Text($"Venue receives: {venueOwes - tipTotal:N0} gil");
     }
 }
