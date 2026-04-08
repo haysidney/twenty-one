@@ -798,10 +798,10 @@ private static unsafe void SendChatMessage(string message)
                         // Resend turn-start button when it's this player's active hand
                         if (isActiveHand && Phase == GamePhase.PlayerTurns && !State.WaitingForNextPlayer)
                         {
-                            var btnW = ImGui.CalcTextSize("↺").X + ImGui.GetStyle().FramePadding.X * 2;
+                            var btnW = ImGui.CalcTextSize("Re").X + ImGui.GetStyle().FramePadding.X * 2;
                             ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX()
                                            - btnW - ImGui.GetScrollX());
-                            if (ImGui.SmallButton($"↺##{pi}_{hi}resend"))
+                            if (ImGui.SmallButton($"Re##{pi}_{hi}resend"))
                                 Apply(new AnnouncePlayerTurn(pi, hi));
                             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Resend turn start message"u8);
                         }
