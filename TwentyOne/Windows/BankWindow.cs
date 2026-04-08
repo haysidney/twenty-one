@@ -2,10 +2,11 @@ using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace TwentyOne.Windows;
 
-public class BankWindow : Window, IDisposable
+public unsafe class BankWindow : Window, IDisposable
 {
     private readonly Configuration config;
 
@@ -38,12 +39,28 @@ public class BankWindow : Window, IDisposable
         {
             if (long.TryParse(gilStartBuf, out var v)) { config.GilStart = v; config.Save(); }
         }
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Current##start"))
+        {
+            var gil = (long)InventoryManager.Instance()->GetGil();
+            config.GilStart = gil;
+            gilStartBuf = gil.ToString();
+            config.Save();
+        }
 
         ImGui.Text("Ending Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);
         if (ImGui.InputText("##gilend", ref gilEndBuf, 20))
         {
             if (long.TryParse(gilEndBuf, out var v)) { config.GilEnd = v; config.Save(); }
+        }
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Current##end"))
+        {
+            var gil = (long)InventoryManager.Instance()->GetGil();
+            config.GilEnd = gil;
+            gilEndBuf = gil.ToString();
+            config.Save();
         }
 
         var profit = config.GilEnd - config.GilStart;
