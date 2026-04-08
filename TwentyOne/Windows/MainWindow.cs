@@ -728,6 +728,7 @@ private static unsafe void SendChatMessage(string message)
 
                     // ── Status column ─────────────────────────────────────────
                     ImGui.TableSetColumnIndex(4);
+                    var statusCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     if (Phase == GamePhase.Payout)
                     {
                         // Check if all hands for this player win (combined display)
@@ -798,8 +799,8 @@ private static unsafe void SendChatMessage(string message)
                         if (isActiveHand && !State.WaitingForNextPlayer)
                         {
                             var remindW = ImGui.CalcTextSize("Remind").X + ImGui.GetStyle().FramePadding.X * 2;
-                            ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - remindW
-                                           - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
+                            ImGui.SameLine();
+                            ImGui.SetCursorPosX(statusCellRight - remindW);
                             if (ImGui.SmallButton($"Remind##{pi}_{hi}resend"))
                                 Apply(new AnnouncePlayerTurn(pi, hi));
                             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Resend turn start message"u8);
