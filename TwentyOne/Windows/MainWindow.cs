@@ -734,6 +734,11 @@ private static unsafe void SendChatMessage(string message)
                         ImGui.SameLine();
                         if (ImGui.SmallButton($"Cancel##{pi}_{hi}splcancel")) pendingSplit = null;
                     }
+                    else if (Phase == GamePhase.Deal && PlayerHitActive(pi, hi))
+                    {
+                        if (ImGui.SmallButton($"Draw##{pi}_{hi}"))
+                            QueueHitRoll(isDealer: false, pi, hi);
+                    }
                     else
                     {
                         var canStand = !hasAnyPending && Phase == GamePhase.PlayerTurns
