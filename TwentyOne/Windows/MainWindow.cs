@@ -107,6 +107,8 @@ public partial class MainWindow : Window, IDisposable
                          and not AnnounceSplit
                          and not AnnounceDealerHit
                          and not AnnouncePlayerHit
+                         and not AnnouncePlayerDeal
+                         and not AnnounceDealerDeal
                          and not AdvanceToNextPlayer
                          and not BeginDealerTurn)
         {
