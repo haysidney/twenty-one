@@ -11,6 +11,7 @@ public class PlayerStat
     public string  DisplayName { get; set; } = string.Empty;
     public int     GamesPlayed { get; set; } = 0;
     public int     GamesWon    { get; set; } = 0;
+    public int     GamesPushed { get; set; } = 0;
     public int     GamesLost   { get; set; } = 0;
     public decimal TotalWon    { get; set; } = 0;
 }

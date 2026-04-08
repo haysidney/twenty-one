@@ -42,13 +42,14 @@ public class PlayerStatsWindow : Window, IDisposable
         ImGui.Spacing();
 
         var flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
-        if (ImGui.BeginTable("##stats", 6, flags))
+        if (ImGui.BeginTable("##stats", 7, flags))
         {
-            ImGui.TableSetupColumn("Player"u8,  ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Played"u8,  ImGuiTableColumnFlags.WidthFixed, 55);
-            ImGui.TableSetupColumn("Won"u8,     ImGuiTableColumnFlags.WidthFixed, 45);
-            ImGui.TableSetupColumn("Lost"u8,    ImGuiTableColumnFlags.WidthFixed, 45);
-            ImGui.TableSetupColumn("Win %"u8,   ImGuiTableColumnFlags.WidthFixed, 55);
+            ImGui.TableSetupColumn("Player"u8,    ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Played"u8,    ImGuiTableColumnFlags.WidthFixed, 55);
+            ImGui.TableSetupColumn("Won"u8,       ImGuiTableColumnFlags.WidthFixed, 45);
+            ImGui.TableSetupColumn("Pushes"u8,    ImGuiTableColumnFlags.WidthFixed, 55);
+            ImGui.TableSetupColumn("Lost"u8,      ImGuiTableColumnFlags.WidthFixed, 45);
+            ImGui.TableSetupColumn("Win %"u8,     ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Total Won"u8, ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableHeadersRow();
 
@@ -69,16 +70,20 @@ public class PlayerStatsWindow : Window, IDisposable
 
                 ImGui.TableSetColumnIndex(3);
                 ImGui.AlignTextToFramePadding();
-                ImGui.TextUnformatted(stat.GamesLost.ToString());
+                ImGui.TextUnformatted(stat.GamesPushed.ToString());
 
                 ImGui.TableSetColumnIndex(4);
+                ImGui.AlignTextToFramePadding();
+                ImGui.TextUnformatted(stat.GamesLost.ToString());
+
+                ImGui.TableSetColumnIndex(5);
                 ImGui.AlignTextToFramePadding();
                 var winPct = stat.GamesPlayed > 0
                     ? $"{stat.GamesWon * 100.0 / stat.GamesPlayed:0.#}%"
                     : "-";
                 ImGui.TextUnformatted(winPct);
 
-                ImGui.TableSetColumnIndex(5);
+                ImGui.TableSetColumnIndex(6);
                 ImGui.AlignTextToFramePadding();
                 var totalColor = stat.TotalWon > 0
                     ? new Vector4(0.35f, 0.9f, 0.35f, 1f)
@@ -91,19 +96,31 @@ public class PlayerStatsWindow : Window, IDisposable
 
             ImGui.EndTable();
         }
+
+        var grandTotal = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
+        var grandColor = grandTotal > 0
+            ? new Vector4(0.35f, 0.9f, 0.35f, 1f)
+            : grandTotal < 0
+                ? new Vector4(1f, 0.35f, 0.35f, 1f)
+                : new Vector4(0.7f, 0.7f, 0.7f, 1f);
+        var grandStr = grandTotal > 0 ? $"+{grandTotal:0.##}" : $"{grandTotal:0.##}";
+        ImGui.Spacing();
+        ImGui.Text("Total Won: ");
+        ImGui.SameLine();
+        ImGui.TextColored(grandColor, grandStr);
     }
 
     private string BuildExportText()
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Player\tPlayed\tWon\tLost\tWin%\tTotal Won");
+        sb.AppendLine("Player\tPlayed\tWon\tPushes\tLost\tWin%\tTotal Won");
         foreach (var stat in config.PlayerStatsStore.Values.OrderBy(s => s.DisplayName))
         {
             var winPct = stat.GamesPlayed > 0
                 ? $"{stat.GamesWon * 100.0 / stat.GamesPlayed:0.#}%"
                 : "-";
             var totalStr = stat.TotalWon > 0 ? $"+{stat.TotalWon:0.##}" : $"{stat.TotalWon:0.##}";
-            sb.AppendLine($"{stat.DisplayName}\t{stat.GamesPlayed}\t{stat.GamesWon}\t{stat.GamesLost}\t{winPct}\t{totalStr}");
+            sb.AppendLine($"{stat.DisplayName}\t{stat.GamesPlayed}\t{stat.GamesWon}\t{stat.GamesPushed}\t{stat.GamesLost}\t{winPct}\t{totalStr}");
         }
         return sb.ToString().TrimEnd();
     }

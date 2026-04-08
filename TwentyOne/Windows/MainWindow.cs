@@ -234,6 +234,7 @@ public partial class MainWindow : Window, IDisposable
             stat.GamesPlayed++;
             if      (net > 0) stat.GamesWon++;
             else if (net < 0) stat.GamesLost++;
+            else               stat.GamesPushed++;
             stat.TotalWon += net;
         }
         config.Save();
