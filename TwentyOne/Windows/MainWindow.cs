@@ -941,6 +941,8 @@ private static unsafe void SendChatMessage(string message)
             if (ImGui.Button("Abort Round"))
             {
                 config.NarrationLog.Add("Round aborted.");
+                chatQueue.Clear();
+                deferredRoll = null;
                 Apply(new NewRound());
             }
             if (!ctrlHeld) ImGui.EndDisabled();

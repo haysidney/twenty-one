@@ -36,8 +36,6 @@
 
 - Add sounds to templates.
 
-- Test sounds in party chat
-
 - Shouts during big game moments
 
 - Send tell to player asking them if they'd like to play some blackjack. Optionally ask in a different channel?
@@ -57,3 +55,5 @@
 - Track bank
 
 - Track amount needed to pay venue
+
+- Figure out if we should prevent certain undos
