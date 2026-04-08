@@ -590,7 +590,7 @@ private static unsafe void SendChatMessage(string message)
                             var clearW  = hasWorld && hasNickname ? BW("C") + sp : 0;
                             var targetW = hasWorld               ? BW("@") + sp : 0;
                             var renameW = BW("R");
-                            var spadeW  = isWinner               ? BW("\u2660") + sp : 0;
+                            var spadeW  = isWinner               ? ImGui.CalcTextSize("\u2660").X + sp : 0;
                             ImGui.SameLine();
                             ImGui.SetCursorPosX(nameCellRight - spadeW - targetW - renameW - clearW);
 
@@ -752,12 +752,14 @@ private static unsafe void SendChatMessage(string message)
                             }
                             var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
                             var combinedAmtStr = $"+{combinedNet:0.##}";
-                            ImGui.TextColored(green, $"Win {combinedAmtStr}");
-                            ImGui.SameLine();
                             var shiftHeld2 = ImGui.GetIO().KeyShift;
                             var totalBet   = p.Hands.Sum(h => GameEngine.GetEffectiveBet(p, h));
                             var withBet    = $"{combinedNet + totalBet:0.##}";
                             var copyVal2   = shiftHeld2 ? withBet : $"{combinedNet:0.##}";
+                            var copyW2     = ImGui.CalcTextSize("Copy").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+                            ImGui.TextColored(green, $"Win {combinedAmtStr}");
+                            ImGui.SameLine();
+                            ImGui.SetCursorPosX(statusCellRight - copyW2 + ImGui.GetStyle().ItemSpacing.X);
                             if (ImGui.SmallButton($"Copy##{pi}cpayout"))
                                 ImGui.SetClipboardText(copyVal2);
                             if (ImGui.IsItemHovered())
@@ -774,13 +776,15 @@ private static unsafe void SendChatMessage(string message)
                                 var result = GameEngine.GetPayoutResult(State, pi, hi);
                                 if (amount.Length > 0 && (result == PayoutResult.Win || result == PayoutResult.BjWin))
                                 {
-                                    ImGui.SameLine();
                                     var shiftHeld  = ImGui.GetIO().KeyShift;
                                     var winnings   = amount.TrimStart('+');
                                     var bet        = GameEngine.GetEffectiveBet(p, hand);
                                     var total      = (decimal.TryParse(winnings, out var w) && bet > 0)
                                                      ? $"{w + bet:0.##}" : winnings;
                                     var copyVal    = shiftHeld ? total : winnings;
+                                    var copyW      = ImGui.CalcTextSize("Copy").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+                                    ImGui.SameLine();
+                                    ImGui.SetCursorPosX(statusCellRight - copyW + ImGui.GetStyle().ItemSpacing.X);
                                     if (ImGui.SmallButton($"Copy##{pi}_{hi}payout"))
                                         ImGui.SetClipboardText(copyVal);
                                     if (ImGui.IsItemHovered()) ImGui.SetTooltip(shiftHeld ? $"Copy with bet: {total}" : $"Copy: {winnings}\nShift+Click to copy with bet: {total}");

@@ -42,20 +42,23 @@
 
 - Add player from vicinity to game feature.
 
-- Undoing a double has an extra step
-
-- Need separate win and lose narration templates
-
-- Track income for the night
-
-- Track tips
-
-- Track percentage cut
-
 - Track bank
-
-- Track amount needed to pay venue
 
 - Figure out if we should prevent certain undos
 
 - Test nonnumeric characters in the bet field
+
+- Track player winnings
+
+- Sounds on every message
+
+- Remind player of turn
+
+- player cards at turn start
+
+- face the player who's doing stuff
+
+- Consecutive text command input is currently restricted.
+ - Change the default from 1000 to 1200
+
+- When a split wins both hands, combine the payout
