@@ -68,7 +68,7 @@ public unsafe class BankWindow : Window, IDisposable
 
         ImGui.Separator();
 
-        ImGui.Text("Venue Cut %"); ImGui.SameLine();
+        ImGui.AlignTextToFramePadding(); ImGui.Text("Venue Cut %"); ImGui.SameLine();
         ImGui.SetNextItemWidth(100);
         var cut = config.DealerCutPct;
         if (ImGui.InputInt("##dealercut", ref cut))
