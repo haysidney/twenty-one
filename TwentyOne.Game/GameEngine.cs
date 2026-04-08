@@ -307,6 +307,7 @@ public static class GameEngine
             var name = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
             Narrate(NarrationTemplates.Fmt(t.PlayerTurnStart,
                 ("name",        name),
+                ("cards",       HandString(hand.Cards)),
                 ("score",       ScoreString(hand.Cards)),
                 ("dealerCards", HandString(dealerHand.Cards)),
                 ("dealerScore", ScoreString(dealerHand.Cards)),

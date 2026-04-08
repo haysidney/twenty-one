@@ -322,7 +322,7 @@ public class ConfigWindow : Window, IDisposable
                 ImGui.TableSetupColumn("##ntPlayersReset", ImGuiTableColumnFlags.WidthFixed, 48);
 
                 var v0 = t.PlayerTurnStart;
-                NtRow("Turn start##ntPTS",  "{name}  {dealerCards}  {dealerScore}  {actions}", Defaults.PlayerTurnStart, ctrlHeld, ref v0);
+                NtRow("Turn start##ntPTS",  "{name}  {cards}  {score}  {dealerCards}  {dealerScore}  {actions}", Defaults.PlayerTurnStart, ctrlHeld, ref v0);
                 if (v0 != t.PlayerTurnStart) { t.PlayerTurnStart = v0; MarkNarrationDirty(); }
 
                 var v1 = t.PlayerHitAnnounce;

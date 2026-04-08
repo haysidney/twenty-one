@@ -809,6 +809,22 @@ public class NarrationTemplateTests
     }
 
     [Fact]
+    public void PlayerTurnStart_IncludesPlayerCards()
+    {
+        var t = new NarrationTemplates { PlayerTurnStart = "{cards}" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.Deal,
+            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
+            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
+        var turnStart = ((SendChat)effects[0]).Text;
+        Assert.Contains("5", turnStart);
+        Assert.Contains("8", turnStart);
+    }
+
+    [Fact]
     public void DealerTurnStart_SubstitutesCardsAndScore()
     {
         var state = new GameState
