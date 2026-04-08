@@ -272,7 +272,8 @@ public static class GameEngine
             var startHi = (pi == fromPi) ? fromHi + 1 : 0;
             for (var hi = startHi; hi < players[pi].Hands.Count; hi++)
             {
-                if (players[pi].Hands[hi].State == HandState.Playing)
+                var hs = players[pi].Hands[hi].State;
+                if (hs == HandState.Playing || hs == HandState.Blackjack)
                     return (pi, hi, GamePhase.PlayerTurns);
             }
         }
@@ -642,12 +643,23 @@ public static class GameEngine
             case BeginPlayerTurns:
             {
                 var (nextPi, nextHi, nextPhase) = AdvanceFrom(-1, -1, state.Players);
-                if (nextPhase == GamePhase.PlayerTurns)
-                    NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
                 var waitDealer = nextPhase == GamePhase.DealerTurn;
-                if (waitDealer) nextPhase = GamePhase.DealerTurn; // keep phase, show button
+                var waitNext   = false;
+                if (nextPhase == GamePhase.PlayerTurns)
+                {
+                    var nextHand = state.Players[nextPi].Hands[nextHi];
+                    if (nextHand.State == HandState.Blackjack)
+                    {
+                        var name = state.Players[nextPi].DisplayName;
+                        Narrate(NarrationTemplates.Fmt(t.PlayerBJ, ("name", name), ("cards", HandString(nextHand.Cards))));
+                        waitNext = true;
+                    }
+                    else
+                        NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
+                }
+                if (waitDealer) nextPhase = GamePhase.DealerTurn;
                 return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
-                    waitingForDealer: waitDealer), effects);
+                    waitingForDealer: waitDealer, waitingForNextPlayer: waitNext), effects);
             }
 
             // ── AdvanceToNextPlayer ──────────────────────────────────────────
@@ -658,12 +670,22 @@ public static class GameEngine
                     state.ActivePlayerIndex, state.ActiveHandIndex, state.Players);
                 if (nextPhase == GamePhase.PlayerTurns)
                 {
-                    if (state.Players[nextPi].Hands[nextHi].Cards.Count == 1)
+                    var nextHand = state.Players[nextPi].Hands[nextHi];
+                    if (nextHand.Cards.Count == 1)
                     {
                         var advPlayer  = state.Players[nextPi];
                         var advName    = $"{advPlayer.DisplayName} (Hand {nextHi + 1})";
                         Narrate(NarrationTemplates.Fmt(t.PlayerSplitRoll, ("name", advName)));
                         effects.Add(new AutoHit(nextPi, nextHi));
+                    }
+                    else if (nextHand.State == HandState.Blackjack)
+                    {
+                        var name = state.Players[nextPi].Hands.Count > 1
+                            ? $"{state.Players[nextPi].DisplayName} (Hand {nextHi + 1})"
+                            : state.Players[nextPi].DisplayName;
+                        Narrate(NarrationTemplates.Fmt(t.PlayerBJ, ("name", name), ("cards", HandString(nextHand.Cards))));
+                        return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+                            waitingForNextPlayer: true), effects);
                     }
                     else
                         NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);

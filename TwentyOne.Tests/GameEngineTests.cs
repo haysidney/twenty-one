@@ -404,7 +404,7 @@ public class ApplyPhaseTransitionTests
     }
 
     [Fact]
-    public void BeginPlayerTurns_AllBlackjacks_TransitionsToDealerTurn()
+    public void BeginPlayerTurns_BlackjackPlayer_NarratesAndWaits()
     {
         var state = new GameState
         {
@@ -415,7 +415,27 @@ public class ApplyPhaseTransitionTests
                 new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
             ],
         };
-        var (newState, _) = GameEngine.Apply(state, new BeginPlayerTurns());
+        var (newState, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
+        Assert.Equal(GamePhase.PlayerTurns, newState.Phase);
+        Assert.True(newState.WaitingForNextPlayer);
+        Assert.Single(effects);
+        Assert.Contains("Blackjack", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void BeginPlayerTurns_AllBlackjacks_AdvanceToNextPlayerGoesToDealerTurn()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.Deal,
+            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
+            Players =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
+            ],
+        };
+        var (mid, _)      = GameEngine.Apply(state, new BeginPlayerTurns());
+        var (newState, _) = GameEngine.Apply(mid, new AdvanceToNextPlayer());
         Assert.Equal(GamePhase.DealerTurn, newState.Phase);
     }
 
