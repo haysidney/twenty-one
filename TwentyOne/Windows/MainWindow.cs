@@ -492,13 +492,24 @@ private static unsafe void SendChatMessage(string message)
                                 }
                             }
 
+                            var winnerKey = p.FullName.Length > 0 ? p.FullName : p.Nickname;
+                            var isWinner  = config.GameState.LastRoundWinners.Contains(winnerKey);
                             var clearW  = hasWorld && hasNickname
                                 ? ImGui.CalcTextSize("C").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
                             var targetW = hasWorld
                                 ? ImGui.CalcTextSize("@").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
                             var renameW = ImGui.CalcTextSize("R").X + ImGui.GetStyle().FramePadding.X * 2;
-                            ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - clearW - targetW
+                            var spadeW  = isWinner
+                                ? ImGui.CalcTextSize("\u2660").X + ImGui.GetStyle().ItemSpacing.X : 0;
+                            ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - clearW - targetW - spadeW
                                            - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
+
+                            if (isWinner)
+                            {
+                                ImGui.TextColored(new System.Numerics.Vector4(0.2f, 0.8f, 0.2f, 1f), "\u2660");
+                                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Won last round"u8);
+                                ImGui.SameLine();
+                            }
 
                             if (hasWorld)
                             {

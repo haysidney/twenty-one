@@ -51,4 +51,6 @@ public class GameState
     public bool WaitingForNextPlayer { get; set; } = false;
     public bool WaitingForDealer { get; set; } = false;
     public BlackjackPayout BjPayout { get; set; } = BlackjackPayout.ThreeToTwo;
+    // FullNames (or Nicknames for manual players) of players who won last round.
+    public HashSet<string> LastRoundWinners { get; set; } = [];
 }

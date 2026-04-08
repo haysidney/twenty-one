@@ -866,6 +866,66 @@ public class AnnounceBettingOpenTests
     }
 }
 
+public class LastRoundWinnersTests
+{
+    [Fact]
+    public void GoToPayout_SetsWinnersForWinningPlayers()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players    =
+            [
+                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] },
+                new Player { Nickname = "Bekki", Bet = "100", Hands = [new Hand { Cards = [10, 6], State = HandState.Stand }] },
+            ],
+        };
+        var (newState, _) = GameEngine.Apply(state, new GoToPayout());
+        Assert.Contains("Lorah", newState.LastRoundWinners);
+        Assert.DoesNotContain("Bekki", newState.LastRoundWinners);
+    }
+
+    [Fact]
+    public void GoToPayout_BjWin_IncludedInWinners()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
+        };
+        var (newState, _) = GameEngine.Apply(state, new GoToPayout());
+        Assert.Contains("Lorah", newState.LastRoundWinners);
+    }
+
+    [Fact]
+    public void NewRound_PreservesLastRoundWinners()
+    {
+        var state = new GameState
+        {
+            Phase            = GamePhase.Payout,
+            LastRoundWinners = ["Lorah"],
+            Players          = [new Player { Nickname = "Lorah", Hands = [new Hand()] }],
+        };
+        var (newState, _) = GameEngine.Apply(state, new NewRound());
+        Assert.Contains("Lorah", newState.LastRoundWinners);
+    }
+
+    [Fact]
+    public void GoToPayout_UsesFullNameForFfxivPlayers()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players    = [new Player { FullName = "Lorah Doe", World = "Cactuar", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] }],
+        };
+        var (newState, _) = GameEngine.Apply(state, new GoToPayout());
+        Assert.Contains("Lorah Doe", newState.LastRoundWinners);
+    }
+}
+
 public class CanGoToPayoutTests
 {
     private static Player BjPlayer(string name) =>

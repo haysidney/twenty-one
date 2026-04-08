@@ -235,14 +235,15 @@ public static class GameEngine
         players.Select((p, i) => i == pi ? newPlayer : p).ToList();
 
     private static GameState With(GameState s,
-        List<Player>?    players               = null,
-        Hand?            dealerHand            = null,
-        GamePhase?       phase                 = null,
-        int?             activePlayerIndex     = null,
-        int?             activeHandIndex       = null,
-        bool?            waitingForNextPlayer  = null,
-        bool?            waitingForDealer      = null,
-        BlackjackPayout? bjPayout              = null) =>
+        List<Player>?       players               = null,
+        Hand?               dealerHand            = null,
+        GamePhase?          phase                 = null,
+        int?                activePlayerIndex     = null,
+        int?                activeHandIndex       = null,
+        bool?               waitingForNextPlayer  = null,
+        bool?               waitingForDealer      = null,
+        BlackjackPayout?    bjPayout              = null,
+        HashSet<string>?    lastRoundWinners      = null) =>
         new GameState
         {
             Players              = players              ?? s.Players,
@@ -253,6 +254,7 @@ public static class GameEngine
             WaitingForNextPlayer = waitingForNextPlayer ?? s.WaitingForNextPlayer,
             WaitingForDealer     = waitingForDealer     ?? s.WaitingForDealer,
             BjPayout             = bjPayout             ?? s.BjPayout,
+            LastRoundWinners     = lastRoundWinners     ?? s.LastRoundWinners,
         };
 
     /// <summary>
@@ -728,7 +730,12 @@ public static class GameEngine
                     }
                 }
 
-                return (With(state, phase: GamePhase.Payout), effects);
+                var winners = new HashSet<string>(
+                    state.Players
+                         .Where((p, pi) => p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
+                                            .Any(r => r is PayoutResult.Win or PayoutResult.BjWin))
+                         .Select(p => p.FullName.Length > 0 ? p.FullName : p.Nickname));
+                return (With(state, phase: GamePhase.Payout, lastRoundWinners: winners), effects);
             }
 
             // ── NewRound ─────────────────────────────────────────────────────
@@ -748,6 +755,7 @@ public static class GameEngine
                     ActivePlayerIndex = -1,
                     ActiveHandIndex   = -1,
                     BjPayout          = state.BjPayout,
+                    LastRoundWinners  = state.LastRoundWinners,
                 }, effects);
 
             // ── Roster management ────────────────────────────────────────────
