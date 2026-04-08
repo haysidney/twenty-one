@@ -1254,8 +1254,12 @@ public class SplitHandTests
             ],
         };
         var (ns, effects) = GameEngine.Apply(state, new StandPlayer(0, 0));
-        Assert.Equal(1, ns.ActiveHandIndex);
-        Assert.Contains(effects, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 1);
+        Assert.Equal(0, ns.ActiveHandIndex);
+        Assert.True(ns.WaitingForNextPlayer);
+        // AutoHit for hand 1 fires when AdvanceToNextPlayer is clicked
+        var (ns2, effects2) = GameEngine.Apply(ns, new AdvanceToNextPlayer());
+        Assert.Equal(1, ns2.ActiveHandIndex);
+        Assert.Contains(effects2, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 1);
     }
 
     [Fact]
@@ -1283,8 +1287,12 @@ public class SplitHandTests
         // Draw a card that busts hand 0
         var (ns, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 9));
         Assert.Equal(HandState.Bust, ns.Players[0].Hands[0].State);
-        Assert.Equal(1, ns.ActiveHandIndex);
-        Assert.Contains(effects, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 1);
+        Assert.Equal(0, ns.ActiveHandIndex);
+        Assert.True(ns.WaitingForNextPlayer);
+        // AutoHit for hand 1 fires when AdvanceToNextPlayer is clicked
+        var (ns2, effects2) = GameEngine.Apply(ns, new AdvanceToNextPlayer());
+        Assert.Equal(1, ns2.ActiveHandIndex);
+        Assert.Contains(effects2, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 1);
     }
 
     [Fact]

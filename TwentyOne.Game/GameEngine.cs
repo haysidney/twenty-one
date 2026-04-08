@@ -445,14 +445,7 @@ public static class GameEngine
                         if (newHand.State != HandState.Playing)
                         {
                             var (peekPi, peekHi, peekPhase) = AdvanceFrom(pi, hi, newPlayers);
-                            if (peekPhase == GamePhase.PlayerTurns
-                                && newPlayers[peekPi].Hands[peekHi].Cards.Count == 1)
-                            {
-                                // Auto-hit split hand — advance immediately, no button needed.
-                                (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
-                                effects.Add(new AutoHit(newActivePi, newActiveHi));
-                            }
-                            else if (peekPhase == GamePhase.DealerTurn)
+                            if (peekPhase == GamePhase.DealerTurn)
                             {
                                 newPhase = GamePhase.DealerTurn;
                                 newWaitingForDealer = true;
@@ -510,13 +503,7 @@ public static class GameEngine
                     if (pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
                     {
                         var (peekPi, peekHi, peekPhase) = AdvanceFrom(pi, hi, newPlayers);
-                        if (peekPhase == GamePhase.PlayerTurns
-                            && newPlayers[peekPi].Hands[peekHi].Cards.Count == 1)
-                        {
-                            (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
-                            effects.Add(new AutoHit(newActivePi, newActiveHi));
-                        }
-                        else if (peekPhase == GamePhase.DealerTurn)
+                        if (peekPhase == GamePhase.DealerTurn)
                         {
                             newPhase = GamePhase.DealerTurn;
                             newWaitingForDealer = true;
@@ -668,7 +655,12 @@ public static class GameEngine
                 var (nextPi, nextHi, nextPhase) = AdvanceFrom(
                     state.ActivePlayerIndex, state.ActiveHandIndex, state.Players);
                 if (nextPhase == GamePhase.PlayerTurns)
-                    NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
+                {
+                    if (state.Players[nextPi].Hands[nextHi].Cards.Count == 1)
+                        effects.Add(new AutoHit(nextPi, nextHi));
+                    else
+                        NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
+                }
                 else if (nextPhase == GamePhase.DealerTurn)
                     return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
                         waitingForNextPlayer: false, waitingForDealer: true), effects);
