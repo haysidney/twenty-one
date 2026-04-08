@@ -580,7 +580,15 @@ private static unsafe void SendChatMessage(string message)
                             var canConfirm = !string.IsNullOrWhiteSpace(betForConfirm);
                             if (!canConfirm) ImGui.BeginDisabled();
                             if (ImGui.SmallButton($"Confirm##{pi}confirm"))
+                            {
+                                if (betEdits.TryGetValue(pi, out var pendingBet))
+                                {
+                                    betEdits.Remove(pi);
+                                    if (pendingBet != p.Bet)
+                                        Apply(new SetPlayerBet(pi, pendingBet));
+                                }
                                 Apply(new AnnounceBetConfirm(pi));
+                            }
                             if (!canConfirm) ImGui.EndDisabled();
                             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                                 ImGui.SetTooltip("Announce confirmed bet in chat");
