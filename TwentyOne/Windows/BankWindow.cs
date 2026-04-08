@@ -68,7 +68,7 @@ public unsafe class BankWindow : Window, IDisposable
 
         ImGui.Separator();
 
-        ImGui.Text("Dealer Cut %"); ImGui.SameLine();
+        ImGui.Text("Venue Cut %"); ImGui.SameLine();
         ImGui.SetNextItemWidth(100);
         var cut = config.DealerCutPct;
         if (ImGui.InputInt("##dealercut", ref cut))
@@ -77,8 +77,7 @@ public unsafe class BankWindow : Window, IDisposable
             config.Save();
         }
 
-        var dealerKeeps = profit > 0 ? (long)Math.Floor(profit * config.DealerCutPct / 100.0) : 0;
-        var venueOwes   = profit > 0 ? profit - dealerKeeps : 0;
+        var profitAfterTips = profit;
 
         ImGui.Separator();
         ImGui.Text("Tips");
@@ -118,7 +117,10 @@ public unsafe class BankWindow : Window, IDisposable
         }
 
         ImGui.Separator();
-        ImGui.Text($"Dealer receives: {dealerKeeps + tipTotal:N0} gil");
-        ImGui.Text($"Venue receives: {venueOwes - tipTotal:N0} gil");
+        var split = profitAfterTips - tipTotal;
+        var venueOwes   = split > 0 ? (long)Math.Floor(split * config.DealerCutPct / 100.0) : 0;
+        var dealerKeeps = split > 0 ? split - venueOwes + tipTotal : tipTotal;
+        ImGui.Text($"Dealer receives: {dealerKeeps:N0} gil");
+        ImGui.Text($"Venue receives: {venueOwes:N0} gil");
     }
 }
