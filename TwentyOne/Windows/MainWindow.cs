@@ -822,7 +822,7 @@ private static unsafe void SendChatMessage(string message)
                         && pi == ActivePlayerIndex && hi == ActiveHandIndex)
                     {
                         var moreHands = p.Hands.Skip(hi + 1).Any(h => h.State == HandState.Playing);
-                        var advLabel  = moreHands ? "Next Hand" : "Next Player";
+                        var advLabel  = moreHands ? "Next Hand ↓" : "Next Player ↓";
                         ImGui.SetCursorPosX(actionsCellRight - ABW(advLabel));
                         if (ImGui.SmallButton($"{advLabel}##{pi}_{hi}")) Apply(new AdvanceToNextPlayer());
                     }
