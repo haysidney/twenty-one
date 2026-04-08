@@ -20,9 +20,10 @@ namespace TwentyOne.Windows;
 
 public partial class MainWindow : Window, IDisposable
 {
-    private readonly Configuration   config;
-    private readonly ConfigWindow    configWindow;
-    private readonly BankWindow bankWindow;
+    private readonly Configuration    config;
+    private readonly ConfigWindow     configWindow;
+    private readonly BankWindow       bankWindow;
+    private readonly PlayerStatsWindow playerStatsWindow;
     private readonly IChatGui      chatGui;
     private readonly IObjectTable  objectTable;
     private readonly ITargetManager targetManager;
@@ -62,13 +63,15 @@ public partial class MainWindow : Window, IDisposable
     // ── Constructor / Dispose ─────────────────────────────────────────────────
 
     public MainWindow(Configuration config, ConfigWindow configWindow, BankWindow bankWindow,
+                      PlayerStatsWindow playerStatsWindow,
                       IChatGui chatGui, IObjectTable objectTable, ITargetManager targetManager)
         : base("Twenty One##TwentyOneMain")
     {
-        this.config           = config;
-        this.configWindow     = configWindow;
-        this.bankWindow = bankWindow;
-        this.chatGui        = chatGui;
+        this.config            = config;
+        this.configWindow      = configWindow;
+        this.bankWindow        = bankWindow;
+        this.playerStatsWindow = playerStatsWindow;
+        this.chatGui           = chatGui;
         this.objectTable    = objectTable;
         this.targetManager  = targetManager;
         SizeConstraints   = new WindowSizeConstraints
@@ -115,6 +118,7 @@ public partial class MainWindow : Window, IDisposable
                          and not AnnounceSplit
                          and not AnnounceDealerHit
                          and not AnnouncePlayerHit
+                         and not AnnouncePlayerTurn
                          and not AnnouncePlayerDeal
                          and not AnnounceDealerDeal
                          and not BeginDealerTurn)
@@ -186,6 +190,52 @@ public partial class MainWindow : Window, IDisposable
         config.UndoStack.Add(config.GameState);
         config.GameState = config.RedoStack[^1];
         config.RedoStack.RemoveAt(config.RedoStack.Count - 1);
+        config.Save();
+    }
+
+    private static string PlayerStatKey(Player p) =>
+        p.FullName.Length > 0 ? $"{p.FullName}@{p.World}" : p.Nickname;
+
+    // Called immediately after Apply(new GoToPayout()) to record round results.
+    private void UpdatePlayerStats()
+    {
+        var state = config.GameState;
+        for (var pi = 0; pi < state.Players.Count; pi++)
+        {
+            var p   = state.Players[pi];
+            var key = PlayerStatKey(p);
+            if (!config.PlayerStatsStore.TryGetValue(key, out var stat))
+            {
+                stat = new PlayerStat { DisplayName = p.DisplayName };
+                config.PlayerStatsStore[key] = stat;
+            }
+            stat.DisplayName = p.DisplayName; // refresh in case nickname changed
+
+            var net = 0m;
+            for (var hi = 0; hi < p.Hands.Count; hi++)
+            {
+                var result = GameEngine.GetPayoutResult(state, pi, hi);
+                var delta  = result switch
+                {
+                    PayoutResult.Win   => GameEngine.GetEffectiveBet(p, p.Hands[hi]),
+                    PayoutResult.BjWin => Math.Round(GameEngine.GetEffectiveBet(p, p.Hands[hi])
+                                            * (state.BjPayout switch
+                                            {
+                                                BlackjackPayout.SixToFive => 1.2m,
+                                                BlackjackPayout.EvenMoney => 1.0m,
+                                                _                         => 1.5m,
+                                            }), 2),
+                    PayoutResult.Lose  => -GameEngine.GetEffectiveBet(p, p.Hands[hi]),
+                    _                  => 0m,
+                };
+                net += delta;
+            }
+
+            stat.GamesPlayed++;
+            if      (net > 0) stat.GamesWon++;
+            else if (net < 0) stat.GamesLost++;
+            stat.TotalWon += net;
+        }
         config.Save();
     }
 
@@ -392,6 +442,9 @@ private static unsafe void SendChatMessage(string message)
         ImGui.SameLine();
         if (ImGui.SmallButton("Bank"))
             bankWindow.Toggle();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Stats"))
+            playerStatsWindow.Toggle();
 
         var canUndo = config.UndoStack.Count > 0;
         var canRedo = config.RedoStack.Count > 0;
@@ -677,31 +730,81 @@ private static unsafe void SendChatMessage(string message)
                     ImGui.TableSetColumnIndex(4);
                     if (Phase == GamePhase.Payout)
                     {
-                        var (label, color) = PayoutDisplay(State, pi, hi);
-                        if (label.Length > 0)
+                        // Check if all hands for this player win (combined display)
+                        var allHandsWin = p.Hands.Count > 1
+                            && p.Hands.Select((_, hh) => GameEngine.GetPayoutResult(State, pi, hh))
+                                      .All(r => r == PayoutResult.Win || r == PayoutResult.BjWin);
+
+                        if (allHandsWin && isFirstHand)
                         {
-                            var amount  = GameEngine.PayoutAmountString(State, pi, hi);
-                            var display = amount.Length > 0 ? $"{label} {amount}" : label;
-                            ImGui.TextColored(color, display);
-                            var result = GameEngine.GetPayoutResult(State, pi, hi);
-                            if (amount.Length > 0 && (result == PayoutResult.Win || result == PayoutResult.BjWin))
+                            // Combined payout display on first hand row
+                            var combinedNet = 0m;
+                            for (var hh = 0; hh < p.Hands.Count; hh++)
                             {
-                                ImGui.SameLine();
-                                var shiftHeld  = ImGui.GetIO().KeyShift;
-                                var winnings   = amount.TrimStart('+');
-                                var bet        = GameEngine.GetEffectiveBet(p, hand);
-                                var total      = (decimal.TryParse(winnings, out var w) && bet > 0)
-                                                 ? $"{w + bet:0.##}" : winnings;
-                                var copyVal    = shiftHeld ? total : winnings;
-                                if (ImGui.SmallButton($"Copy##{pi}_{hi}payout"))
-                                    ImGui.SetClipboardText(copyVal);
-                                if (ImGui.IsItemHovered()) ImGui.SetTooltip(shiftHeld ? $"Copy with bet: {total}" : $"Copy: {winnings}\nShift+Click to copy with bet: {total}");
+                                var eb = GameEngine.GetEffectiveBet(p, p.Hands[hh]);
+                                combinedNet += GameEngine.GetPayoutResult(State, pi, hh) == PayoutResult.BjWin
+                                    ? Math.Round(eb * (State.BjPayout switch
+                                        { BlackjackPayout.SixToFive => 1.2m, BlackjackPayout.EvenMoney => 1.0m, _ => 1.5m }), 2)
+                                    : eb;
                             }
+                            var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
+                            var combinedAmtStr = $"+{combinedNet:0.##}";
+                            ImGui.TextColored(green, $"Win {combinedAmtStr}");
+                            ImGui.SameLine();
+                            var shiftHeld2 = ImGui.GetIO().KeyShift;
+                            var totalBet   = p.Hands.Sum(h => GameEngine.GetEffectiveBet(p, h));
+                            var withBet    = $"{combinedNet + totalBet:0.##}";
+                            var copyVal2   = shiftHeld2 ? withBet : $"{combinedNet:0.##}";
+                            if (ImGui.SmallButton($"Copy##{pi}cpayout"))
+                                ImGui.SetClipboardText(copyVal2);
+                            if (ImGui.IsItemHovered())
+                                ImGui.SetTooltip(shiftHeld2 ? $"Copy with bets: {withBet}" : $"Copy: {combinedNet:0.##}\nShift+Click to copy with bets: {withBet}");
+                        }
+                        else if (!allHandsWin)
+                        {
+                            var (label, color) = PayoutDisplay(State, pi, hi);
+                            if (label.Length > 0)
+                            {
+                                var amount  = GameEngine.PayoutAmountString(State, pi, hi);
+                                var display = amount.Length > 0 ? $"{label} {amount}" : label;
+                                ImGui.TextColored(color, display);
+                                var result = GameEngine.GetPayoutResult(State, pi, hi);
+                                if (amount.Length > 0 && (result == PayoutResult.Win || result == PayoutResult.BjWin))
+                                {
+                                    ImGui.SameLine();
+                                    var shiftHeld  = ImGui.GetIO().KeyShift;
+                                    var winnings   = amount.TrimStart('+');
+                                    var bet        = GameEngine.GetEffectiveBet(p, hand);
+                                    var total      = (decimal.TryParse(winnings, out var w) && bet > 0)
+                                                     ? $"{w + bet:0.##}" : winnings;
+                                    var copyVal    = shiftHeld ? total : winnings;
+                                    if (ImGui.SmallButton($"Copy##{pi}_{hi}payout"))
+                                        ImGui.SetClipboardText(copyVal);
+                                    if (ImGui.IsItemHovered()) ImGui.SetTooltip(shiftHeld ? $"Copy with bet: {total}" : $"Copy: {winnings}\nShift+Click to copy with bet: {total}");
+                                }
+                            }
+                        }
+                        // else allHandsWin && !isFirstHand: show per-hand label only (no amount)
+                        else
+                        {
+                            var (label, color) = PayoutDisplay(State, pi, hi);
+                            if (label.Length > 0)
+                                ImGui.TextColored(color, label);
                         }
                     }
                     else
                     {
                         DrawHandStateLabel(hand);
+                        // Resend turn-start button when it's this player's active hand
+                        if (isActiveHand && Phase == GamePhase.PlayerTurns && !State.WaitingForNextPlayer)
+                        {
+                            var btnW = ImGui.CalcTextSize("↺").X + ImGui.GetStyle().FramePadding.X * 2;
+                            ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX()
+                                           - btnW - ImGui.GetScrollX());
+                            if (ImGui.SmallButton($"↺##{pi}_{hi}resend"))
+                                Apply(new AnnouncePlayerTurn(pi, hi));
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Resend turn start message"u8);
+                        }
                     }
 
                     // ── Actions column ────────────────────────────────────────
@@ -923,7 +1026,7 @@ private static unsafe void SendChatMessage(string message)
                 {
                     var canPayout = GameEngine.CanGoToPayout(State);
                     if (!canPayout) ImGui.BeginDisabled();
-                    if (ImGui.Button("Go to Payout →")) Apply(new GoToPayout());
+                    if (ImGui.Button("Go to Payout →")) { Apply(new GoToPayout()); UpdatePlayerStats(); }
                     if (!canPayout) ImGui.EndDisabled();
                     if (!canPayout && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                         ImGui.SetTooltip("Dealer must finish their hand first."u8);

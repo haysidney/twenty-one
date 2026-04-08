@@ -583,6 +583,12 @@ public static class GameEngine
                 return (state, effects);
             }
 
+            case AnnouncePlayerTurn a:
+            {
+                NarratePlayerTurn(a.PlayerIndex, a.HandIndex, state.Players, state.DealerHand);
+                return (state, effects);
+            }
+
             // ── AnnounceDouble / AnnounceSplit ───────────────────────────────
             case AnnounceDouble a:
             {
@@ -724,6 +730,28 @@ public static class GameEngine
                 {
                     var p         = state.Players[pi];
                     var multiHand = p.Hands.Count > 1;
+
+                    // For split hands where every hand wins, emit one combined line.
+                    var allWin = multiHand && p.Hands
+                        .Select((_, hi) => GetPayoutResult(state, pi, hi))
+                        .All(r => r == PayoutResult.Win || r == PayoutResult.BjWin);
+                    if (allWin)
+                    {
+                        var total = 0m;
+                        for (var hi = 0; hi < p.Hands.Count; hi++)
+                        {
+                            var eb = GetEffectiveBet(p, p.Hands[hi]);
+                            total += GetPayoutResult(state, pi, hi) == PayoutResult.BjWin
+                                ? Math.Round(eb * BjMultiplier(state.BjPayout), 2)
+                                : eb;
+                        }
+                        var amtStr = total > 0 ? $" +{total:0.##}" : string.Empty;
+                        Narrate(NarrationTemplates.Fmt(t.PayoutSplitCombined,
+                            ("name",   p.DisplayName),
+                            ("amount", amtStr)));
+                        continue;
+                    }
+
                     for (var hi = 0; hi < p.Hands.Count; hi++)
                     {
                         var result = GetPayoutResult(state, pi, hi);

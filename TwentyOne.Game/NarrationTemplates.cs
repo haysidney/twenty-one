@@ -65,6 +65,10 @@ public class NarrationTemplates
     public string DealSummaryDealer { get; set; } = " | {dealer} shows {cards}";
 
     // Payout
+    // Combined payout for split hands where all hands win — replaces per-hand lines
+    // {name} = player name; {amount} = combined payout amount (e.g. " +300")
+    public string PayoutSplitCombined { get; set; } = "{name}: Split wins{amount}";
+
     public string PayoutDealerBust   { get; set; } = "{dealer} busts ({score})";
     public string PayoutDealerStands { get; set; } = "{dealer} {score}";
     // {name} may include "(Hand N)"; {bet} = " (bet: 100)" or ""; {amount} = " +150" or " -100" or ""

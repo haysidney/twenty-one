@@ -30,20 +30,23 @@ public sealed class Plugin : IDalamudPlugin
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("TwentyOne");
-    private MainWindow       MainWindow       { get; init; }
-    private ConfigWindow     ConfigWindow     { get; init; }
-    private BankWindow BankWindow { get; init; }
+    private MainWindow        MainWindow        { get; init; }
+    private ConfigWindow      ConfigWindow      { get; init; }
+    private BankWindow        BankWindow        { get; init; }
+    private PlayerStatsWindow PlayerStatsWindow { get; init; }
 
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
-        ConfigWindow = new ConfigWindow(Configuration);
-        BankWindow   = new BankWindow(Configuration);
-        MainWindow   = new MainWindow(Configuration, ConfigWindow, BankWindow, ChatGui, ObjectTable, TargetManager);
+        ConfigWindow      = new ConfigWindow(Configuration);
+        BankWindow        = new BankWindow(Configuration);
+        PlayerStatsWindow = new PlayerStatsWindow(Configuration);
+        MainWindow        = new MainWindow(Configuration, ConfigWindow, BankWindow, PlayerStatsWindow, ChatGui, ObjectTable, TargetManager);
         ContextMenu.OnMenuOpened += OnMenuOpened;
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(BankWindow);
+        WindowSystem.AddWindow(PlayerStatsWindow);
         WindowSystem.AddWindow(MainWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -142,6 +145,7 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.RemoveAllWindows();
         ConfigWindow.Dispose();
         BankWindow.Dispose();
+        PlayerStatsWindow.Dispose();
         MainWindow.Dispose();
 
         CommandManager.RemoveHandler(CommandName);

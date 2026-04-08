@@ -472,6 +472,10 @@ public class ConfigWindow : Window, IDisposable
                 NtRow("Push##ntPPush",     "{name}  {bet}",           Defaults.PayoutPush,         ctrlHeld, ref v5);
                 if (v5 != t.PayoutPush)         { t.PayoutPush         = v5; MarkNarrationDirty(); }
 
+                var v6 = t.PayoutSplitCombined;
+                NtRow("Split win##ntPSW",  "{name}  {amount}",        Defaults.PayoutSplitCombined, ctrlHeld, ref v6);
+                if (v6 != t.PayoutSplitCombined) { t.PayoutSplitCombined = v6; MarkNarrationDirty(); }
+
                 ImGui.EndTable();
             }
 

@@ -21,6 +21,9 @@ public record AnnounceSplit(int PlayerIndex, int HandIndex) : GameAction;
 public record AnnounceDealerHit : GameAction;
 public record AnnouncePlayerHit(int PlayerIndex, int HandIndex) : GameAction;
 
+// Resend player turn start announcement (narration only, no state change)
+public record AnnouncePlayerTurn(int PlayerIndex, int HandIndex) : GameAction;
+
 // Betting phase announcement (narration only)
 public record AnnounceBettingOpen : GameAction;
 

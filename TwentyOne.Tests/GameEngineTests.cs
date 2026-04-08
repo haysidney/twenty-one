@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using TwentyOne.Game;
 using Xunit;
 
@@ -1615,5 +1616,120 @@ public class SplitHandTests
         var (_, effects) = GameEngine.Apply(state, new AnnounceBetConfirm(0), t);
         Assert.Single(effects);
         Assert.Equal("Lorah bet=50000", ((SendChat)effects[0]).Text);
+    }
+}
+
+public class AnnouncePlayerTurnTests
+{
+    [Fact]
+    public void AnnouncePlayerTurn_NarratesPlayerTurnStart_NoStateChange()
+    {
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            DealerHand        = new Hand { Cards = [7] },
+            Players           = [new Player { Nickname = "Lorah", Bet = "100",
+                Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] }],
+        };
+        var t = new NarrationTemplates { PlayerTurnStart = "{name}:{score}" };
+        var (newState, effects) = GameEngine.Apply(state, new AnnouncePlayerTurn(0, 0), t);
+        Assert.Same(state, newState);
+        Assert.Single(effects);
+        Assert.Equal("Lorah:11", ((SendChat)effects[0]).Text);
+    }
+}
+
+public class PayoutSplitCombinedTests
+{
+    private static GameState SplitWinState(int[]hand0Cards, int[] hand1Cards, int[] dealerCards)
+    {
+        return new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [..dealerCards], State = HandState.Stand },
+            Players    =
+            [
+                new Player
+                {
+                    Nickname = "Lorah",
+                    Bet = "100",
+                    Hands =
+                    [
+                        new Hand { Cards = [..hand0Cards], State = HandState.Stand, IsFromSplit = true },
+                        new Hand { Cards = [..hand1Cards], State = HandState.Stand, IsFromSplit = true },
+                    ],
+                },
+            ],
+        };
+    }
+
+    [Fact]
+    public void SplitBothHandsWin_EmitsCombinedNarration()
+    {
+        var state = SplitWinState([10, 9], [10, 8], [10, 6]);
+        var t = new NarrationTemplates { PayoutSplitCombined = "SPLIT:{name}={amount}", PayoutDealerStands = "D" };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.Contains(texts, s => s.StartsWith("SPLIT:Lorah="));
+        // Should not emit per-hand win lines
+        Assert.DoesNotContain(texts, s => s.Contains("Hand 1") || s.Contains("Hand 2"));
+    }
+
+    [Fact]
+    public void SplitBothHandsWin_CombinedAmountIsSum()
+    {
+        var state = SplitWinState([10, 9], [10, 8], [10, 6]);
+        var t = new NarrationTemplates { PayoutSplitCombined = "{amount}", PayoutDealerStands = "D" };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
+        var combined = effects.OfType<SendChat>().Select(e => e.Text).First(s => s.Contains("+200"));
+        Assert.Contains("+200", combined); // 100 + 100
+    }
+
+    [Fact]
+    public void SplitMixedResult_EmitsPerHandNarration()
+    {
+        // Lorah hand0 wins, hand1 loses — should NOT use combined template
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 8], State = HandState.Stand },
+            Players    =
+            [
+                new Player
+                {
+                    Nickname = "Lorah",
+                    Bet = "100",
+                    Hands =
+                    [
+                        new Hand { Cards = [10, 9], State = HandState.Stand, IsFromSplit = true },
+                        new Hand { Cards = [10, 7], State = HandState.Stand, IsFromSplit = true },
+                    ],
+                },
+            ],
+        };
+        var t = new NarrationTemplates
+        {
+            PayoutSplitCombined = "SPLIT",
+            PayoutWin  = "WIN:{name}",
+            PayoutLose = "LOSE:{name}",
+            PayoutDealerStands = "D",
+        };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.DoesNotContain("SPLIT", texts);
+        Assert.Contains(texts, s => s.Contains("Hand 1") && s.StartsWith("WIN:"));
+        Assert.Contains(texts, s => s.Contains("Hand 2") && s.StartsWith("LOSE:"));
+    }
+
+    [Fact]
+    public void PayoutSplitCombined_TemplateVariable_Amount()
+    {
+        var state = SplitWinState([10, 9], [10, 8], [10, 6]);
+        var t = new NarrationTemplates { PayoutSplitCombined = "TOTAL={amount}", PayoutDealerStands = "D" };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.Contains(texts, s => s == "TOTAL= +200");
     }
 }

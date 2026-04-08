@@ -6,6 +6,16 @@ using TwentyOne.Game;
 namespace TwentyOne;
 
 [Serializable]
+public class PlayerStat
+{
+    public string  DisplayName { get; set; } = string.Empty;
+    public int     GamesPlayed { get; set; } = 0;
+    public int     GamesWon    { get; set; } = 0;
+    public int     GamesLost   { get; set; } = 0;
+    public decimal TotalWon    { get; set; } = 0;
+}
+
+[Serializable]
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 0;
@@ -34,7 +44,7 @@ public class Configuration : IPluginConfiguration
     public bool ChatEnabled { get; set; } = false;
     public string ChatChannel { get; set; } = "/p";
     public int PublicChatCooldownMs  { get; set; } = 2000;
-    public int PrivateChatCooldownMs { get; set; } = 1000;
+    public int PrivateChatCooldownMs { get; set; } = 1200;
 
     // ── Narration templates ────────────────────────────────────────────────────
     public NarrationTemplates NarrationTemplates { get; set; } = new();
@@ -47,6 +57,10 @@ public class Configuration : IPluginConfiguration
     public long GilEnd       { get; set; } = 0;
     public int  DealerCutPct { get; set; } = 0;
     public List<long> Tips   { get; set; } = [];
+
+    // ── Player stats ───────────────────────────────────────────────────────────
+    // Key: "{FullName}@{World}" for FFXIV players, Nickname for manual players.
+    public Dictionary<string, PlayerStat> PlayerStatsStore { get; set; } = [];
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }
