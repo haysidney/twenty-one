@@ -190,7 +190,7 @@ public partial class MainWindow : Window, IDisposable
         if (s.Phase != GamePhase.PlayerTurns || s.WaitingForNextPlayer) return false;
         if (s.ActivePlayerIndex < 0 || s.ActivePlayerIndex >= s.Players.Count) return false;
         var p = s.Players[s.ActivePlayerIndex];
-        if (s.ActiveHandIndex <= 0 || s.ActiveHandIndex >= p.Hands.Count) return false;
+        if (s.ActiveHandIndex < 0 || s.ActiveHandIndex >= p.Hands.Count) return false;
         var h = p.Hands[s.ActiveHandIndex];
         return h.IsFromSplit && h.Cards.Count == 1 && h.State == HandState.Playing;
     }
