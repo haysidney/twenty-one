@@ -69,6 +69,10 @@ Every narration string emitted via `SendChat` must have a corresponding property
 2. Add an `NtRow(...)` entry in the appropriate `ConfigWindow` section (or a new section if needed).
 3. Add a test in `NarrationTemplateTests` verifying the new template variable(s) are substituted.
 
+## UI Rules
+
+- Never use non-ASCII characters (icons, arrows, symbols) on buttons unless explicitly requested. Use plain text labels only.
+
 ## Design Decisions
 
 - Dealer hits on soft 17.
