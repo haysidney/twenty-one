@@ -52,6 +52,9 @@ public class NarrationTemplates
     // Sent when the split is confirmed (after trade)
     public string PlayerSplit { get; set; } = "{name} splits into two hands!";
 
+    // Sent before rolling the mandatory 2nd card for a split hand
+    public string PlayerSplitRoll { get; set; } = "Rolling 2nd card for {name}...";
+
     // Initial deal announcements (Deal phase)
     public string DealDealerCard  { get; set; } = "{dealer}'s Card:";
     public string DealPlayerHand  { get; set; } = "{name}'s Hand:";

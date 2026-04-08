@@ -44,6 +44,16 @@
 
 - Add player from vicinity to game feature.
 
-- UI interactions should be queued/locked while shit is happening
+- Undoing a double has an extra step
 
-- Investigate undo steps that look like nothing. (visualize undo stack somehow)
+- Need separate win and lose narration templates
+
+- Track income for the night
+
+- Track tips
+
+- Track percentage cut
+
+- Track bank
+
+- Track amount needed to pay venue

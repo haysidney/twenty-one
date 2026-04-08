@@ -562,6 +562,8 @@ public static class GameEngine
                 var newPlayers = WithPlayer(state.Players, pi, newPlayer);
                 var name       = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
                 Narrate(NarrationTemplates.Fmt(t.PlayerSplit, ("name", name)));
+                var rollName   = $"{player.DisplayName} (Hand {hi + 1})";
+                Narrate(NarrationTemplates.Fmt(t.PlayerSplitRoll, ("name", rollName)));
                 effects.Add(new AutoHit(pi, hi));
                 return (With(state, players: newPlayers, activePlayerIndex: pi, activeHandIndex: hi), effects);
             }
@@ -657,7 +659,12 @@ public static class GameEngine
                 if (nextPhase == GamePhase.PlayerTurns)
                 {
                     if (state.Players[nextPi].Hands[nextHi].Cards.Count == 1)
+                    {
+                        var advPlayer  = state.Players[nextPi];
+                        var advName    = $"{advPlayer.DisplayName} (Hand {nextHi + 1})";
+                        Narrate(NarrationTemplates.Fmt(t.PlayerSplitRoll, ("name", advName)));
                         effects.Add(new AutoHit(nextPi, nextHi));
+                    }
                     else
                         NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
                 }

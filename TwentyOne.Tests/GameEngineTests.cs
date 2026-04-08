@@ -1154,6 +1154,43 @@ public class SplitHandTests
     }
 
     [Fact]
+    public void SplitHand_NarratesRollBeforeAutoHit()
+    {
+        var t = new NarrationTemplates { PlayerSplitRoll = "Rolling for {name}" };
+        var (_, effects) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0), t);
+        Assert.Contains(effects, e => e is SendChat c && c.Text == "Rolling for Lorah (Hand 1)");
+    }
+
+    [Fact]
+    public void AdvanceToNextPlayer_NarratesRollForOneCardHand()
+    {
+        var t = new NarrationTemplates { PlayerSplitRoll = "Rolling for {name}" };
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            WaitingForNextPlayer = true,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            DealerHand        = new Hand { Cards = [10] },
+            Players           =
+            [
+                new Player
+                {
+                    Nickname = "Lorah", Bet = "100",
+                    Hands    =
+                    [
+                        new Hand { Cards = [8, 5], State = HandState.Stand, IsFromSplit = true },
+                        new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
+                    ],
+                },
+            ],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AdvanceToNextPlayer(), t);
+        Assert.Contains(effects, e => e is SendChat c && c.Text == "Rolling for Lorah (Hand 2)");
+        Assert.Contains(effects, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 1);
+    }
+
+    [Fact]
     public void CanSplit_SameValue_True()
     {
         var hand = new Hand { Cards = [8, 8], State = HandState.Playing };

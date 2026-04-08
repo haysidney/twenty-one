@@ -378,6 +378,10 @@ public class ConfigWindow : Window, IDisposable
             NtRow("Split##ntSP",      "{name}", Defaults.PlayerSplit, ctrlHeld, ref v3);
             if (v3 != t.PlayerSplit) { t.PlayerSplit = v3; MarkNarrationDirty(); }
 
+            var v3b = t.PlayerSplitRoll;
+            NtRow("Spl roll##ntSPR",  "{name}", Defaults.PlayerSplitRoll, ctrlHeld, ref v3b);
+            if (v3b != t.PlayerSplitRoll) { t.PlayerSplitRoll = v3b; MarkNarrationDirty(); }
+
             var v4 = t.PlayerSplitAce;
             NtRow("Split ace##ntSA",  "{name}  {card}  {cards}  {score}", Defaults.PlayerSplitAce, ctrlHeld, ref v4);
             if (v4 != t.PlayerSplitAce) { t.PlayerSplitAce = v4; MarkNarrationDirty(); }
