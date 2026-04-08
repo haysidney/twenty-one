@@ -117,10 +117,9 @@ public static class GameEngine
         hand.Cards.Count == 2 && hand.State == HandState.Playing
         && CardValue(hand.Cards[0]) == CardValue(hand.Cards[1]);
 
-    // Hit is allowed on any Playing hand. (1-card split hands are normally auto-hit,
-    // but after undo the player must be able to manually re-draw the card.)
+    // Hit is allowed on a Playing hand that already has ≥2 cards (1-card split hands are auto-hit).
     public static bool CanHit(Hand hand) =>
-        hand.State == HandState.Playing;
+        hand.State == HandState.Playing && hand.Cards.Count >= 2;
 
     // Deal phase is complete when the dealer has ≥1 card and every player's first hand has ≥2 cards.
     public static bool IsDealComplete(GameState state) =>

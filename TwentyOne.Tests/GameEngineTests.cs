@@ -1398,11 +1398,10 @@ public class SplitHandTests
     }
 
     [Fact]
-    public void CanHit_TrueFor1CardSplitHand()
+    public void CanHit_FalseFor1CardSplitHand()
     {
-        // After undo, a 1-card split hand must be hittable so the player can re-draw.
         var hand = new Hand { Cards = [8], State = HandState.Playing, IsFromSplit = true };
-        Assert.True(GameEngine.CanHit(hand));
+        Assert.False(GameEngine.CanHit(hand));
     }
 
     [Fact]

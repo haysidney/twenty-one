@@ -114,7 +114,10 @@ public partial class MainWindow : Window, IDisposable
         {
             // GameEngine is pure — it never mutates state, so pushing the current
             // reference is safe; future Apply calls create entirely new objects.
-            config.UndoStack.Add(config.GameState);
+            // Skip the transient 1-card split hand state: auto-hit resolves it
+            // immediately in normal play, so undo should skip back past it.
+            if (!IsTransientSplitState(config.GameState))
+                config.UndoStack.Add(config.GameState);
         }
         config.RedoStack.Clear();
 
@@ -178,6 +181,18 @@ public partial class MainWindow : Window, IDisposable
         config.GameState = config.RedoStack[^1];
         config.RedoStack.RemoveAt(config.RedoStack.Count - 1);
         config.Save();
+    }
+
+    // A 1-card Playing split hand is transient: auto-hit resolves it immediately.
+    // We skip saving it to the undo stack so undo jumps past it.
+    private static bool IsTransientSplitState(GameState s)
+    {
+        if (s.Phase != GamePhase.PlayerTurns || s.WaitingForNextPlayer) return false;
+        if (s.ActivePlayerIndex < 0 || s.ActivePlayerIndex >= s.Players.Count) return false;
+        var p = s.Players[s.ActivePlayerIndex];
+        if (s.ActiveHandIndex <= 0 || s.ActiveHandIndex >= p.Hands.Count) return false;
+        var h = p.Hands[s.ActiveHandIndex];
+        return h.IsFromSplit && h.Cards.Count == 1 && h.State == HandState.Playing;
     }
 
     // ── Chat / roll ───────────────────────────────────────────────────────────
