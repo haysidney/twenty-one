@@ -819,7 +819,8 @@ private static unsafe void SendChatMessage(string message)
                     foreach (var (idx, val) in betEdits.ToList())
                     {
                         betEdits.Remove(idx);
-                        Apply(new SetPlayerBet(idx, val));
+                        if (val != State.Players[idx].Bet)
+                            Apply(new SetPlayerBet(idx, val));
                     }
                     Apply(new StartDeal());
                     // Queue initial cards: dealer first, then each player gets both cards in a pair
