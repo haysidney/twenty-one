@@ -102,9 +102,8 @@ public partial class MainWindow : Window, IDisposable
         }
         else if (action is AdvanceToNextPlayer)
         {
-            // Push the WaitingForNextPlayer state when advancing to a split hand so
-            // the player can undo back to it without re-clicking Stand.
-            if (IsAdvanceToSplitHand(config.GameState))
+            // Always push the WaitingForNextPlayer state so undo can return to it.
+            if (config.GameState.WaitingForNextPlayer)
                 config.UndoStack.Add(config.GameState);
         }
         else if (action is not AnnounceBettingOpen
@@ -120,9 +119,8 @@ public partial class MainWindow : Window, IDisposable
         {
             // GameEngine is pure — it never mutates state, so pushing the current
             // reference is safe; future Apply calls create entirely new objects.
-            // Skip the transient 1-card split hand state: auto-hit resolves it
-            // immediately in normal play, so undo should skip back past it.
-            if (!IsTransientSplitState(config.GameState))
+            // Skip transient states that auto-resolve immediately in normal play.
+            if (!IsTransientSplitState(config.GameState) && !IsTransientDoubleState(config.GameState))
                 config.UndoStack.Add(config.GameState);
         }
         config.RedoStack.Clear();
@@ -189,19 +187,6 @@ public partial class MainWindow : Window, IDisposable
         config.Save();
     }
 
-    // True when AdvanceToNextPlayer will land on a 1-card split hand (auto-hit target).
-    // We push the WaitingForNextPlayer state so undo can return to it directly.
-    private static bool IsAdvanceToSplitHand(GameState s)
-    {
-        if (!s.WaitingForNextPlayer) return false;
-        if (s.ActivePlayerIndex < 0 || s.ActivePlayerIndex >= s.Players.Count) return false;
-        var p     = s.Players[s.ActivePlayerIndex];
-        var nextHi = s.ActiveHandIndex + 1;
-        if (nextHi >= p.Hands.Count) return false;
-        var h = p.Hands[nextHi];
-        return h.IsFromSplit && h.Cards.Count == 1 && h.State == HandState.Playing;
-    }
-
     // A 1-card Playing split hand is transient: auto-hit resolves it immediately.
     // We skip saving it to the undo stack so undo jumps past it.
     private static bool IsTransientSplitState(GameState s)
@@ -212,6 +197,18 @@ public partial class MainWindow : Window, IDisposable
         if (s.ActiveHandIndex < 0 || s.ActiveHandIndex >= p.Hands.Count) return false;
         var h = p.Hands[s.ActiveHandIndex];
         return h.IsFromSplit && h.Cards.Count == 1 && h.State == HandState.Playing;
+    }
+
+    // A Doubled Playing hand with 2 cards is transient: the next hit always force-stands it.
+    // We skip saving it to the undo stack so undo jumps past it.
+    private static bool IsTransientDoubleState(GameState s)
+    {
+        if (s.Phase != GamePhase.PlayerTurns || s.WaitingForNextPlayer) return false;
+        if (s.ActivePlayerIndex < 0 || s.ActivePlayerIndex >= s.Players.Count) return false;
+        var p = s.Players[s.ActivePlayerIndex];
+        if (s.ActiveHandIndex < 0 || s.ActiveHandIndex >= p.Hands.Count) return false;
+        var h = p.Hands[s.ActiveHandIndex];
+        return h.Doubled && h.State == HandState.Playing && h.Cards.Count == 2;
     }
 
     // ── Chat / roll ───────────────────────────────────────────────────────────
