@@ -370,6 +370,9 @@ private static unsafe void SendChatMessage(string message)
         if (ImGui.SmallButton("Redo")) Redo();
         if (!canRedo) ImGui.EndDisabled();
 
+        var uiBusy = chatQueue.Count > 0 || pendingHit != null || deferredRoll.HasValue;
+        if (uiBusy) ImGui.BeginDisabled();
+
         ImGui.Separator();
 
         var dealerHitActive = GameEngine.CanHitDealer(State);
@@ -889,6 +892,8 @@ private static unsafe void SendChatMessage(string message)
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
                 ImGui.SetTooltip("Hold Ctrl to abort the round."u8);
         }
+
+        if (uiBusy) ImGui.EndDisabled();
 
         // ── Narration panel ───────────────────────────────────────────────────
         ImGui.Spacing();

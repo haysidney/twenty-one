@@ -44,8 +44,6 @@
 
 - Add player from vicinity to game feature.
 
-- Add a bet confirmation button. "{name}, you're current bet is {amount}. If you want to change it let me know."
+- UI interactions should be queued/locked while shit is happening
 
-- Figure out if I need /facetarget in the templates
-
-- If a message starts with a / we need to respect <wait.X> in the command. The X represents an integer number of seconds to wait before sending the next message in the queue. Subtract the current rate-limit setting in the config window from this wait if the wait is longer than the rate-limit duration.
+- Investigate undo steps that look like nothing. (visualize undo stack somehow)
