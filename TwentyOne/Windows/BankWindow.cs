@@ -104,9 +104,10 @@ public unsafe class BankWindow : Window, IDisposable
         ImGui.Text($"Tips total: {tipTotal:N0} gil");
 
         ImGui.SetNextItemWidth(120);
-        ImGui.InputText("##tipinput", ref tipBuf, 20);
+        var addTip = ImGui.InputText("##tipinput", ref tipBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
-        if (ImGui.Button("Add Tip"))
+        addTip |= ImGui.Button("Add Tip");
+        if (addTip)
         {
             if (long.TryParse(tipBuf, out var tip) && tip != 0)
             {
@@ -117,7 +118,7 @@ public unsafe class BankWindow : Window, IDisposable
         }
 
         ImGui.Separator();
-        ImGui.Text($"Dealer receives: {dealerKeeps:N0} gil");
+        ImGui.Text($"Dealer receives: {dealerKeeps + tipTotal:N0} gil");
         ImGui.Text($"Venue receives: {venueOwes - tipTotal:N0} gil");
     }
 }
