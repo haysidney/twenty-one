@@ -522,7 +522,7 @@ private static unsafe void SendChatMessage(string message)
             ImGui.TableSetupColumn("Bet"u8,       ImGuiTableColumnFlags.WidthFixed, 70);
             ImGui.TableSetupColumn("Cards"u8,     ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Score"u8,     ImGuiTableColumnFlags.WidthFixed, 55);
-            ImGui.TableSetupColumn("Status"u8,    ImGuiTableColumnFlags.WidthFixed, 130);
+            ImGui.TableSetupColumn("Status"u8,    ImGuiTableColumnFlags.WidthFixed, 100);
             ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 190);
             ImGui.TableHeadersRow();
 
@@ -797,7 +797,9 @@ private static unsafe void SendChatMessage(string message)
                         DrawHandStateLabel(hand);
                         if (isActiveHand && !State.WaitingForNextPlayer)
                         {
-                            ImGui.SameLine();
+                            var remindW = ImGui.CalcTextSize("Remind").X + ImGui.GetStyle().FramePadding.X * 2;
+                            ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - remindW
+                                           - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
                             if (ImGui.SmallButton($"Remind##{pi}_{hi}resend"))
                                 Apply(new AnnouncePlayerTurn(pi, hi));
                             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Resend turn start message"u8);
