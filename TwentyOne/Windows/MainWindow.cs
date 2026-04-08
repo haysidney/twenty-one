@@ -548,6 +548,7 @@ private static unsafe void SendChatMessage(string message)
 
                     // ── Name column ───────────────────────────────────────────
                     ImGui.TableSetColumnIndex(0);
+                    var nameCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     if (isFirstHand)
                     {
                         if (renamingIndex == pi)
@@ -583,15 +584,15 @@ private static unsafe void SendChatMessage(string message)
 
                             var winnerKey = p.FullName.Length > 0 ? p.FullName : p.Nickname;
                             var isWinner  = config.GameState.LastRoundWinners.Contains(winnerKey);
-                            var clearW  = hasWorld && hasNickname
-                                ? ImGui.CalcTextSize("C").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
-                            var targetW = hasWorld
-                                ? ImGui.CalcTextSize("@").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X : 0;
-                            var renameW = ImGui.CalcTextSize("R").X + ImGui.GetStyle().FramePadding.X * 2;
-                            var spadeW  = isWinner
-                                ? ImGui.CalcTextSize("\u2660").X + ImGui.GetStyle().ItemSpacing.X : 0;
-                            ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - renameW - clearW - targetW - spadeW
-                                           - ImGui.GetScrollX() - ImGui.GetStyle().ItemSpacing.X * 0.5f);
+                            var sp      = ImGui.GetStyle().ItemSpacing.X;
+                            var fp      = ImGui.GetStyle().FramePadding.X;
+                            float BW(string s) => ImGui.CalcTextSize(s).X + fp * 2;
+                            var clearW  = hasWorld && hasNickname ? BW("C") + sp : 0;
+                            var targetW = hasWorld               ? BW("@") + sp : 0;
+                            var renameW = BW("R");
+                            var spadeW  = isWinner               ? BW("\u2660") + sp : 0;
+                            ImGui.SameLine();
+                            ImGui.SetCursorPosX(nameCellRight - spadeW - targetW - renameW - clearW);
 
                             if (isWinner)
                             {
@@ -635,13 +636,14 @@ private static unsafe void SendChatMessage(string message)
                     ImGui.TableSetColumnIndex(1);
                     if (isFirstHand)
                     {
+                        var betCellRight   = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                         var confirmButtonW = Phase == GamePhase.Betting
                             ? ImGui.CalcTextSize("Confirm").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X
                             : 0;
                         var tradeButtonW = hasWorld
                             ? ImGui.CalcTextSize("Trade").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X
                             : 0;
-                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - tradeButtonW - confirmButtonW);
+                        ImGui.SetNextItemWidth(betCellRight - ImGui.GetCursorPosX() - tradeButtonW - confirmButtonW);
                         if (Phase != GamePhase.Betting) ImGui.BeginDisabled();
                         var betVal = betEdits.TryGetValue(pi, out var e) ? e : p.Bet;
                         if (ImGui.InputText($"##bet{pi}", ref betVal, 16, ImGuiInputTextFlags.EnterReturnsTrue))
@@ -809,19 +811,24 @@ private static unsafe void SendChatMessage(string message)
 
                     // ── Actions column ────────────────────────────────────────
                     ImGui.TableSetColumnIndex(5);
+                    var actionsCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     var hasAnyPending = pendingDouble.HasValue || pendingSplit.HasValue;
                     var isPendingDouble = pendingDouble.HasValue && pendingDouble.Value == (pi, hi);
                     var isPendingSplit  = pendingSplit.HasValue  && pendingSplit.Value  == (pi, hi);
+                    var asp = ImGui.GetStyle().ItemSpacing.X;
+                    float ABW(string s) => ImGui.CalcTextSize(s).X + ImGui.GetStyle().FramePadding.X * 2;
 
                     if (Phase == GamePhase.PlayerTurns && State.WaitingForNextPlayer
                         && pi == ActivePlayerIndex && hi == ActiveHandIndex)
                     {
                         var moreHands = p.Hands.Skip(hi + 1).Any(h => h.State == HandState.Playing);
-                        var advLabel  = moreHands ? $"Next Hand ↓##{pi}_{hi}" : $"Next Player ↓##{pi}_{hi}";
-                        if (ImGui.SmallButton(advLabel)) Apply(new AdvanceToNextPlayer());
+                        var advLabel  = moreHands ? "Next Hand" : "Next Player";
+                        ImGui.SetCursorPosX(actionsCellRight - ABW(advLabel));
+                        if (ImGui.SmallButton($"{advLabel}##{pi}_{hi}")) Apply(new AdvanceToNextPlayer());
                     }
                     else if (isPendingDouble)
                     {
+                        ImGui.SetCursorPosX(actionsCellRight - ABW("Confirm Dbl") - asp - ABW("Cancel"));
                         if (ImGui.SmallButton($"Confirm Dbl##{pi}_{hi}"))
                         {
                             Apply(new DoubleDown(pi, hi));
@@ -833,6 +840,7 @@ private static unsafe void SendChatMessage(string message)
                     }
                     else if (isPendingSplit)
                     {
+                        ImGui.SetCursorPosX(actionsCellRight - ABW("Confirm Spl") - asp - ABW("Cancel"));
                         if (ImGui.SmallButton($"Confirm Spl##{pi}_{hi}"))
                         {
                             Apply(new SplitHand(pi, hi));
@@ -844,11 +852,16 @@ private static unsafe void SendChatMessage(string message)
                     }
                     else if (Phase == GamePhase.Deal && PlayerHitActive(pi, hi))
                     {
+                        ImGui.SetCursorPosX(actionsCellRight - ABW("Draw"));
                         if (ImGui.SmallButton($"Draw##{pi}_{hi}"))
                             QueueHitRoll(isDealer: false, pi, hi);
                     }
                     else
                     {
+                        var total = ABW("Stand") + asp + ABW("Hit") + asp + ABW("Dbl") + asp + ABW("Spl")
+                                  + (isFirstHand ? asp + ABW("X") : 0);
+                        ImGui.SetCursorPosX(actionsCellRight - total);
+
                         var canStand = !hasAnyPending && Phase == GamePhase.PlayerTurns
                                     && pi == ActivePlayerIndex && hi == ActiveHandIndex
                                     && GameEngine.CanHit(hand);
