@@ -579,7 +579,7 @@ private static unsafe void SendChatMessage(string message)
                             var betForConfirm = betEdits.TryGetValue(pi, out var bec) ? bec : p.Bet;
                             var canConfirm = !string.IsNullOrWhiteSpace(betForConfirm);
                             if (!canConfirm) ImGui.BeginDisabled();
-                            if (ImGui.SmallButton($"Confirm##{pi}confirm"))
+                            if (ImGui.SmallButton($"Remind##{pi}confirm"))
                             {
                                 if (betEdits.TryGetValue(pi, out var pendingBet))
                                 {
@@ -591,7 +591,7 @@ private static unsafe void SendChatMessage(string message)
                             }
                             if (!canConfirm) ImGui.EndDisabled();
                             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                                ImGui.SetTooltip("Announce confirmed bet in chat");
+                                ImGui.SetTooltip("Remind the player of their current bet in chat");
                         }
                     }
                     else
