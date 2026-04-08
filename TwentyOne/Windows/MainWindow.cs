@@ -100,6 +100,13 @@ public partial class MainWindow : Window, IDisposable
             pendingDouble = null;
             pendingSplit  = null;
         }
+        else if (action is AdvanceToNextPlayer)
+        {
+            // Push the WaitingForNextPlayer state when advancing to a split hand so
+            // the player can undo back to it without re-clicking Stand.
+            if (IsAdvanceToSplitHand(config.GameState))
+                config.UndoStack.Add(config.GameState);
+        }
         else if (action is not AnnounceBettingOpen
                          and not AnnounceBetRequest
                          and not AnnounceBetConfirm
@@ -109,7 +116,6 @@ public partial class MainWindow : Window, IDisposable
                          and not AnnouncePlayerHit
                          and not AnnouncePlayerDeal
                          and not AnnounceDealerDeal
-                         and not AdvanceToNextPlayer
                          and not BeginDealerTurn)
         {
             // GameEngine is pure — it never mutates state, so pushing the current
@@ -181,6 +187,19 @@ public partial class MainWindow : Window, IDisposable
         config.GameState = config.RedoStack[^1];
         config.RedoStack.RemoveAt(config.RedoStack.Count - 1);
         config.Save();
+    }
+
+    // True when AdvanceToNextPlayer will land on a 1-card split hand (auto-hit target).
+    // We push the WaitingForNextPlayer state so undo can return to it directly.
+    private static bool IsAdvanceToSplitHand(GameState s)
+    {
+        if (!s.WaitingForNextPlayer) return false;
+        if (s.ActivePlayerIndex < 0 || s.ActivePlayerIndex >= s.Players.Count) return false;
+        var p     = s.Players[s.ActivePlayerIndex];
+        var nextHi = s.ActiveHandIndex + 1;
+        if (nextHi >= p.Hands.Count) return false;
+        var h = p.Hands[nextHi];
+        return h.IsFromSplit && h.Cards.Count == 1 && h.State == HandState.Playing;
     }
 
     // A 1-card Playing split hand is transient: auto-hit resolves it immediately.
