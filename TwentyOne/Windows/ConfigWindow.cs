@@ -444,9 +444,21 @@ public class ConfigWindow : Window, IDisposable
             NtRow("Dlr Stands##ntPDS", "{dealer}  {score}",                  Defaults.PayoutDealerStands, ctrlHeld, ref v1);
             if (v1 != t.PayoutDealerStands) { t.PayoutDealerStands = v1; MarkNarrationDirty(); }
 
-            var v2 = t.PayoutPlayer;
-            NtRow("Player##ntPP",      "{name}  {result}  {bet}  {amount}", Defaults.PayoutPlayer,       ctrlHeld, ref v2);
-            if (v2 != t.PayoutPlayer)       { t.PayoutPlayer       = v2; MarkNarrationDirty(); }
+            var v2 = t.PayoutWin;
+            NtRow("Win##ntPW",         "{name}  {bet}  {amount}",           Defaults.PayoutWin,          ctrlHeld, ref v2);
+            if (v2 != t.PayoutWin)          { t.PayoutWin          = v2; MarkNarrationDirty(); }
+
+            var v3 = t.PayoutBjWin;
+            NtRow("BJ Win##ntPBJ",     "{name}  {bet}  {amount}",           Defaults.PayoutBjWin,        ctrlHeld, ref v3);
+            if (v3 != t.PayoutBjWin)        { t.PayoutBjWin        = v3; MarkNarrationDirty(); }
+
+            var v4 = t.PayoutLose;
+            NtRow("Lose##ntPL",        "{name}  {bet}  {amount}",           Defaults.PayoutLose,         ctrlHeld, ref v4);
+            if (v4 != t.PayoutLose)         { t.PayoutLose         = v4; MarkNarrationDirty(); }
+
+            var v5 = t.PayoutPush;
+            NtRow("Push##ntPPush",     "{name}  {bet}",                     Defaults.PayoutPush,         ctrlHeld, ref v5);
+            if (v5 != t.PayoutPush)         { t.PayoutPush         = v5; MarkNarrationDirty(); }
 
             ImGui.EndTable();
         }

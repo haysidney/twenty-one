@@ -726,15 +726,15 @@ public static class GameEngine
                     for (var hi = 0; hi < p.Hands.Count; hi++)
                     {
                         var result = GetPayoutResult(state, pi, hi);
-                        var label  = result switch
+                        var template = result switch
                         {
-                            PayoutResult.Win   => "Win",
-                            PayoutResult.BjWin => "BJ Win",
-                            PayoutResult.Lose  => "Lose",
-                            PayoutResult.Push  => "Push",
+                            PayoutResult.Win   => t.PayoutWin,
+                            PayoutResult.BjWin => t.PayoutBjWin,
+                            PayoutResult.Lose  => t.PayoutLose,
+                            PayoutResult.Push  => t.PayoutPush,
                             _                  => string.Empty,
                         };
-                        if (label.Length == 0) continue;
+                        if (template.Length == 0) continue;
 
                         var effectiveBet = GetEffectiveBet(p, p.Hands[hi]);
                         var amount       = PayoutAmountString(state, pi, hi);
@@ -743,9 +743,8 @@ public static class GameEngine
                             : string.Empty;
                         var amountStr    = amount.Length > 0 ? $" {amount}" : string.Empty;
                         var name         = multiHand ? $"{p.DisplayName} (Hand {hi + 1})" : p.DisplayName;
-                        Narrate(NarrationTemplates.Fmt(t.PayoutPlayer,
+                        Narrate(NarrationTemplates.Fmt(template,
                             ("name",   name),
-                            ("result", label),
                             ("bet",    betStr),
                             ("amount", amountStr)));
                     }

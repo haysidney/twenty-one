@@ -67,8 +67,11 @@ public class NarrationTemplates
     // Payout
     public string PayoutDealerBust   { get; set; } = "{dealer} busts ({score})";
     public string PayoutDealerStands { get; set; } = "{dealer} {score}";
-    // {bet} = " (bet: 100)" or ""; {amount} = " +150" or ""
-    public string PayoutPlayer { get; set; } = "{name}: {result}{bet}{amount}";
+    // {name} may include "(Hand N)"; {bet} = " (bet: 100)" or ""; {amount} = " +150" or " -100" or ""
+    public string PayoutWin   { get; set; } = "{name}: Win{bet}{amount}";
+    public string PayoutBjWin { get; set; } = "{name}: Blackjack!{bet}{amount}";
+    public string PayoutLose  { get; set; } = "{name}: Lose{bet}{amount}";
+    public string PayoutPush  { get; set; } = "{name}: Push{bet}";
 
     /// Use <c>{|}</c> in any template to split the output into multiple chat messages.
     public static string Fmt(string template, params (string Key, string Value)[] vars)

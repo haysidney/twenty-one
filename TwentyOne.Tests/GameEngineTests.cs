@@ -719,9 +719,9 @@ public class NarrationTemplateTests
     }
 
     [Fact]
-    public void CustomPayoutPlayer_UsesTemplate()
+    public void PayoutWin_UsesTemplate()
     {
-        var t = new NarrationTemplates { PayoutPlayer = "{name} {result}", PayoutDealerStands = "D" };
+        var t = new NarrationTemplates { PayoutWin = "W:{name}", PayoutDealerStands = "D" };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,
@@ -729,8 +729,49 @@ public class NarrationTemplateTests
             Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] }],
         };
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
-        // effects[0] = dealer line, effects[1] = player line
-        Assert.Equal("Lorah Win", ((SendChat)effects[1]).Text);
+        Assert.Equal("W:Lorah", ((SendChat)effects[1]).Text);
+    }
+
+    [Fact]
+    public void PayoutBjWin_UsesTemplate()
+    {
+        var t = new NarrationTemplates { PayoutBjWin = "BJ:{name}", PayoutDealerStands = "D" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
+        Assert.Equal("BJ:Lorah", ((SendChat)effects[1]).Text);
+    }
+
+    [Fact]
+    public void PayoutLose_UsesTemplate()
+    {
+        var t = new NarrationTemplates { PayoutLose = "L:{name}", PayoutDealerStands = "D" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 9], State = HandState.Stand },
+            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
+        Assert.Equal("L:Lorah", ((SendChat)effects[1]).Text);
+    }
+
+    [Fact]
+    public void PayoutPush_UsesTemplate()
+    {
+        var t = new NarrationTemplates { PayoutPush = "P:{name}", PayoutDealerStands = "D" };
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
+        Assert.Equal("P:Lorah", ((SendChat)effects[1]).Text);
     }
 
     [Fact]
@@ -815,7 +856,7 @@ public class NarrationTemplateTests
     [Fact]
     public void PayoutDealerBust_SubstitutesDealerName()
     {
-        var t     = new NarrationTemplates { PayoutDealerBust = "{dealer} BUST", PayoutPlayer = "" };
+        var t     = new NarrationTemplates { PayoutDealerBust = "{dealer} BUST", PayoutWin = "" };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,

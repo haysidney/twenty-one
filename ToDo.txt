@@ -57,3 +57,5 @@
 - Track amount needed to pay venue
 
 - Figure out if we should prevent certain undos
+
+- Test nonnumeric characters in the bet field
