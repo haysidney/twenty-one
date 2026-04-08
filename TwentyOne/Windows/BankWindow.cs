@@ -32,14 +32,14 @@ public class BankWindow : Window, IDisposable
 
     public override void Draw()
     {
-        ImGui.Text("Starting Gil"); ImGui.SameLine();
+        ImGui.Text("Starting Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);
         if (ImGui.InputText("##gilstart", ref gilStartBuf, 20))
         {
             if (long.TryParse(gilStartBuf, out var v)) { config.GilStart = v; config.Save(); }
         }
 
-        ImGui.Text("Ending Gil"); ImGui.SameLine();
+        ImGui.Text("Ending Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);
         if (ImGui.InputText("##gilend", ref gilEndBuf, 20))
         {
