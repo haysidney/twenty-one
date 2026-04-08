@@ -20,8 +20,9 @@ namespace TwentyOne.Windows;
 
 public partial class MainWindow : Window, IDisposable
 {
-    private readonly Configuration config;
-    private readonly ConfigWindow  configWindow;
+    private readonly Configuration   config;
+    private readonly ConfigWindow    configWindow;
+    private readonly BankWindow bankWindow;
     private readonly IChatGui      chatGui;
     private readonly IObjectTable  objectTable;
     private readonly ITargetManager targetManager;
@@ -60,12 +61,13 @@ public partial class MainWindow : Window, IDisposable
 
     // ── Constructor / Dispose ─────────────────────────────────────────────────
 
-    public MainWindow(Configuration config, ConfigWindow configWindow,
+    public MainWindow(Configuration config, ConfigWindow configWindow, BankWindow bankWindow,
                       IChatGui chatGui, IObjectTable objectTable, ITargetManager targetManager)
         : base("Twenty One##TwentyOneMain")
     {
-        this.config         = config;
-        this.configWindow   = configWindow;
+        this.config           = config;
+        this.configWindow     = configWindow;
+        this.bankWindow = bankWindow;
         this.chatGui        = chatGui;
         this.objectTable    = objectTable;
         this.targetManager  = targetManager;
@@ -387,6 +389,9 @@ private static unsafe void SendChatMessage(string message)
 
         if (ImGui.SmallButton("Config"))
             configWindow.Toggle();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Bank"))
+            bankWindow.Toggle();
 
         var canUndo = config.UndoStack.Count > 0;
         var canRedo = config.RedoStack.Count > 0;

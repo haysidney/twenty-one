@@ -42,5 +42,11 @@ public class Configuration : IPluginConfiguration
     // Used as {dealer} in narration templates.
     public string DealerName { get; set; } = "Dealer";
 
+    // ── Gil tracker ────────────────────────────────────────────────────────────
+    public long GilStart     { get; set; } = 0;
+    public long GilEnd       { get; set; } = 0;
+    public int  DealerCutPct { get; set; } = 0;
+    public List<long> Tips   { get; set; } = [];
+
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

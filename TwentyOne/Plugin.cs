@@ -30,17 +30,20 @@ public sealed class Plugin : IDalamudPlugin
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("TwentyOne");
-    private MainWindow MainWindow { get; init; }
-    private ConfigWindow ConfigWindow { get; init; }
+    private MainWindow       MainWindow       { get; init; }
+    private ConfigWindow     ConfigWindow     { get; init; }
+    private BankWindow BankWindow { get; init; }
 
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         ConfigWindow = new ConfigWindow(Configuration);
-        MainWindow = new MainWindow(Configuration, ConfigWindow, ChatGui, ObjectTable, TargetManager);
+        BankWindow   = new BankWindow(Configuration);
+        MainWindow   = new MainWindow(Configuration, ConfigWindow, BankWindow, ChatGui, ObjectTable, TargetManager);
         ContextMenu.OnMenuOpened += OnMenuOpened;
         WindowSystem.AddWindow(ConfigWindow);
+        WindowSystem.AddWindow(BankWindow);
         WindowSystem.AddWindow(MainWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -138,6 +141,7 @@ public sealed class Plugin : IDalamudPlugin
 
         WindowSystem.RemoveAllWindows();
         ConfigWindow.Dispose();
+        BankWindow.Dispose();
         MainWindow.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
