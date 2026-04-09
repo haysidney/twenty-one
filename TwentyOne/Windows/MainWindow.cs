@@ -804,7 +804,7 @@ private static unsafe void SendChatMessage(string message)
                         if (hasWorld)
                         {
                             var tradeOnlyW = ImGui.CalcTextSize("Trade").X + ImGui.GetStyle().FramePadding.X * 2;
-                            var tradePosX  = betCellRight - tradeOnlyW;
+                            var tradePosX  = betCellRight - tradeOnlyW - confirmButtonW;
                             ImGui.SameLine();
                             if (ImGui.GetCursorPosX() < tradePosX)
                                 ImGui.SetCursorPosX(tradePosX);
