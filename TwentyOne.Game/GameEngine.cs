@@ -179,6 +179,14 @@ public static class GameEngine
     public static decimal ParseBet(string bet) =>
         decimal.TryParse(bet.Trim(), out var v) && v > 0 ? v : 0;
 
+    public static string FormatGil(decimal v)
+    {
+        var abs = Math.Abs(v);
+        return abs >= 1_000_000 ? $"{v / 1_000_000:0.##}M"
+             : abs >= 1_000     ? $"{v / 1_000:0.##}K"
+             : $"{v:0.##}";
+    }
+
     public static string PayoutAmountString(GameState state, int playerIndex, int handIndex = 0)
     {
         var player = state.Players[playerIndex];
@@ -194,7 +202,7 @@ public static class GameEngine
             _                  => 0m,
         };
         if (delta == 0) return string.Empty;
-        return delta > 0 ? $"+{delta:0.##}" : $"{delta:0.##}";
+        return delta > 0 ? $"+{FormatGil(delta)}" : FormatGil(delta);
     }
 
     private static decimal BjMultiplier(BlackjackPayout payout) => payout switch
@@ -629,7 +637,7 @@ public static class GameEngine
                 var hand   = player.Hands[a.HandIndex];
                 var bet    = GetEffectiveBet(player, hand);
                 var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
-                Narrate(t.PlayerDoubleRequest, ("name", name), ("amount", bet.ToString("0.##")));
+                Narrate(t.PlayerDoubleRequest, ("name", name), ("amount", FormatGil(bet)));
                 return (state, effects);
             }
 
@@ -647,7 +655,7 @@ public static class GameEngine
                 var hand   = player.Hands[a.HandIndex];
                 var bet    = GetEffectiveBet(player, hand);
                 var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
-                Narrate(t.PlayerSplitRequest, ("name", name), ("amount", bet.ToString("0.##")));
+                Narrate(t.PlayerSplitRequest, ("name", name), ("amount", FormatGil(bet)));
                 return (state, effects);
             }
 
@@ -668,7 +676,7 @@ public static class GameEngine
             case AnnounceBetConfirm a:
             {
                 var player = state.Players[a.PlayerIndex];
-                Narrate(t.PlayerBetConfirm, ("name", player.DisplayName), ("amount", player.Bet));
+                Narrate(t.PlayerBetConfirm, ("name", player.DisplayName), ("amount", FormatGil(ParseBet(player.Bet))));
                 return (state, effects);
             }
 
@@ -812,7 +820,7 @@ public static class GameEngine
                         var effectiveBet = GetEffectiveBet(p, p.Hands[hi]);
                         var amount       = PayoutAmountString(state, pi, hi);
                         var betStr       = effectiveBet > 0
-                            ? $" (bet: {effectiveBet:0.##})"
+                            ? $" (bet: {FormatGil(effectiveBet)})"
                             : string.Empty;
                         var amountStr    = amount.Length > 0 ? $" {amount}" : string.Empty;
                         var name         = multiHand ? $"{p.DisplayName} (Hand {hi + 1})" : p.DisplayName;

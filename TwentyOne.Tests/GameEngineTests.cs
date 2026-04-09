@@ -1642,7 +1642,7 @@ public class SplitHandTests
         var t = new NarrationTemplates { PlayerBetConfirm = ["{name} bet={amount}"] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBetConfirm(0), t);
         Assert.Single(effects);
-        Assert.Equal("Lorah bet=50000", ((SendChat)effects[0]).Text);
+        Assert.Equal("Lorah bet=50K", ((SendChat)effects[0]).Text);
     }
 }
 
