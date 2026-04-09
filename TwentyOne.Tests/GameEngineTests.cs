@@ -237,9 +237,9 @@ public class ApplyAddPlayerCardTests
             ],
         };
         var (newState, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
-        // All players bust → DealerTurn (waiting for dealer to manually proceed to payout).
+        // All players bust → DealerTurn without WaitingForDealer (shows "Go to Payout" directly).
         Assert.Equal(GamePhase.DealerTurn, newState.Phase);
-        Assert.True(newState.WaitingForDealer);
+        Assert.False(newState.WaitingForDealer);
     }
 
     [Fact]

@@ -471,10 +471,15 @@ public static class GameEngine
                         if (newHand.State != HandState.Playing)
                         {
                             var (peekPi, peekHi, peekPhase) = AdvanceFrom(pi, hi, newPlayers);
-                            if (peekPhase is GamePhase.DealerTurn or GamePhase.Payout)
+                            if (peekPhase == GamePhase.DealerTurn)
                             {
                                 newPhase = GamePhase.DealerTurn;
                                 newWaitingForDealer = true;
+                            }
+                            else if (peekPhase == GamePhase.Payout)
+                            {
+                                // All players bust — skip dealer turn, but require manual payout trigger.
+                                newPhase = GamePhase.DealerTurn;
                             }
                             else if (peekPhase != GamePhase.PlayerTurns)
                             {
