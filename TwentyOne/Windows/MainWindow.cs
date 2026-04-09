@@ -690,6 +690,10 @@ private static unsafe void SendChatMessage(string message)
                             var eb        = GameEngine.GetEffectiveBet(p, hand);
                             var betLabel  = eb > 0 ? GameEngine.FormatGil(eb) : p.Bet;
                             var betCopy   = eb > 0 ? $"{eb:0.##}" : p.Bet;
+                            var labelW    = ImGui.CalcTextSize(betLabel).X;
+                            var available = betCellRight - ImGui.GetCursorPosX();
+                            var offset    = available - tradeButtonW - labelW;
+                            if (offset > 0) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + offset);
                             ImGui.AlignTextToFramePadding();
                             ImGui.TextDisabled(betLabel);
                             if (ImGui.IsItemHovered())

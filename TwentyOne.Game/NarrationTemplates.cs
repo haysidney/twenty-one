@@ -85,16 +85,16 @@ public class NarrationTemplates
     public List<string> PayoutHeader { get; set; } = ["Summary:"];
 
     // Combined payout for split hands where all hands win — replaces per-hand lines
-    // {name} = player name; {amount} = combined payout amount (e.g. " +300")
-    public List<string> PayoutSplitCombined { get; set; } = ["{name}: Split wins{amount}"];
+    // {name} = player name; {amount} = combined payout amount (e.g. "+300g")
+    public List<string> PayoutSplitCombined { get; set; } = ["{name}: Split wins {amount}"];
 
     public List<string> PayoutDealerBust   { get; set; } = ["{dealer} busts ({score})"];
     public List<string> PayoutDealerStands { get; set; } = ["{dealer} {score}"];
-    // {name} may include "(Hand N)"; {bet} = " (bet: 100)" or ""; {amount} = " +150" or " -100" or ""
-    public List<string> PayoutWin   { get; set; } = ["{name}: Win{bet}{amount}"];
-    public List<string> PayoutBjWin { get; set; } = ["{name}: Blackjack!{bet}{amount}"];
-    public List<string> PayoutLose  { get; set; } = ["{name}: Lose{bet}{amount}"];
-    public List<string> PayoutPush  { get; set; } = ["{name}: Push{bet}"];
+    // {name} may include "(Hand N)"; {bet} = "100g" or ""; {amount} = "+150g" or "-100g" or ""
+    public List<string> PayoutWin   { get; set; } = ["{name}: Win (bet: {bet}) {amount}"];
+    public List<string> PayoutBjWin { get; set; } = ["{name}: Blackjack! (bet: {bet}) {amount}"];
+    public List<string> PayoutLose  { get; set; } = ["{name}: Lose (bet: {bet}) {amount}"];
+    public List<string> PayoutPush  { get; set; } = ["{name}: Push (bet: {bet})"];
 
     // Newtonsoft.Json reuses existing List instances and appends to them.
     // Clear all lists before deserialization so defaults don't accumulate on reload.

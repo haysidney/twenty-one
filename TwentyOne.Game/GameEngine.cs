@@ -803,7 +803,7 @@ public static class GameEngine
                                 ? Math.Round(eb * BjMultiplier(state.BjPayout), 2)
                                 : eb;
                         }
-                        var amtStr = total > 0 ? $" +{total:0.##}" : string.Empty;
+                        var amtStr = total > 0 ? $"+{total:0.##}" : string.Empty;
                         Narrate(t.PayoutSplitCombined,
                             ("name",   p.DisplayName),
                             ("amount", amtStr));
@@ -826,9 +826,9 @@ public static class GameEngine
                         var effectiveBet = GetEffectiveBet(p, p.Hands[hi]);
                         var amount       = PayoutAmountString(state, pi, hi);
                         var betStr       = effectiveBet > 0
-                            ? $" (bet: {FormatGil(effectiveBet)})"
+                            ? FormatGil(effectiveBet)
                             : string.Empty;
-                        var amountStr    = amount.Length > 0 ? $" {amount}" : string.Empty;
+                        var amountStr    = amount;
                         var name         = multiHand ? $"{p.DisplayName} (Hand {hi + 1})" : p.DisplayName;
                         Narrate(template,
                             ("name",   name),

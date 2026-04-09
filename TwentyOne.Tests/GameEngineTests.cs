@@ -1757,7 +1757,7 @@ public class PayoutSplitCombinedTests
         var t = new NarrationTemplates { PayoutSplitCombined = ["TOTAL={amount}"], PayoutDealerStands = ["D"] };
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
-        Assert.Contains(texts, s => s == "TOTAL= +200");
+        Assert.Contains(texts, s => s == "TOTAL=+200");
     }
 }
 
