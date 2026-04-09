@@ -1021,6 +1021,10 @@ private static unsafe void SendChatMessage(string message)
                     QueueHitRoll(isDealer: true, -1, -1);
                 }
                 if (!canDeal) ImGui.EndDisabled();
+                if (!canDeal && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip(State.Players.Count == 0
+                        ? "Add at least one player first."
+                        : "All players need a bet before dealing.");
                 break;
 
             case GamePhase.Deal:
