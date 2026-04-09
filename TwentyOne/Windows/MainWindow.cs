@@ -534,7 +534,10 @@ private static unsafe void SendChatMessage(string message)
         // ── Trade bet prompt modal ─────────────────────────────────────────────
         if (pendingBetPrompt.HasValue)
             ImGui.OpenPopup("Set bet from trade?##tradeBet");
-        if (ImGui.BeginPopupModal("Set bet from trade?##tradeBet", ImGuiWindowFlags.AlwaysAutoResize))
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, new Vector4(0, 0, 0, 0));
+        var showBetModal = ImGui.BeginPopupModal("Set bet from trade?##tradeBet", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.PopStyleColor();
+        if (showBetModal)
         {
             var (bpi, bgil) = pendingBetPrompt!.Value;
             var bplayer     = State.Players[bpi];
