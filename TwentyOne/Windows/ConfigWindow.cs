@@ -370,17 +370,37 @@ public class ConfigWindow : Window, IDisposable
             ImGui.SetTooltip("Hold Ctrl to reset this template to its default.");
 
         int? toRemove = null;
+        (int A, int B)? swap = null;
+        var style = ImGui.GetStyle();
+        var upW   = ImGui.CalcTextSize("Up").X   + style.FramePadding.X * 2;
+        var downW = ImGui.CalcTextSize("Down").X + style.FramePadding.X * 2;
+        var xW    = ImGui.CalcTextSize("X").X    + style.FramePadding.X * 2;
+        var btnW  = upW + downW + xW + style.ItemSpacing.X * 3;
         for (var i = 0; i < value.Count; i++)
         {
             var line = value[i];
-            var xW = ImGui.CalcTextSize("X").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
-            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - xW);
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - btnW);
             if (ImGui.InputText($"##{id}_{i}", ref line, 512))
             { value[i] = line; MarkNarrationDirty(); }
+
             ImGui.SameLine();
-            if (ImGui.SmallButton($"X##{id}_{i}X"))
-                toRemove = i;
+            if (i == 0) ImGui.BeginDisabled();
+            if (ImGui.SmallButton($"Up##{id}_{i}U")) swap = (i, i - 1);
+            if (i == 0) ImGui.EndDisabled();
+
+            ImGui.SameLine();
+            if (i == value.Count - 1) ImGui.BeginDisabled();
+            if (ImGui.SmallButton($"Down##{id}_{i}D")) swap = (i, i + 1);
+            if (i == value.Count - 1) ImGui.EndDisabled();
+
+            ImGui.SameLine();
+            if (!ctrlHeld) ImGui.BeginDisabled();
+            if (ImGui.SmallButton($"X##{id}_{i}X")) toRemove = i;
+            if (!ctrlHeld) ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
+                ImGui.SetTooltip("Hold Ctrl to delete this line.");
         }
+        if (swap.HasValue) { (value[swap.Value.A], value[swap.Value.B]) = (value[swap.Value.B], value[swap.Value.A]); MarkNarrationDirty(); }
         if (toRemove.HasValue) { value.RemoveAt(toRemove.Value); MarkNarrationDirty(); }
 
         ImGui.Spacing();
