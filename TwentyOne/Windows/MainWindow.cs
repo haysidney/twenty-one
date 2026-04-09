@@ -816,6 +816,8 @@ private static unsafe void SendChatMessage(string message)
                                 if (ImGui.GetIO().KeyShift)
                                 {
                                     Apply(new AnnounceBetRequest(pi));
+                                    if (hasWorld)
+                                        QueueTarget(p.FullName, p.World);
                                     QueueTrade(p.FullName, p.World, config.PrivateChatCooldownMs);
                                 }
                                 else
