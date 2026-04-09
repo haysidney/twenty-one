@@ -154,7 +154,6 @@ public partial class MainWindow : Window, IDisposable
                 {
                     var raw      = chat.Text;
                     int minWait  = 0;
-                    if (raw.StartsWith('/'))
                     {
                         var m = System.Text.RegularExpressions.Regex.Match(raw, @"<wait\.(\d+)>");
                         if (m.Success)
@@ -247,6 +246,8 @@ public partial class MainWindow : Window, IDisposable
             else if (net < 0) stat.GamesLost++;
             else               stat.GamesPushed++;
             stat.TotalWon += net;
+            if (p.Hands.Any(h => h.State == HandState.Blackjack))
+                stat.Blackjacks++;
         }
         config.Save();
     }
@@ -756,6 +757,11 @@ private static unsafe void SendChatMessage(string message)
                     {
                         ImGui.AlignTextToFramePadding();
                         ImGui.Text(GameEngine.HandString(hand.Cards));
+                        if (hand.Doubled)
+                        {
+                            ImGui.SameLine();
+                            ImGui.TextColored(new Vector4(0.9f, 0.7f, 0.2f, 1f), "2x");
+                        }
                     }
 
                     // ── Score column ──────────────────────────────────────────

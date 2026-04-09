@@ -42,13 +42,14 @@ public class PlayerStatsWindow : Window, IDisposable
         ImGui.Spacing();
 
         var flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
-        if (ImGui.BeginTable("##stats", 7, flags))
+        if (ImGui.BeginTable("##stats", 8, flags))
         {
             ImGui.TableSetupColumn("Player"u8,    ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Played"u8,    ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Won"u8,       ImGuiTableColumnFlags.WidthFixed, 45);
             ImGui.TableSetupColumn("Pushes"u8,    ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Lost"u8,      ImGuiTableColumnFlags.WidthFixed, 45);
+            ImGui.TableSetupColumn("BJs"u8,       ImGuiTableColumnFlags.WidthFixed, 40);
             ImGui.TableSetupColumn("Win %"u8,     ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Total Won"u8, ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableHeadersRow();
@@ -78,12 +79,16 @@ public class PlayerStatsWindow : Window, IDisposable
 
                 ImGui.TableSetColumnIndex(5);
                 ImGui.AlignTextToFramePadding();
+                ImGui.TextUnformatted(stat.Blackjacks.ToString());
+
+                ImGui.TableSetColumnIndex(6);
+                ImGui.AlignTextToFramePadding();
                 var winPct = stat.GamesPlayed > 0
                     ? $"{stat.GamesWon * 100.0 / stat.GamesPlayed:0.#}%"
                     : "-";
                 ImGui.TextUnformatted(winPct);
 
-                ImGui.TableSetColumnIndex(6);
+                ImGui.TableSetColumnIndex(7);
                 ImGui.AlignTextToFramePadding();
                 var totalColor = stat.TotalWon > 0
                     ? new Vector4(0.35f, 0.9f, 0.35f, 1f)
@@ -113,14 +118,14 @@ public class PlayerStatsWindow : Window, IDisposable
     private string BuildExportText()
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Player\tPlayed\tWon\tPushes\tLost\tWin%\tTotal Won");
+        sb.AppendLine("Player\tPlayed\tWon\tPushes\tLost\tBJs\tWin%\tTotal Won");
         foreach (var stat in config.PlayerStatsStore.Values.OrderBy(s => s.DisplayName))
         {
             var winPct = stat.GamesPlayed > 0
                 ? $"{stat.GamesWon * 100.0 / stat.GamesPlayed:0.#}%"
                 : "-";
             var totalStr = stat.TotalWon > 0 ? $"+{stat.TotalWon:0.##}" : $"{stat.TotalWon:0.##}";
-            sb.AppendLine($"{stat.DisplayName}\t{stat.GamesPlayed}\t{stat.GamesWon}\t{stat.GamesPushed}\t{stat.GamesLost}\t{winPct}\t{totalStr}");
+            sb.AppendLine($"{stat.DisplayName}\t{stat.GamesPlayed}\t{stat.GamesWon}\t{stat.GamesPushed}\t{stat.GamesLost}\t{stat.Blackjacks}\t{winPct}\t{totalStr}");
         }
         return sb.ToString().TrimEnd();
     }

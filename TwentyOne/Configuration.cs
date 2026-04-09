@@ -13,6 +13,7 @@ public class PlayerStat
     public int     GamesWon    { get; set; } = 0;
     public int     GamesPushed { get; set; } = 0;
     public int     GamesLost   { get; set; } = 0;
+    public int     Blackjacks  { get; set; } = 0;
     public decimal TotalWon    { get; set; } = 0;
 }
 
