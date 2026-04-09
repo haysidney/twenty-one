@@ -84,3 +84,7 @@
 - Fix the winnings column in the Player Stats window
 
 - Right align trade button
+
+- Remove "bet: " from the narrations
+
+- Add " total" to the multi-hand payout amount

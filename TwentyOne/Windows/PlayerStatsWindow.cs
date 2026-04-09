@@ -51,7 +51,7 @@ public class PlayerStatsWindow : Window, IDisposable
             ImGui.TableSetupColumn("Lost"u8,      ImGuiTableColumnFlags.WidthFixed, 45);
             ImGui.TableSetupColumn("BJs"u8,       ImGuiTableColumnFlags.WidthFixed, 40);
             ImGui.TableSetupColumn("Win %"u8,     ImGuiTableColumnFlags.WidthFixed, 55);
-            ImGui.TableSetupColumn("Total Won"u8, ImGuiTableColumnFlags.WidthFixed, 90);
+            ImGui.TableSetupColumn("Net"u8,       ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableHeadersRow();
 
             foreach (var stat in config.PlayerStatsStore.Values.OrderBy(s => s.DisplayName))
@@ -110,7 +110,7 @@ public class PlayerStatsWindow : Window, IDisposable
                 : new Vector4(0.7f, 0.7f, 0.7f, 1f);
         var grandStr = grandTotal > 0 ? $"+{grandTotal:0.##}" : $"{grandTotal:0.##}";
         ImGui.Spacing();
-        ImGui.Text("Total Won: ");
+        ImGui.Text("Net (all players):");
         ImGui.SameLine();
         ImGui.TextColored(grandColor, grandStr);
     }
@@ -118,7 +118,7 @@ public class PlayerStatsWindow : Window, IDisposable
     private string BuildExportText()
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Player\tPlayed\tWon\tPushes\tLost\tBJs\tWin%\tTotal Won");
+        sb.AppendLine("Player\tPlayed\tWon\tPushes\tLost\tBJs\tWin%\tNet");
         foreach (var stat in config.PlayerStatsStore.Values.OrderBy(s => s.DisplayName))
         {
             var winPct = stat.GamesPlayed > 0

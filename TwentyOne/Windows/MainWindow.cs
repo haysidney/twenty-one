@@ -687,15 +687,16 @@ private static unsafe void SendChatMessage(string message)
                             : 0;
                         if (Phase != GamePhase.Betting)
                         {
-                            var parsedBet = GameEngine.ParseBet(p.Bet);
-                            var betLabel  = parsedBet > 0 ? GameEngine.FormatGil(parsedBet) : p.Bet;
+                            var eb        = GameEngine.GetEffectiveBet(p, hand);
+                            var betLabel  = eb > 0 ? GameEngine.FormatGil(eb) : p.Bet;
+                            var betCopy   = eb > 0 ? $"{eb:0.##}" : p.Bet;
                             ImGui.AlignTextToFramePadding();
                             ImGui.TextDisabled(betLabel);
                             if (ImGui.IsItemHovered())
                             {
                                 ImGui.SetTooltip("Click to copy bet");
                                 if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                                    ImGui.SetClipboardText(p.Bet);
+                                    ImGui.SetClipboardText(betCopy);
                             }
                         }
                         else
@@ -794,11 +795,22 @@ private static unsafe void SendChatMessage(string message)
                     if (Phase == GamePhase.Payout)
                     {
                         var isMultiHand = p.Hands.Count > 1;
+                        var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
+                        var red   = new Vector4(1f, 0.35f, 0.35f, 1f);
+                        var grey  = new Vector4(0.55f, 0.55f, 0.55f, 1f);
                         if (isMultiHand && !isFirstHand)
                         {
-                            // Non-first split hand: label only, no amount or copy button
+                            // Non-first split hand: label only, no copy button
                             var (lbl, col) = PayoutDisplay(State, pi, hi);
-                            if (lbl.Length > 0) ImGui.TextColored(col, lbl);
+                            if (lbl.Length > 0)
+                            {
+                                ImGui.TextColored(col, lbl);
+                                if (ImGui.IsItemHovered())
+                                {
+                                    var amt = GameEngine.PayoutAmountString(State, pi, hi);
+                                    ImGui.SetTooltip(amt.Length > 0 ? $"{lbl} {amt}" : lbl);
+                                }
+                            }
                         }
                         else
                         {
@@ -823,14 +835,11 @@ private static unsafe void SendChatMessage(string message)
 
                             string dispLabel;
                             Vector4 dispColor;
-                            var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
-                            var red   = new Vector4(1f, 0.35f, 0.35f, 1f);
-                            var grey  = new Vector4(0.55f, 0.55f, 0.55f, 1f);
                             if (isMultiHand)
                             {
-                                if (netDelta > 0)      (dispLabel, dispColor) = ($"Win +{GameEngine.FormatGil(netDelta)}",  green);
-                                else if (netDelta < 0) (dispLabel, dispColor) = ($"Lose {GameEngine.FormatGil(netDelta)}", red);
-                                else                   (dispLabel, dispColor) = ("Push",                                    grey);
+                                if (netDelta > 0)      (dispLabel, dispColor) = ($"Total Win +{GameEngine.FormatGil(netDelta)}",  green);
+                                else if (netDelta < 0) (dispLabel, dispColor) = ($"Total Lose {GameEngine.FormatGil(netDelta)}", red);
+                                else                   (dispLabel, dispColor) = ("Total Push",                                    grey);
                             }
                             else
                             {
@@ -843,6 +852,25 @@ private static unsafe void SendChatMessage(string message)
                             if (dispLabel.Length > 0)
                             {
                                 ImGui.TextColored(dispColor, dispLabel);
+                                if (ImGui.IsItemHovered())
+                                {
+                                    if (isMultiHand)
+                                    {
+                                        var lines = new System.Text.StringBuilder();
+                                        for (var hh = 0; hh < p.Hands.Count; hh++)
+                                        {
+                                            var (hlbl, _) = PayoutDisplay(State, pi, hh);
+                                            var hamt = GameEngine.PayoutAmountString(State, pi, hh);
+                                            lines.AppendLine($"Hand {hh + 1}: {(hamt.Length > 0 ? $"{hlbl} {hamt}" : hlbl)}");
+                                        }
+                                        ImGui.SetTooltip(lines.ToString().TrimEnd());
+                                    }
+                                    else
+                                    {
+                                        var d = GameEngine.PayoutDelta(State, pi, hi);
+                                        if (d != null) ImGui.SetTooltip($"{d.Value:0.##}");
+                                    }
+                                }
                                 if (totalOwed > 0)
                                 {
                                     var ctrlHeld   = ImGui.GetIO().KeyCtrl;
