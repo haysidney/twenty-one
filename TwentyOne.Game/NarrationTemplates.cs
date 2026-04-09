@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace TwentyOne.Game;
@@ -88,37 +90,9 @@ public class NarrationTemplates
     [OnDeserializing]
     internal void OnDeserializing(StreamingContext _)
     {
-        BettingOpen         = [];
-        DealerTurnStart     = [];
-        DealerHitAnnounce   = [];
-        DealerHit           = [];
-        DealerBust          = [];
-        DealerBJ            = [];
-        DealerStand         = [];
-        PlayerHitAnnounce   = [];
-        PlayerTurnStart     = [];
-        PlayerAfterHit      = [];
-        PlayerHit           = [];
-        PlayerBust          = [];
-        PlayerBJ            = [];
-        PlayerStand         = [];
-        PlayerDouble        = [];
-        PlayerSplitAce      = [];
-        PlayerBetRequest    = [];
-        PlayerBetConfirm    = [];
-        PlayerDoubleRequest = [];
-        PlayerSplitRequest  = [];
-        PlayerSplit         = [];
-        PlayerSplitRoll     = [];
-        DealDealerCard      = [];
-        DealPlayerHand      = [];
-        PayoutSplitCombined = [];
-        PayoutDealerBust    = [];
-        PayoutDealerStands  = [];
-        PayoutWin           = [];
-        PayoutBjWin         = [];
-        PayoutLose          = [];
-        PayoutPush          = [];
+        foreach (var prop in GetType().GetProperties()
+            .Where(p => p.PropertyType == typeof(List<string>)))
+            prop.SetValue(this, new List<string>());
     }
 
     public static string Fmt(string template, params (string Key, string Value)[] vars)
