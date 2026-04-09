@@ -837,9 +837,9 @@ private static unsafe void SendChatMessage(string message)
                             Vector4 dispColor;
                             if (isMultiHand)
                             {
-                                if (netDelta > 0)      (dispLabel, dispColor) = ($"Total Win +{GameEngine.FormatGil(netDelta)}",  green);
-                                else if (netDelta < 0) (dispLabel, dispColor) = ($"Total Lose {GameEngine.FormatGil(netDelta)}", red);
-                                else                   (dispLabel, dispColor) = ("Total Push",                                    grey);
+                                if (netDelta > 0)      (dispLabel, dispColor) = ($"Win +{GameEngine.FormatGil(netDelta)}",  green);
+                                else if (netDelta < 0) (dispLabel, dispColor) = ($"Lose {GameEngine.FormatGil(netDelta)}", red);
+                                else                   (dispLabel, dispColor) = ("Push",                                    grey);
                             }
                             else
                             {
@@ -863,7 +863,9 @@ private static unsafe void SendChatMessage(string message)
                                             var hamt = GameEngine.PayoutAmountString(State, pi, hh);
                                             lines.AppendLine($"Hand {hh + 1}: {(hamt.Length > 0 ? $"{hlbl} {hamt}" : hlbl)}");
                                         }
-                                        ImGui.SetTooltip(lines.ToString().TrimEnd());
+                                        var netStr = netDelta > 0 ? $"+{GameEngine.FormatGil(netDelta)}" : GameEngine.FormatGil(netDelta);
+                                        lines.Append($"Net: {netStr}");
+                                        ImGui.SetTooltip(lines.ToString());
                                     }
                                     else
                                     {
