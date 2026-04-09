@@ -731,6 +731,7 @@ public static class GameEngine
             // ── GoToPayout ───────────────────────────────────────────────────
             case GoToPayout:
             {
+                Narrate(t.PayoutHeader);
                 var dealerScore = HandValue(state.DealerHand.Cards);
                 var dealerBust  = state.DealerHand.Cards.Count > 0 && dealerScore > 21;
                 Narrate(dealerBust ? t.PayoutDealerBust : t.PayoutDealerStands,

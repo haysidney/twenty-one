@@ -77,6 +77,8 @@ public class NarrationTemplates
     public string DealSummaryDealer { get; set; } = " | {dealer} shows {cards}";
 
     // Payout
+    public List<string> PayoutHeader { get; set; } = ["Summary:"];
+
     // Combined payout for split hands where all hands win — replaces per-hand lines
     // {name} = player name; {amount} = combined payout amount (e.g. " +300")
     public List<string> PayoutSplitCombined { get; set; } = ["{name}: Split wins{amount}"];

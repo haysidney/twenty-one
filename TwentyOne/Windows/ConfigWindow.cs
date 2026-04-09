@@ -344,6 +344,7 @@ public class ConfigWindow : Window, IDisposable
             ImGui.Spacing();
             ImGui.TextDisabled("Payout");
             ImGui.Spacing();
+            NtListRow("Header##ntPH",      "(no variables)",          Defaults.PayoutHeader,        ctrlHeld, t.PayoutHeader);
             NtListRow("Dlr Bust##ntPDB",   "{dealer}  {score}",      Defaults.PayoutDealerBust,    ctrlHeld, t.PayoutDealerBust);
             NtListRow("Dlr Stands##ntPDS", "{dealer}  {score}",      Defaults.PayoutDealerStands,  ctrlHeld, t.PayoutDealerStands);
             NtListRow("Win##ntPW",         "{name}  {bet}  {amount}", Defaults.PayoutWin,           ctrlHeld, t.PayoutWin);
