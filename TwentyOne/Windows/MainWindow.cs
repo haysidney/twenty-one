@@ -542,6 +542,7 @@ private static unsafe void SendChatMessage(string message)
             ImGui.Spacing();
             if (ImGui.Button("Yes"))
             {
+                betEdits.Remove(bpi);
                 Apply(new SetPlayerBet(bpi, bgil.ToString()));
                 pendingBetPrompt = null;
                 ImGui.CloseCurrentPopup();
