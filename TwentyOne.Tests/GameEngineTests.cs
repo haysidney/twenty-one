@@ -237,8 +237,9 @@ public class ApplyAddPlayerCardTests
             ],
         };
         var (newState, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
-        Assert.Equal(GamePhase.Payout, newState.Phase);
-        Assert.Equal(-1, newState.ActivePlayerIndex);
+        // All players bust → DealerTurn (waiting for dealer to manually proceed to payout).
+        Assert.Equal(GamePhase.DealerTurn, newState.Phase);
+        Assert.True(newState.WaitingForDealer);
     }
 
     [Fact]

@@ -94,6 +94,10 @@ public static class GameEngine
             return dc.Count >= 2 || !couldHaveBJ;
         }
 
+        var allBust = state.Players.Count > 0
+                   && state.Players.All(p => p.Hands.All(h => h.State == HandState.Bust));
+        if (allBust) return true;
+
         var dc2 = state.DealerHand.Cards;
         return dc2.Count > 0
             && (HandValue(dc2) > 21 || DealerRecommendation(state.DealerHand) == "STAND");
@@ -467,7 +471,7 @@ public static class GameEngine
                         if (newHand.State != HandState.Playing)
                         {
                             var (peekPi, peekHi, peekPhase) = AdvanceFrom(pi, hi, newPlayers);
-                            if (peekPhase == GamePhase.DealerTurn)
+                            if (peekPhase is GamePhase.DealerTurn or GamePhase.Payout)
                             {
                                 newPhase = GamePhase.DealerTurn;
                                 newWaitingForDealer = true;
