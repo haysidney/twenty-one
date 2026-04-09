@@ -1165,6 +1165,16 @@ public class DoubleDownTests
     }
 
     [Fact]
+    public void AnnounceDoubleConfirm_NarratesWithName()
+    {
+        var state = ActiveState([5, 6]);
+        var t = new NarrationTemplates { PlayerDoubleConfirm = ["GL {name}!"] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceDoubleConfirm(0, 0), t);
+        Assert.Single(effects);
+        Assert.Equal("GL Lorah!", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
     public void PayoutAmountString_DoubledHand_UsesDoubledBet()
     {
         var state = new GameState

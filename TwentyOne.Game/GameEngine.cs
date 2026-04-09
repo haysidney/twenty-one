@@ -607,6 +607,14 @@ public static class GameEngine
                 return (state, effects);
             }
 
+            case AnnounceDoubleConfirm a:
+            {
+                var player = state.Players[a.PlayerIndex];
+                var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
+                Narrate(t.PlayerDoubleConfirm, ("name", name));
+                return (state, effects);
+            }
+
             case AnnounceSplit a:
             {
                 var player = state.Players[a.PlayerIndex];

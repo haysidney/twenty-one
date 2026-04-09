@@ -302,8 +302,9 @@ public class ConfigWindow : Window, IDisposable
             ImGui.Spacing();
             ImGui.TextDisabled("Double / Split");
             ImGui.Spacing();
-            NtListRow("Dbl req##ntDR",    "{name}  {amount}",                Defaults.PlayerDoubleRequest, ctrlHeld, t.PlayerDoubleRequest);
-            NtListRow("Dbl result##ntDD", "{name}  {card}  {cards}  {score}", Defaults.PlayerDouble,        ctrlHeld, t.PlayerDouble);
+            NtListRow("Dbl req##ntDR",     "{name}  {amount}",                 Defaults.PlayerDoubleRequest, ctrlHeld, t.PlayerDoubleRequest);
+            NtListRow("Dbl confirm##ntDC", "{name}",                           Defaults.PlayerDoubleConfirm, ctrlHeld, t.PlayerDoubleConfirm);
+            NtListRow("Dbl result##ntDD",  "{name}  {card}  {cards}  {score}", Defaults.PlayerDouble,        ctrlHeld, t.PlayerDouble);
             NtListRow("Spl req##ntSR",    "{name}  {amount}",                Defaults.PlayerSplitRequest,  ctrlHeld, t.PlayerSplitRequest);
             NtListRow("Split##ntSP",      "{name}",                          Defaults.PlayerSplit,         ctrlHeld, t.PlayerSplit);
             NtListRow("Spl roll##ntSPR",  "{name}",                          Defaults.PlayerSplitRoll,     ctrlHeld, t.PlayerSplitRoll);

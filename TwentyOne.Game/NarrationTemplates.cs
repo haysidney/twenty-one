@@ -57,6 +57,10 @@ public class NarrationTemplates
     public List<string> PlayerDoubleRequest { get; set; } = ["{name} would like to double down! Please trade {amount} gil to the dealer."];
     public List<string> PlayerSplitRequest  { get; set; } = ["{name} would like to split! Please trade {amount} gil to the dealer."];
 
+    // Sent when dealer clicks Confirm Dbl (trade received, card about to be drawn)
+    // {name} = player display name
+    public List<string> PlayerDoubleConfirm { get; set; } = ["Good luck, {name}!"];
+
     // Sent when the split is confirmed (after trade)
     public List<string> PlayerSplit { get; set; } = ["{name} splits into two hands!"];
 

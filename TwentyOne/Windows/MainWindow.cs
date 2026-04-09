@@ -115,6 +115,7 @@ public partial class MainWindow : Window, IDisposable
                          and not AnnounceBetRequest
                          and not AnnounceBetConfirm
                          and not AnnounceDouble
+                         and not AnnounceDoubleConfirm
                          and not AnnounceSplit
                          and not AnnounceDealerHit
                          and not AnnouncePlayerHit
@@ -836,6 +837,7 @@ private static unsafe void SendChatMessage(string message)
                         ImGui.SetCursorPosX(actionsCellRight - ABW("Confirm Dbl") - asp - ABW("Cancel"));
                         if (ImGui.SmallButton($"Confirm Dbl##{pi}_{hi}"))
                         {
+                            Apply(new AnnounceDoubleConfirm(pi, hi));
                             Apply(new DoubleDown(pi, hi));
                             pendingDouble = null;
                             QueueHitRoll(isDealer: false, pi, hi);

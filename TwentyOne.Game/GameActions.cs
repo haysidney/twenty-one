@@ -15,6 +15,7 @@ public record AnnouncePlayerDeal(int PlayerIndex) : GameAction;
 
 // Double/Split trade-request announcements (narration only, no state change)
 public record AnnounceDouble(int PlayerIndex, int HandIndex) : GameAction;
+public record AnnounceDoubleConfirm(int PlayerIndex, int HandIndex) : GameAction;
 public record AnnounceSplit(int PlayerIndex, int HandIndex) : GameAction;
 
 // Hit announcements (narration only, no state change)
