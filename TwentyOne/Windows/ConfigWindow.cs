@@ -124,6 +124,15 @@ public class ConfigWindow : Window, IDisposable
                 config.Save();
             }
 
+            var allowCross = config.AllowCrossChannelCommands;
+            if (ImGui.Checkbox("Allow cross-channel commands in templates", ref allowCross))
+            {
+                config.AllowCrossChannelCommands = allowCross;
+                config.Save();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("When disabled, narration commands that target a channel other than the one\nselected above are redirected to /echo so only you see them.");
+
             var isPublic = currentChannel is "/say" or "/yell" or "/shout";
             if (isPublic)
             {

@@ -163,7 +163,17 @@ public partial class MainWindow : Window, IDisposable
                             raw     = raw.Replace(m.Value, "").Trim();
                         }
                     }
-                    var msg = raw.StartsWith('/') ? raw : config.ChatChannel + " " + raw;
+                    string msg;
+                    if (raw.StartsWith('/'))
+                    {
+                        if (!config.AllowCrossChannelCommands && IsCrossChannelCommand(raw, config.ChatChannel))
+                            raw = "/echo " + raw.Split(' ', 2)[1];
+                        msg = raw;
+                    }
+                    else
+                    {
+                        msg = config.ChatChannel + " " + raw;
+                    }
                     chatQueue.Enqueue((false, () => SendChatMessage(msg), minWait));
                 }
             }
@@ -266,6 +276,26 @@ public partial class MainWindow : Window, IDisposable
     }
 
     // ── Chat / roll ───────────────────────────────────────────────────────────
+
+    // Chat commands that send messages visible to other players (not client-side).
+    private static readonly HashSet<string> ChannelCommands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "/say", "/s", "/yell", "/y", "/shout", "/sh",
+        "/party", "/p", "/alliance", "/a",
+        "/fc", "/linkshell", "/l",
+        "/ls1", "/ls2", "/ls3", "/ls4", "/ls5", "/ls6", "/ls7", "/ls8",
+        "/cwlinkshell", "/cwl",
+        "/cwl1", "/cwl2", "/cwl3", "/cwl4", "/cwl5", "/cwl6", "/cwl7", "/cwl8",
+        "/tell", "/t", "/reply", "/r", "/novice", "/beginner",
+    };
+
+    // Returns true if `raw` is a channel-sending command targeting a different channel than `configChannel`.
+    private static bool IsCrossChannelCommand(string raw, string configChannel)
+    {
+        var cmd = raw.Split(' ', 2)[0];
+        if (!ChannelCommands.Contains(cmd)) return false;
+        return !string.Equals(cmd, configChannel, StringComparison.OrdinalIgnoreCase);
+    }
 
 private static unsafe void SendChatMessage(string message)
     {

@@ -44,6 +44,7 @@ public class Configuration : IPluginConfiguration
     // ── Chat ───────────────────────────────────────────────────────────────────
     public bool ChatEnabled { get; set; } = false;
     public string ChatChannel { get; set; } = "/p";
+    public bool AllowCrossChannelCommands { get; set; } = false;
     public int PublicChatCooldownMs  { get; set; } = 2000;
     public int PrivateChatCooldownMs { get; set; } = 1200;
 
