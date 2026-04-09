@@ -811,7 +811,7 @@ private static unsafe void SendChatMessage(string message)
                                     : eb;
                             }
                             var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
-                            var combinedAmtStr = $"+{combinedNet:0.##}";
+                            var combinedAmtStr = $"+{GameEngine.FormatGil(combinedNet)}";
                             var shiftHeld2 = ImGui.GetIO().KeyShift;
                             var totalBet   = p.Hands.Sum(h => GameEngine.GetEffectiveBet(p, h));
                             var withBet    = $"{combinedNet + totalBet:0.##}";
@@ -837,10 +837,10 @@ private static unsafe void SendChatMessage(string message)
                                 if (amount.Length > 0 && (result == PayoutResult.Win || result == PayoutResult.BjWin))
                                 {
                                     var shiftHeld  = ImGui.GetIO().KeyShift;
-                                    var winnings   = amount.TrimStart('+');
+                                    var delta      = GameEngine.PayoutDelta(State, pi, hi) ?? 0m;
                                     var bet        = GameEngine.GetEffectiveBet(p, hand);
-                                    var total      = (decimal.TryParse(winnings, out var w) && bet > 0)
-                                                     ? $"{w + bet:0.##}" : winnings;
+                                    var winnings   = $"{delta:0.##}";
+                                    var total      = bet > 0 ? $"{delta + bet:0.##}" : winnings;
                                     var copyVal    = shiftHeld ? total : winnings;
                                     var copyW      = ImGui.CalcTextSize("Copy").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
                                     ImGui.SameLine();

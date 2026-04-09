@@ -187,12 +187,12 @@ public static class GameEngine
              : $"{v:0.##}";
     }
 
-    public static string PayoutAmountString(GameState state, int playerIndex, int handIndex = 0)
+    public static decimal? PayoutDelta(GameState state, int playerIndex, int handIndex = 0)
     {
         var player = state.Players[playerIndex];
         var hand   = player.Hands[handIndex];
         var bet    = GetEffectiveBet(player, hand);
-        if (bet <= 0) return string.Empty;
+        if (bet <= 0) return null;
         var result = GetPayoutResult(state, playerIndex, handIndex);
         var delta  = result switch
         {
@@ -201,8 +201,14 @@ public static class GameEngine
             PayoutResult.Lose  => -bet,
             _                  => 0m,
         };
-        if (delta == 0) return string.Empty;
-        return delta > 0 ? $"+{FormatGil(delta)}" : FormatGil(delta);
+        return delta == 0 ? null : delta;
+    }
+
+    public static string PayoutAmountString(GameState state, int playerIndex, int handIndex = 0)
+    {
+        var delta = PayoutDelta(state, playerIndex, handIndex);
+        if (delta == null) return string.Empty;
+        return delta > 0 ? $"+{FormatGil(delta.Value)}" : FormatGil(delta.Value);
     }
 
     private static decimal BjMultiplier(BlackjackPayout payout) => payout switch
