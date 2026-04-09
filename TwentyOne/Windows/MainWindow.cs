@@ -154,13 +154,11 @@ public partial class MainWindow : Window, IDisposable
                 {
                     var raw      = chat.Text;
                     int minWait  = 0;
+                    var m = System.Text.RegularExpressions.Regex.Match(raw, @"<wait\.(\d+)>");
+                    if (m.Success)
                     {
-                        var m = System.Text.RegularExpressions.Regex.Match(raw, @"<wait\.(\d+)>");
-                        if (m.Success)
-                        {
-                            minWait = int.Parse(m.Groups[1].Value) * 1000;
-                            raw     = raw.Replace(m.Value, "").Trim();
-                        }
+                        minWait = int.Parse(m.Groups[1].Value) * 1000;
+                        raw     = raw.Replace(m.Value, "").Trim();
                     }
                     string msg;
                     if (raw.StartsWith('/'))
