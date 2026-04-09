@@ -38,7 +38,7 @@ public class ConfigWindow : Window, IDisposable
 
     private static readonly string[] ChatChannels =
     [
-        "/say", "/yell", "/shout", "/p", "/a", "/fc",
+        "/say", "/yell", "/shout", "/p", "/a", "/fc", "/echo",
         "/cwl1", "/cwl2", "/cwl3", "/cwl4", "/cwl5", "/cwl6", "/cwl7", "/cwl8",
         "/l1", "/l2", "/l3", "/l4", "/l5", "/l6", "/l7", "/l8",
     ];
