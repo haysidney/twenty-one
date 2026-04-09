@@ -529,7 +529,16 @@ private static unsafe void SendChatMessage(string message)
             // Advance auto-deal if more cards are needed
             if (Phase == GamePhase.Deal && autoDealQueue.TryDequeue(out var next))
             {
-                if (next.IsFirstCard) Apply(new AnnouncePlayerDeal(next.PlayerIndex));
+                if (next.IsFirstCard)
+                {
+                    if (config.AutoTargetEnabled)
+                    {
+                        var dp = config.GameState.Players[next.PlayerIndex];
+                        if (dp.World.Length > 0)
+                            Plugin.TargetPlayer(dp.FullName, dp.World);
+                    }
+                    Apply(new AnnouncePlayerDeal(next.PlayerIndex));
+                }
                 QueueHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
             }
         }
