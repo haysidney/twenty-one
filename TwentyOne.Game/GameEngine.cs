@@ -147,7 +147,7 @@ public static class GameEngine
     {
         if (hand.State != HandState.Playing) return string.Empty;
         var options = new List<string> { "Hit", "Stand" };
-        if (canDouble) options.Add("Double");
+        if (canDouble) options.Add("Double Down");
         if (canSplit)  options.Add("Split");
         if (options.Count == 2) return $"{options[0]} or {options[1]}";
         return string.Join(", ", options[..^1]) + ", or " + options[^1];

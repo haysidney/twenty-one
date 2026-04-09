@@ -28,7 +28,7 @@ public class NarrationTemplates
     public List<string> DealerStand       { get; set; } = ["{dealer} stands. {cards} = {score}"];
 
     // Player actions (PlayerTurns phase)
-    // {actions} = e.g. "Hit or Stand" or "Hit or Stand, Double, Split"
+    // {actions} = e.g. "Hit or Stand" or "Hit or Stand, Double Down, Split"
     public List<string> PlayerHitAnnounce { get; set; } = ["{name} hits!"];
     public List<string> PlayerTurnStart   { get; set; } = ["{name}'s turn: {cards} ({score}) — Dealer shows {dealerCards} ({dealerScore}). {actions}"];
     // After a hit that leaves the hand still Playing: show score and ask what to do next
