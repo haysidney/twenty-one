@@ -372,8 +372,8 @@ public class ConfigWindow : Window, IDisposable
         int? toRemove = null;
         (int A, int B)? swap = null;
         var style = ImGui.GetStyle();
-        var upW   = ImGui.CalcTextSize("Up").X   + style.FramePadding.X * 2;
-        var downW = ImGui.CalcTextSize("Down").X + style.FramePadding.X * 2;
+        var upW   = ImGui.CalcTextSize("↑").X + style.FramePadding.X * 2;
+        var downW = ImGui.CalcTextSize("↓").X + style.FramePadding.X * 2;
         var xW    = ImGui.CalcTextSize("X").X    + style.FramePadding.X * 2;
         var btnW  = upW + downW + xW + style.ItemSpacing.X * 3;
         for (var i = 0; i < value.Count; i++)
@@ -385,12 +385,12 @@ public class ConfigWindow : Window, IDisposable
 
             ImGui.SameLine();
             if (i == 0) ImGui.BeginDisabled();
-            if (ImGui.SmallButton($"Up##{id}_{i}U")) swap = (i, i - 1);
+            if (ImGui.SmallButton($"↑##{id}_{i}U")) swap = (i, i - 1);
             if (i == 0) ImGui.EndDisabled();
 
             ImGui.SameLine();
             if (i == value.Count - 1) ImGui.BeginDisabled();
-            if (ImGui.SmallButton($"Down##{id}_{i}D")) swap = (i, i + 1);
+            if (ImGui.SmallButton($"↓##{id}_{i}D")) swap = (i, i + 1);
             if (i == value.Count - 1) ImGui.EndDisabled();
 
             ImGui.SameLine();
