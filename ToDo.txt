@@ -48,17 +48,39 @@
 
 - Test nonnumeric characters in the bet field
 
-- Track player winnings
-
 - Sounds on every message
 
-- Remind player of turn
-
-- player cards at turn start
-
-- face the player who's doing stuff
-
 - Consecutive text command input is currently restricted.
- - Change the default from 1000 to 1200
+ - Change the default from 1000 to 1200				
 
 - When a split wins both hands, combine the payout
+
+- Deal summary is weird that it's different.
+
+- Auto target option on trade or bet remind.
+
+- Add an option to allow commands in messages that send messages in channels other than the one chosen
+
+- Check if Hit result is even necessary
+
+- Need a thank you for playing announcement
+
+-----
+
+- auto determine bet amount
+
+- Summary 1000s to k
+
+- Need an announcement for holding some amount for the bet next round before trading after winning a double down
+
+- Happy noises for winners, sad noises for loser, medium noises for pushers, crazy noises for bjers
+
+- Need a settlement narration
+
+- If one player pushes with multiple hands because of a split, we actually need to give them money. Need to account for any of those hands that were a double down. 
+
+- A push of a doubled down hand means they need to be given money.
+
+- Fix the winnings column in the Player Stats window
+
+- Right align trade button
