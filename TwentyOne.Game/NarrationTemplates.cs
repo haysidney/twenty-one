@@ -35,6 +35,9 @@ public class NarrationTemplates
     public List<string> PlayerHit         { get; set; } = ["{name} hits → {card} | {cards} = {score}"];
     public List<string> PlayerBust        { get; set; } = ["{name} busts! {cards} = {score}"];
     public List<string> PlayerBJ          { get; set; } = ["{name} — Blackjack! {cards}"];
+    // Shown in the old PlayerBJ position (player-turns phase) when multiple players are at the table.
+    // {name} {cards}
+    public List<string> PlayerBJMovingAlong { get; set; } = ["{name} has a blackjack so we'll just move along \u2665"];
     public List<string> PlayerStand       { get; set; } = ["{name} stands. {cards} = {score}"];
 
     // Double down — sent when the card lands and the hand is auto-stood

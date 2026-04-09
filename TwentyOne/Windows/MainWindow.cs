@@ -49,9 +49,9 @@ public partial class MainWindow : Window, IDisposable
     // rate-limited outgoing queue — narration strings and roll commands share a single FIFO and lastChatSent
     // each entry: (IsRoll, Invoke, MinWaitMs) — narration passes through freely; rolls block until pendingHit is clear
     // MinWaitMs: minimum ms to wait after the *previous* entry before sending this one (0 = use cooldownMs)
-    private readonly Queue<(bool IsRoll, Action Invoke, int MinWaitMs)> chatQueue = new();
-    private          DateTime                                             lastChatSent      = DateTime.MinValue;
-    private          int                                                  lastSentMinWaitMs = 0;
+    private readonly Queue<(bool IsRoll, Action Invoke, int MinWaitAfterMs, int MinWaitBeforeMs)> chatQueue = new();
+    private          DateTime                                                                       lastChatSent      = DateTime.UtcNow;
+    private          int                                                                            lastSentMinWaitMs = 0;
 
     // ── Convenience accessors ─────────────────────────────────────────────────
 
@@ -174,7 +174,7 @@ public partial class MainWindow : Window, IDisposable
                     {
                         msg = config.ChatChannel + " " + raw;
                     }
-                    chatQueue.Enqueue((false, () => SendChatMessage(msg), minWait));
+                    chatQueue.Enqueue((false, () => SendChatMessage(msg), minWait, 0));
                 }
             }
             else if (effect is AutoHit ah)
@@ -311,6 +311,9 @@ private static unsafe void SendChatMessage(string message)
         config.NarrationLog.Add($"[Roll] {who}: {roll}");
     }
 
+    private void QueueTrade(string fullName, string world, int minWaitBeforeMs = 0) =>
+        chatQueue.Enqueue((false, () => Plugin.TradePlayer(fullName, world), 0, minWaitBeforeMs));
+
     private void QueueHitRoll(bool isDealer, int playerIndex, int handIndex)
     {
         if (!config.ChatEnabled)
@@ -320,7 +323,7 @@ private static unsafe void SendChatMessage(string message)
             deferredRoll = (isDealer, playerIndex, handIndex, simRoll);
             return;
         }
-        chatQueue.Enqueue((true, () => SendHitRoll(isDealer, playerIndex, handIndex), 0));
+        chatQueue.Enqueue((true, () => SendHitRoll(isDealer, playerIndex, handIndex), 0, 0));
     }
 
     private unsafe void SendHitRoll(bool isDealer, int playerIndex, int handIndex)
@@ -442,16 +445,16 @@ private static unsafe void SendChatMessage(string message)
         // Drain outgoing queue — hold a roll entry until the previous roll's response has arrived
         var isPublicChannel = config.ChatChannel is "/say" or "/yell" or "/shout";
         var cooldownMs = isPublicChannel ? config.PublicChatCooldownMs : config.PrivateChatCooldownMs;
-        var waitMs = Math.Max(cooldownMs, lastSentMinWaitMs);
-        if (chatQueue.Count > 0 && (DateTime.UtcNow - lastChatSent).TotalMilliseconds >= waitMs)
+        if (chatQueue.Count > 0)
         {
-            var (isRoll, invoke, minWaitMs) = chatQueue.Peek();
-            if (!isRoll || pendingHit == null)
+            var (isRoll, invoke, minWaitAfterMs, minWaitBeforeMs) = chatQueue.Peek();
+            var requiredMs = Math.Max(cooldownMs, lastSentMinWaitMs) + minWaitBeforeMs;
+            if ((DateTime.UtcNow - lastChatSent).TotalMilliseconds >= requiredMs && (!isRoll || pendingHit == null))
             {
                 chatQueue.Dequeue();
                 invoke();
                 lastChatSent      = DateTime.UtcNow;
-                lastSentMinWaitMs = minWaitMs;
+                lastSentMinWaitMs = minWaitAfterMs;
             }
         }
 
@@ -616,13 +619,14 @@ private static unsafe void SendChatMessage(string message)
 
                             var winnerKey = p.FullName.Length > 0 ? p.FullName : p.Nickname;
                             var isWinner  = config.GameState.LastRoundWinners.Contains(winnerKey);
+                            var isPusher  = !isWinner && config.GameState.LastRoundPushers.Contains(winnerKey);
                             var sp      = ImGui.GetStyle().ItemSpacing.X;
                             var fp      = ImGui.GetStyle().FramePadding.X;
                             float BW(string s) => ImGui.CalcTextSize(s).X + fp * 2;
                             var clearW  = hasWorld && hasNickname ? BW("C") + sp : 0;
                             var targetW = hasWorld               ? BW("@") + sp : 0;
                             var renameW = BW("R");
-                            var spadeW  = isWinner               ? ImGui.CalcTextSize("\u2660").X + sp : 0;
+                            var spadeW  = (isWinner || isPusher) ? ImGui.CalcTextSize("\u2660").X + sp : 0;
                             ImGui.SameLine();
                             ImGui.SetCursorPosX(nameCellRight - spadeW - targetW - renameW - clearW);
 
@@ -630,6 +634,12 @@ private static unsafe void SendChatMessage(string message)
                             {
                                 ImGui.TextColored(new System.Numerics.Vector4(0.2f, 0.8f, 0.2f, 1f), "\u2660");
                                 if (ImGui.IsItemHovered()) ImGui.SetTooltip("Won last round"u8);
+                                ImGui.SameLine();
+                            }
+                            else if (isPusher)
+                            {
+                                ImGui.TextColored(new System.Numerics.Vector4(1f, 1f, 1f, 1f), "\u2660");
+                                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Pushed last round"u8);
                                 ImGui.SameLine();
                             }
 
@@ -700,12 +710,15 @@ private static unsafe void SendChatMessage(string message)
                             if (ImGui.SmallButton($"Trade##{pi}trade"))
                             {
                                 if (ImGui.GetIO().KeyShift)
+                                {
                                     Apply(new AnnounceBetRequest(pi));
+                                    QueueTrade(p.FullName, p.World, config.PrivateChatCooldownMs);
+                                }
                                 else
                                     Plugin.TradePlayer(p.FullName, p.World);
                             }
                             if (ImGui.IsItemHovered())
-                                ImGui.SetTooltip($"Trade {p.FullName}@{p.World}\nShift+Click to announce bet request in chat");
+                                ImGui.SetTooltip($"Trade {p.FullName}@{p.World}\nShift+Click to announce bet request then open trade");
                         }
                         if (Phase == GamePhase.Betting)
                         {
@@ -924,7 +937,7 @@ private static unsafe void SendChatMessage(string message)
                         {
                             pendingDouble = (pi, hi);
                             Apply(new AnnounceDouble(pi, hi));
-                            if (hasWorld && config.AutoTradeEnabled) Plugin.TradePlayer(p.FullName, p.World);
+                            if (hasWorld && config.AutoTradeEnabled) QueueTrade(p.FullName, p.World);
                         }
                         if (!canDouble) ImGui.EndDisabled();
 
@@ -936,7 +949,7 @@ private static unsafe void SendChatMessage(string message)
                         {
                             pendingSplit = (pi, hi);
                             Apply(new AnnounceSplit(pi, hi));
-                            if (hasWorld && config.AutoTradeEnabled) Plugin.TradePlayer(p.FullName, p.World);
+                            if (hasWorld && config.AutoTradeEnabled) QueueTrade(p.FullName, p.World);
                         }
                         if (!canSplit) ImGui.EndDisabled();
 

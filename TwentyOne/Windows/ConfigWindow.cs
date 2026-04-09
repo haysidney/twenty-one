@@ -264,6 +264,12 @@ public class ConfigWindow : Window, IDisposable
 
             ImGui.Spacing();
             ImGui.TextDisabled("Deal summary (components of a single message)");
+            var skipOne = config.GameState.SkipDealSummaryOnePlayer;
+            if (ImGui.Checkbox("Skip deal summary when only one player##skipDS1P", ref skipOne))
+            {
+                config.GameState.SkipDealSummaryOnePlayer = skipOne;
+                config.Save();
+            }
             if (ImGui.BeginTable("##ntDeal", 3, flags))
             {
                 ImGui.TableSetupColumn("##ntDealLabel", ImGuiTableColumnFlags.WidthFixed, 90);
@@ -299,7 +305,8 @@ public class ConfigWindow : Window, IDisposable
             NtListRow("Hit result##ntPH",  "{name}  {card}  {cards}  {score}",                                  Defaults.PlayerHit,         ctrlHeld, t.PlayerHit);
             NtListRow("After hit##ntPAH",  "{name}  {cards}  {score}  {actions}",                               Defaults.PlayerAfterHit,    ctrlHeld, t.PlayerAfterHit);
             NtListRow("Bust##ntPB",        "{name}  {cards}  {score}",                                          Defaults.PlayerBust,        ctrlHeld, t.PlayerBust);
-            NtListRow("Blackjack##ntPBJ",  "{name}  {cards}",                                                   Defaults.PlayerBJ,          ctrlHeld, t.PlayerBJ);
+            NtListRow("Blackjack##ntPBJ",       "{name}  {cards}",  Defaults.PlayerBJ,            ctrlHeld, t.PlayerBJ);
+            NtListRow("BJ moving along##ntPBJMA", "{name}  {cards}", Defaults.PlayerBJMovingAlong, ctrlHeld, t.PlayerBJMovingAlong);
             NtListRow("Stand##ntPS",       "{name}  {cards}  {score}",                                          Defaults.PlayerStand,       ctrlHeld, t.PlayerStand);
 
             ImGui.EndTabItem();

@@ -243,18 +243,21 @@ public static class GameEngine
         bool?               waitingForNextPlayer  = null,
         bool?               waitingForDealer      = null,
         BlackjackPayout?    bjPayout              = null,
-        HashSet<string>?    lastRoundWinners      = null) =>
+        HashSet<string>?    lastRoundWinners      = null,
+        HashSet<string>?    lastRoundPushers      = null) =>
         new GameState
         {
-            Players              = players              ?? s.Players,
-            DealerHand           = dealerHand           ?? s.DealerHand,
-            Phase                = phase                ?? s.Phase,
-            ActivePlayerIndex    = activePlayerIndex    ?? s.ActivePlayerIndex,
-            ActiveHandIndex      = activeHandIndex      ?? s.ActiveHandIndex,
-            WaitingForNextPlayer = waitingForNextPlayer ?? s.WaitingForNextPlayer,
-            WaitingForDealer     = waitingForDealer     ?? s.WaitingForDealer,
-            BjPayout             = bjPayout             ?? s.BjPayout,
-            LastRoundWinners     = lastRoundWinners     ?? s.LastRoundWinners,
+            Players                   = players              ?? s.Players,
+            DealerHand                = dealerHand           ?? s.DealerHand,
+            Phase                     = phase                ?? s.Phase,
+            ActivePlayerIndex         = activePlayerIndex    ?? s.ActivePlayerIndex,
+            ActiveHandIndex           = activeHandIndex      ?? s.ActiveHandIndex,
+            WaitingForNextPlayer      = waitingForNextPlayer ?? s.WaitingForNextPlayer,
+            WaitingForDealer          = waitingForDealer     ?? s.WaitingForDealer,
+            BjPayout                  = bjPayout             ?? s.BjPayout,
+            LastRoundWinners          = lastRoundWinners     ?? s.LastRoundWinners,
+            LastRoundPushers          = lastRoundPushers     ?? s.LastRoundPushers,
+            SkipDealSummaryOnePlayer  = s.SkipDealSummaryOnePlayer,
         };
 
     /// <summary>
@@ -323,21 +326,31 @@ public static class GameEngine
 
         void NarrateDealSummary(GameState s)
         {
-            var sb = new StringBuilder(t.DealSummaryPrefix);
-            for (var i = 0; i < s.Players.Count; i++)
+            if (!(s.SkipDealSummaryOnePlayer && s.Players.Count == 1))
             {
-                if (i > 0) sb.Append(", ");
-                var p    = s.Players[i];
-                var hand = p.Hands[0];
-                sb.Append(NarrationTemplates.Fmt(t.DealSummaryPlayer,
-                    ("name",  p.DisplayName),
-                    ("cards", HandString(hand.Cards)),
-                    ("score", ScoreString(hand.Cards)),
-                    ("bj",    hand.State == HandState.Blackjack ? " BJ!" : string.Empty)));
+                var sb = new StringBuilder(t.DealSummaryPrefix);
+                for (var i = 0; i < s.Players.Count; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    var p    = s.Players[i];
+                    var hand = p.Hands[0];
+                    sb.Append(NarrationTemplates.Fmt(t.DealSummaryPlayer,
+                        ("name",  p.DisplayName),
+                        ("cards", HandString(hand.Cards)),
+                        ("score", ScoreString(hand.Cards)),
+                        ("bj",    hand.State == HandState.Blackjack ? " BJ!" : string.Empty)));
+                }
+                sb.Append(NarrationTemplates.Fmt(t.DealSummaryDealer,
+                    ("dealer", dealerName), ("cards", HandString(s.DealerHand.Cards))));
+                NarrateStr(sb.ToString());
             }
-            sb.Append(NarrationTemplates.Fmt(t.DealSummaryDealer,
-                ("dealer", dealerName), ("cards", HandString(s.DealerHand.Cards))));
-            NarrateStr(sb.ToString());
+            // Announce natural blackjacks immediately after the deal summary, in player order.
+            foreach (var p in s.Players)
+            {
+                var hand = p.Hands[0];
+                if (hand.State == HandState.Blackjack)
+                    Narrate(t.PlayerBJ, ("name", p.DisplayName), ("cards", HandString(hand.Cards)));
+            }
         }
 
         switch (action)
@@ -671,7 +684,8 @@ public static class GameEngine
                     if (nextHand.State == HandState.Blackjack)
                     {
                         var name = state.Players[nextPi].DisplayName;
-                        Narrate(t.PlayerBJ, ("name", name), ("cards", HandString(nextHand.Cards)));
+                        if (state.Players.Count > 1)
+                            Narrate(t.PlayerBJMovingAlong, ("name", name), ("cards", HandString(nextHand.Cards)));
                         waitNext = true;
                     }
                     else
@@ -703,7 +717,8 @@ public static class GameEngine
                         var name = state.Players[nextPi].Hands.Count > 1
                             ? $"{state.Players[nextPi].DisplayName} (Hand {nextHi + 1})"
                             : state.Players[nextPi].DisplayName;
-                        Narrate(t.PlayerBJ, ("name", name), ("cards", HandString(nextHand.Cards)));
+                        if (state.Players.Count > 1)
+                            Narrate(t.PlayerBJMovingAlong, ("name", name), ("cards", HandString(nextHand.Cards)));
                         return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
                             waitingForNextPlayer: true), effects);
                     }
@@ -795,7 +810,14 @@ public static class GameEngine
                          .Where((p, pi) => p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
                                             .Any(r => r is PayoutResult.Win or PayoutResult.BjWin))
                          .Select(p => p.FullName.Length > 0 ? p.FullName : p.Nickname));
-                return (With(state, phase: GamePhase.Payout, lastRoundWinners: winners), effects);
+                var pushers = new HashSet<string>(
+                    state.Players
+                         .Where((p, pi) => p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
+                                            .Any(r => r == PayoutResult.Push)
+                                        && !p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
+                                            .Any(r => r is PayoutResult.Win or PayoutResult.BjWin))
+                         .Select(p => p.FullName.Length > 0 ? p.FullName : p.Nickname));
+                return (With(state, phase: GamePhase.Payout, lastRoundWinners: winners, lastRoundPushers: pushers), effects);
             }
 
             // ── NewRound ─────────────────────────────────────────────────────
@@ -814,8 +836,10 @@ public static class GameEngine
                     Phase             = GamePhase.Betting,
                     ActivePlayerIndex = -1,
                     ActiveHandIndex   = -1,
-                    BjPayout          = state.BjPayout,
-                    LastRoundWinners  = state.LastRoundWinners,
+                    BjPayout                 = state.BjPayout,
+                    LastRoundWinners         = state.LastRoundWinners,
+                    LastRoundPushers         = state.LastRoundPushers,
+                    SkipDealSummaryOnePlayer = state.SkipDealSummaryOnePlayer,
                 }, effects);
 
             // ── Roster management ────────────────────────────────────────────

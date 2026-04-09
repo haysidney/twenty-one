@@ -419,8 +419,8 @@ public class ApplyPhaseTransitionTests
         var (newState, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
         Assert.Equal(GamePhase.PlayerTurns, newState.Phase);
         Assert.True(newState.WaitingForNextPlayer);
-        Assert.Single(effects);
-        Assert.Contains("Blackjack", ((SendChat)effects[0]).Text);
+        // Single player: no moving-along message; BJ was already announced after deal summary.
+        Assert.Empty(effects);
     }
 
     [Fact]
@@ -711,9 +711,10 @@ public class NarrationTemplateTests
         // Deal is incomplete: Lorah has 1 card. Adding 2nd card completes the deal.
         var state = new GameState
         {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5], State = HandState.Playing }] }],
+            Phase                   = GamePhase.Deal,
+            SkipDealSummaryOnePlayer = false,
+            DealerHand              = new Hand { Cards = [10], State = HandState.Playing },
+            Players                 = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5], State = HandState.Playing }] }],
         };
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 8), t);
         Assert.StartsWith("DEALT: ", ((SendChat)effects[0]).Text);
@@ -904,9 +905,10 @@ public class NarrationTemplateTests
         var t     = new NarrationTemplates { DealSummaryDealer = "|{dealer}:{cards}", DealSummaryPrefix = "", DealSummaryPlayer = "" };
         var state = new GameState
         {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5], State = HandState.Playing }] }],
+            Phase                   = GamePhase.Deal,
+            SkipDealSummaryOnePlayer = false,
+            DealerHand              = new Hand { Cards = [10], State = HandState.Playing },
+            Players                 = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5], State = HandState.Playing }] }],
         };
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 8), t, dealerName: "Vera");
         Assert.Contains("Vera:", ((SendChat)effects[0]).Text);
@@ -1755,5 +1757,238 @@ public class PayoutSplitCombinedTests
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.Contains(texts, s => s == "TOTAL= +200");
+    }
+}
+
+public class PlayerBJMovingAlongTests
+{
+    private static GameState MultiPlayerBJState() => new()
+    {
+        Phase      = GamePhase.PlayerTurns,
+        ActivePlayerIndex = 0,
+        ActiveHandIndex   = 0,
+        DealerHand = new Hand { Cards = [7], State = HandState.Playing },
+        Players    =
+        [
+            new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
+            new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }]  },
+        ],
+    };
+
+    [Fact]
+    public void BeginPlayerTurns_BJ_MultiPlayer_EmitsMovingAlong()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.PlayerTurns,
+            DealerHand = new Hand { Cards = [7], State = HandState.Playing },
+            Players    =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
+                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }]  },
+            ],
+        };
+        var t = new NarrationTemplates { PlayerBJMovingAlong = ["MOVING: {name}"] };
+        var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.Contains(texts, s => s == "MOVING: Lorah");
+    }
+
+    [Fact]
+    public void BeginPlayerTurns_BJ_SinglePlayer_NoMovingAlong()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.PlayerTurns,
+            DealerHand = new Hand { Cards = [7], State = HandState.Playing },
+            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
+        };
+        var t = new NarrationTemplates { PlayerBJMovingAlong = ["MOVING: {name}"] };
+        var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.DoesNotContain(texts, s => s.StartsWith("MOVING:"));
+    }
+
+    [Fact]
+    public void AdvanceToNextPlayer_BJ_MultiPlayer_EmitsMovingAlong()
+    {
+        var s = MultiPlayerBJState();
+        s.WaitingForNextPlayer = true;
+        var state = s;
+        var t = new NarrationTemplates { PlayerBJMovingAlong = ["MA:{name}"], PlayerTurnStart = ["{name}"] };
+        var (_, effects) = GameEngine.Apply(state, new AdvanceToNextPlayer(), t);
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.Contains(texts, s => s == "MA:Bekki" || s == "Bekki");
+    }
+
+    [Fact]
+    public void PlayerBJMovingAlong_TemplateVariable_Name()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.PlayerTurns,
+            DealerHand = new Hand { Cards = [7], State = HandState.Playing },
+            Players    =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
+                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }]  },
+            ],
+        };
+        var t = new NarrationTemplates { PlayerBJMovingAlong = ["BJ:{name} cards:{cards}"] };
+        var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.Contains(texts, s => s == "BJ:Lorah cards:A 10");
+    }
+}
+
+public class DealSummaryOnePlayerTests
+{
+    [Fact]
+    public void SkipDealSummaryOnePlayer_True_SkipsSummary()
+    {
+        var state = new GameState
+        {
+            Phase                   = GamePhase.Deal,
+            SkipDealSummaryOnePlayer = true,
+            DealerHand              = new Hand { Cards = [7], State = HandState.Playing },
+            Players                 = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10], State = HandState.Playing }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 9));
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.DoesNotContain(texts, s => s.StartsWith("Deal"));
+    }
+
+    [Fact]
+    public void SkipDealSummaryOnePlayer_False_EmitsSummary()
+    {
+        var state = new GameState
+        {
+            Phase                   = GamePhase.Deal,
+            SkipDealSummaryOnePlayer = false,
+            DealerHand              = new Hand { Cards = [7], State = HandState.Playing },
+            Players                 = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10], State = HandState.Playing }] }],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 9));
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.Contains(texts, s => s.Contains("Deal"));
+    }
+
+    [Fact]
+    public void SkipDealSummaryOnePlayer_MultiPlayer_AlwaysEmits()
+    {
+        var state = new GameState
+        {
+            Phase                   = GamePhase.Deal,
+            SkipDealSummaryOnePlayer = true,
+            DealerHand              = new Hand { Cards = [7], State = HandState.Playing },
+            Players                 =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
+                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10],    State = HandState.Playing }] },
+            ],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(1, 0, 9));
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.Contains(texts, s => s.Contains("Deal"));
+    }
+}
+
+public class DealSummaryBJNarrationTests
+{
+    [Fact]
+    public void DealComplete_BJ_EmitsPlayerBJAfterSummary()
+    {
+        var state = new GameState
+        {
+            Phase                   = GamePhase.Deal,
+            SkipDealSummaryOnePlayer = false,
+            DealerHand              = new Hand { Cards = [7], State = HandState.Playing },
+            Players                 =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10], State = HandState.Playing }] },
+                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }] },
+            ],
+        };
+        // Lorah gets an ace → blackjack
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 1));
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.Contains(texts, s => s.Contains("Deal"));
+        Assert.Contains(texts, s => s.Contains("Blackjack"));
+        // Summary comes before BJ announcement
+        var summaryIdx = texts.FindIndex(s => s.Contains("Deal"));
+        var bjIdx      = texts.FindIndex(s => s.Contains("Blackjack"));
+        Assert.True(summaryIdx < bjIdx);
+    }
+
+    [Fact]
+    public void DealComplete_MultipleBJ_EmittedInPlayerOrder()
+    {
+        var state = new GameState
+        {
+            Phase                   = GamePhase.Deal,
+            SkipDealSummaryOnePlayer = false,
+            DealerHand              = new Hand { Cards = [7], State = HandState.Playing },
+            Players                 =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
+                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10],    State = HandState.Playing }] },
+                new Player { Nickname = "Nolla", Hands = [new Hand { Cards = [1],     State = HandState.Playing }] },
+            ],
+        };
+        // Nolla's 2nd card → BJ; Bekki already has BJ
+        var stateAfterBekki = GameEngine.Apply(state, new AddPlayerCard(1, 0, 1)).Item1;
+        var (_, effects) = GameEngine.Apply(stateAfterBekki, new AddPlayerCard(2, 0, 10));
+        var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        var lorahBjIdx = texts.FindIndex(s => s.Contains("Lorah") && s.Contains("Blackjack"));
+        var nollaBjIdx = texts.FindIndex(s => s.Contains("Nolla") && s.Contains("Blackjack"));
+        Assert.True(lorahBjIdx >= 0 && nollaBjIdx >= 0);
+        Assert.True(lorahBjIdx < nollaBjIdx);
+    }
+}
+
+public class LastRoundPushersTests
+{
+    [Fact]
+    public void GoToPayout_SetsPushersForPushingPlayers()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players    =
+            [
+                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] },
+                new Player { Nickname = "Bekki", Bet = "100", Hands = [new Hand { Cards = [10, 6], State = HandState.Stand }] },
+            ],
+        };
+        var (newState, _) = GameEngine.Apply(state, new GoToPayout());
+        Assert.Contains("Lorah", newState.LastRoundPushers);
+        Assert.DoesNotContain("Bekki", newState.LastRoundPushers);
+    }
+
+    [Fact]
+    public void GoToPayout_Winner_NotInPushers()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] }],
+        };
+        var (newState, _) = GameEngine.Apply(state, new GoToPayout());
+        Assert.DoesNotContain("Lorah", newState.LastRoundPushers);
+    }
+
+    [Fact]
+    public void NewRound_PreservesLastRoundPushers()
+    {
+        var state = new GameState
+        {
+            Phase            = GamePhase.Payout,
+            LastRoundPushers = ["Lorah"],
+            Players          = [new Player { Nickname = "Lorah", Hands = [new Hand()] }],
+        };
+        var (newState, _) = GameEngine.Apply(state, new NewRound());
+        Assert.Contains("Lorah", newState.LastRoundPushers);
     }
 }

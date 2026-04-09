@@ -53,4 +53,8 @@ public class GameState
     public BlackjackPayout BjPayout { get; set; } = BlackjackPayout.ThreeToTwo;
     // FullNames (or Nicknames for manual players) of players who won last round.
     public HashSet<string> LastRoundWinners { get; set; } = [];
+    // FullNames (or Nicknames for manual players) of players who pushed last round.
+    public HashSet<string> LastRoundPushers { get; set; } = [];
+    // Skip deal summary when there is only one player.
+    public bool SkipDealSummaryOnePlayer { get; set; } = true;
 }
