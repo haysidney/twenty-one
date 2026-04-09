@@ -475,15 +475,11 @@ public static class GameEngine
                         if (newHand.State != HandState.Playing)
                         {
                             var (peekPi, peekHi, peekPhase) = AdvanceFrom(pi, hi, newPlayers);
-                            if (peekPhase == GamePhase.DealerTurn)
+                            if (peekPhase is GamePhase.DealerTurn or GamePhase.Payout)
                             {
                                 newPhase = GamePhase.DealerTurn;
-                                newWaitingForDealer = true;
-                            }
-                            else if (peekPhase == GamePhase.Payout)
-                            {
-                                // All players bust — skip dealer turn, but require manual payout trigger.
-                                newPhase = GamePhase.DealerTurn;
+                                var provisional = With(state, phase: GamePhase.DealerTurn, players: newPlayers);
+                                newWaitingForDealer = !CanGoToPayout(provisional);
                             }
                             else if (peekPhase != GamePhase.PlayerTurns)
                             {
@@ -689,7 +685,8 @@ public static class GameEngine
             case BeginPlayerTurns:
             {
                 var (nextPi, nextHi, nextPhase) = AdvanceFrom(-1, -1, state.Players);
-                var waitDealer = nextPhase == GamePhase.DealerTurn;
+                var provisionalDealer = With(state, phase: GamePhase.DealerTurn);
+                var waitDealer = nextPhase == GamePhase.DealerTurn && !CanGoToPayout(provisionalDealer);
                 var waitNext   = false;
                 if (nextPhase == GamePhase.PlayerTurns)
                 {
@@ -739,8 +736,12 @@ public static class GameEngine
                         NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
                 }
                 else if (nextPhase == GamePhase.DealerTurn)
+                {
+                    var provisional = With(state, phase: GamePhase.DealerTurn);
+                    var needWait    = !CanGoToPayout(provisional);
                     return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
-                        waitingForNextPlayer: false, waitingForDealer: true), effects);
+                        waitingForNextPlayer: false, waitingForDealer: needWait), effects);
+                }
                 return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
                     waitingForNextPlayer: false), effects);
             }
