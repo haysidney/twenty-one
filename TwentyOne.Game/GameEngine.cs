@@ -601,8 +601,12 @@ public static class GameEngine
 
             // ── AnnounceDealerHit / AnnouncePlayerHit ───────────────────────
             case AnnounceDealerHit:
-                Narrate(t.DealerHitAnnounce, ("dealer", dealerName));
+            {
+                var allBJ = state.Players.Count > 0
+                         && state.Players.All(p => p.Hands.All(h => h.State == HandState.Blackjack));
+                Narrate(allBJ ? t.DealerBJCheck : t.DealerHitAnnounce, ("dealer", dealerName));
                 return (state, effects);
+            }
 
             case AnnouncePlayerHit a:
             {

@@ -20,6 +20,8 @@ public class NarrationTemplates
     // {dealer} = dealer's name (configured in Settings)
     public List<string> DealerTurnStart   { get; set; } = ["{dealer}'s turn — showing {cards} ({score})."];
     public List<string> DealerHitAnnounce { get; set; } = ["{dealer} hits!"];
+    // Used instead of DealerHitAnnounce when all players have blackjack and dealer is checking for BJ.
+    public List<string> DealerBJCheck { get; set; } = ["Let's see if I get lucky! \u2665"];
     public List<string> DealerHit         { get; set; } = ["{dealer} draws {card} → {cards} = {score}"];
     public List<string> DealerBust        { get; set; } = ["{dealer} draws {card} → {cards} = {score} — Bust!"];
     public List<string> DealerBJ          { get; set; } = ["{dealer} draws {card} → {cards} — Blackjack!"];

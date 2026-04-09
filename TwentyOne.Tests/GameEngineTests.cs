@@ -1947,6 +1947,37 @@ public class DealSummaryBJNarrationTests
     }
 }
 
+public class DealerBJCheckTests
+{
+    [Fact]
+    public void AnnounceDealerHit_AllBJ_UsesBJCheckTemplate()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [1], State = HandState.Playing },
+            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
+        };
+        var t = new NarrationTemplates { DealerBJCheck = ["LUCKY CHECK"] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t);
+        Assert.Equal("LUCKY CHECK", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void AnnounceDealerHit_NotAllBJ_UsesHitAnnounceTemplate()
+    {
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [7], State = HandState.Playing },
+            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Stand }] }],
+        };
+        var t = new NarrationTemplates { DealerHitAnnounce = ["HIT: {dealer}"], DealerBJCheck = ["LUCKY CHECK"] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t, dealerName: "Vera");
+        Assert.Equal("HIT: Vera", ((SendChat)effects[0]).Text);
+    }
+}
+
 public class LastRoundPushersTests
 {
     [Fact]
