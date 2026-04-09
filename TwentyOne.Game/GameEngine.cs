@@ -132,12 +132,16 @@ public static class GameEngine
         && state.Players.TrueForAll(p => p.Hands.Count > 0 && p.Hands[0].Cards.Count >= 2);
 
     // Dealer may receive a card during Deal (exactly 1 card; 0 so far) or during DealerTurn (must hit).
-    public static bool CanHitDealer(GameState state) =>
-        (state.Phase == GamePhase.Deal && state.DealerHand.Cards.Count < 1)
-        || (state.Phase == GamePhase.DealerTurn
-            && !state.WaitingForDealer
+    public static bool CanHitDealer(GameState state)
+    {
+        if (state.Phase == GamePhase.Deal) return state.DealerHand.Cards.Count < 1;
+        if (state.Phase != GamePhase.DealerTurn || state.WaitingForDealer) return false;
+        var allBust = state.Players.Count > 0
+                   && state.Players.All(p => p.Hands.All(h => h.State == HandState.Bust));
+        return !allBust
             && DealerRecommendation(state.DealerHand) == "HIT"
-            && GameEngine.HandValue(state.DealerHand.Cards) <= 21);
+            && HandValue(state.DealerHand.Cards) <= 21;
+    }
 
     public static string ValidActionsString(Hand hand, bool canDouble, bool canSplit)
     {
