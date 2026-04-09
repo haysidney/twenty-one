@@ -72,6 +72,7 @@ Every narration string emitted via `SendChat` must have a corresponding property
 ## UI Rules
 
 - Never use non-ASCII characters (icons, arrows, symbols) on buttons unless explicitly requested. Use plain text labels only.
+- To right-align a button within a cell/region: use `SameLine()` followed by `if (GetCursorPosX() < targetX) SetCursorPosX(targetX)`, where `targetX = cellRight - buttonWidth` (button width = `CalcTextSize(...).X + FramePadding.X * 2`). Do **not** pass a position directly to `SameLine(pos)` — if `pos` is behind the current cursor, ImGui will clip or hide the widget.
 
 ## Design Decisions
 

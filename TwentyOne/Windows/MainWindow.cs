@@ -690,10 +690,6 @@ private static unsafe void SendChatMessage(string message)
                             var eb        = GameEngine.GetEffectiveBet(p, hand);
                             var betLabel  = eb > 0 ? GameEngine.FormatGil(eb) : p.Bet;
                             var betCopy   = eb > 0 ? $"{eb:0.##}" : p.Bet;
-                            var labelW    = ImGui.CalcTextSize(betLabel).X;
-                            var available = betCellRight - ImGui.GetCursorPosX();
-                            var offset    = available - tradeButtonW - labelW;
-                            if (offset > 0) ImGui.SetCursorPosX(ImGui.GetCursorPosX() + offset);
                             ImGui.AlignTextToFramePadding();
                             ImGui.TextDisabled(betLabel);
                             if (ImGui.IsItemHovered())
@@ -719,7 +715,11 @@ private static unsafe void SendChatMessage(string message)
                         }
                         if (hasWorld)
                         {
+                            var tradeOnlyW = ImGui.CalcTextSize("Trade").X + ImGui.GetStyle().FramePadding.X * 2;
+                            var tradePosX  = betCellRight - tradeOnlyW;
                             ImGui.SameLine();
+                            if (ImGui.GetCursorPosX() < tradePosX)
+                                ImGui.SetCursorPosX(tradePosX);
                             if (ImGui.SmallButton($"Trade##{pi}trade"))
                             {
                                 if (ImGui.GetIO().KeyShift)
