@@ -318,6 +318,9 @@ private static unsafe void SendChatMessage(string message)
     private void QueueTrade(string fullName, string world, int minWaitBeforeMs = 0) =>
         chatQueue.Enqueue((false, () => Plugin.TradePlayer(fullName, world), 0, minWaitBeforeMs));
 
+    private void QueueTarget(string fullName, string world, int minWaitBeforeMs = 0) =>
+        chatQueue.Enqueue((false, () => Plugin.TargetPlayer(fullName, world), 0, minWaitBeforeMs));
+
     private void QueueHitRoll(bool isDealer, int playerIndex, int handIndex)
     {
         if (!config.ChatEnabled)
@@ -835,6 +838,8 @@ private static unsafe void SendChatMessage(string message)
                                     if (pendingBet != p.Bet)
                                         Apply(new SetPlayerBet(pi, pendingBet));
                                 }
+                                if (config.RemindTargetEnabled && hasWorld)
+                                    QueueTarget(p.FullName, p.World);
                                 Apply(new AnnounceBetConfirm(pi));
                             }
                             if (!canConfirm) ImGui.EndDisabled();

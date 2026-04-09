@@ -41,7 +41,8 @@ public class Configuration : IPluginConfiguration
     public bool AutoBetFromTrades  { get; set; } = false;
 
     // ── Targeting ──────────────────────────────────────────────────────────────
-    public bool AutoTargetEnabled { get; set; } = false;
+    public bool AutoTargetEnabled      { get; set; } = false;
+    public bool RemindTargetEnabled    { get; set; } = false;
 
     // ── Chat ───────────────────────────────────────────────────────────────────
     public bool ChatEnabled { get; set; } = false;

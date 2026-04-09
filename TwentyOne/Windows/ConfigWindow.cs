@@ -107,6 +107,13 @@ public class ConfigWindow : Window, IDisposable
             config.Save();
         }
 
+        var remindTarget = config.RemindTargetEnabled;
+        if (ImGui.Checkbox("Target player before sending Remind message", ref remindTarget))
+        {
+            config.RemindTargetEnabled = remindTarget;
+            config.Save();
+        }
+
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
