@@ -507,7 +507,7 @@ public static class GameEngine
                     Narrate(t.PlayerStand,
                         ("name",  displayName),
                         ("cards", HandString(hand.Cards)),
-                        ("score", ScoreString(hand.Cards)));
+                        ("score", HandValue(hand.Cards).ToString()));
 
                     if (pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
                     {
