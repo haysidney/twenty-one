@@ -817,7 +817,7 @@ private static unsafe void SendChatMessage(string message)
                                 {
                                     Apply(new AnnounceBetRequest(pi));
                                     if (hasWorld)
-                                        QueueTarget(p.FullName, p.World);
+                                        Plugin.TargetPlayer(p.FullName, p.World);
                                     QueueTrade(p.FullName, p.World, config.PrivateChatCooldownMs);
                                 }
                                 else
