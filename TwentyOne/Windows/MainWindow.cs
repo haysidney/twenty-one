@@ -759,6 +759,8 @@ private static unsafe void SendChatMessage(string message)
                         {
                             ImGui.SameLine();
                             ImGui.TextColored(new Vector4(0.9f, 0.7f, 0.2f, 1f), "2x");
+                            if (ImGui.IsItemHovered())
+                                ImGui.SetTooltip("Player doubled down");
                         }
                     }
 
