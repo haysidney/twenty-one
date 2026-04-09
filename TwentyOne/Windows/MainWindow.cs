@@ -42,6 +42,11 @@ public partial class MainWindow : Window, IDisposable
     // pending trade confirmation for double/split: set when dealer clicks the button, cleared on confirm/cancel
     private (int PlayerIndex, int HandIndex)? pendingDouble;
     private (int PlayerIndex, int HandIndex)? pendingSplit;
+    // trade bet detection: track in-progress trade partner + received gil
+    private (string FullName, string World)? pendingTradePartner;
+    private long                              pendingTradeGil;
+    // prompt to set a player's bet after a completed trade; shown as a modal
+    private (int PlayerIndex, long Gil)?      pendingBetPrompt;
     // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
     // IsFirstCard=true → emit AnnouncePlayerDeal before rolling
     private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex, bool IsFirstCard)> autoDealQueue = new();
@@ -356,12 +361,67 @@ private static unsafe void SendChatMessage(string message)
     [GeneratedRegex(@"Random! \(1-13\)\D*(\d+)")]
     private static partial Regex DiceRollRegex();
 
+    // "Trade request sent to Firstname Lastname." — we initiated trade
+    [GeneratedRegex(@"^Trade request sent to (.+)\.$")]
+    private static partial Regex TradeSentRegex();
+
+    // "Firstname Lastname wishes to trade with you." — they initiated trade
+    [GeneratedRegex(@"^(.+) wishes to trade with you\.$")]
+    private static partial Regex TradeWishesRegex();
+
+    // "You receive 1,234 gil." — gil received during trade
+    [GeneratedRegex(@"^You receive ([\d,]+) gil\.$")]
+    private static partial Regex TradeGilRegex();
+
     private void OnChatMessage(XivChatType type, int timestamp,
         ref SeString sender, ref SeString message, ref bool isHandled)
     {
+        // ── Trade bet detection (betting phase only) ──────────────────────────
+        if (config.AutoBetFromTrades && Phase == GamePhase.Betting)
+        {
+            var msgText = message.TextValue;
+
+            // Trade initiation: either party may initiate, either world.
+            // PlayerPayload present for cross-world; absent for same-world (parse text instead).
+            var tradeMatch = TradeSentRegex().Match(msgText);
+            if (!tradeMatch.Success) tradeMatch = TradeWishesRegex().Match(msgText);
+            if (tradeMatch.Success)
+            {
+                var payload = message.Payloads.OfType<PlayerPayload>().FirstOrDefault();
+                pendingTradePartner = payload != null
+                    ? (payload.PlayerName, payload.World.ValueNullable?.Name.ToString() ?? string.Empty)
+                    : (tradeMatch.Groups[1].Value, string.Empty);
+            }
+            // Gil received
+            else if (TradeGilRegex().Match(msgText) is { Success: true } m2
+                     && long.TryParse(m2.Groups[1].Value.Replace(",", ""), out var gil))
+            {
+                pendingTradeGil = gil;
+            }
+            // Trade complete — match partner to player table and queue prompt
+            else if (msgText == "Trade complete." && pendingTradePartner.HasValue && pendingTradeGil > 0)
+            {
+                var (fullName, world) = pendingTradePartner.Value;
+                var pi = State.Players.FindIndex(p =>
+                    string.Equals(p.FullName, fullName, StringComparison.OrdinalIgnoreCase) &&
+                    (world.Length == 0 || string.Equals(p.World, world, StringComparison.OrdinalIgnoreCase)));
+                if (pi >= 0)
+                    pendingBetPrompt = (pi, pendingTradeGil);
+                pendingTradePartner = null;
+                pendingTradeGil     = 0;
+            }
+            // Trade cancelled — clear state
+            else if (msgText == "Trade canceled." || msgText == "Trade cancelled.")
+            {
+                pendingTradePartner = null;
+                pendingTradeGil     = 0;
+            }
+        }
+
+        // ── Roll detection ────────────────────────────────────────────────────
         if (pendingHit == null) return;
 
-        var (isDealer, pi, hi, isPublic) = pendingHit.Value;
+        var (isDealer, pi2, hi, isPublic) = pendingHit.Value;
 
         if (!isPublic)
         {
@@ -370,15 +430,15 @@ private static unsafe void SendChatMessage(string message)
             if (localName == null || payload != null || !sender.TextValue.Contains(localName)) return;
         }
 
-        var msgText = message.TextValue;
-        var match   = (isPublic ? RandomRollRegex() : DiceRollRegex()).Match(msgText);
+        var rollMsgText = message.TextValue;
+        var match       = (isPublic ? RandomRollRegex() : DiceRollRegex()).Match(rollMsgText);
         if (!match.Success) return;
 
         if (!int.TryParse(match.Groups[1].Value, out var roll) || roll < 1 || roll > 13) return;
 
         pendingHit   = null;
-        LogRoll(isDealer, pi, roll);
-        deferredRoll = (isDealer, pi, hi, roll);
+        LogRoll(isDealer, pi2, roll);
+        deferredRoll = (isDealer, pi2, hi, roll);
     }
 
     // ── ImGui helpers ─────────────────────────────────────────────────────────
@@ -469,6 +529,30 @@ private static unsafe void SendChatMessage(string message)
                 if (next.IsFirstCard) Apply(new AnnouncePlayerDeal(next.PlayerIndex));
                 QueueHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
             }
+        }
+
+        // ── Trade bet prompt modal ─────────────────────────────────────────────
+        if (pendingBetPrompt.HasValue)
+            ImGui.OpenPopup("Set bet from trade?##tradeBet");
+        if (ImGui.BeginPopupModal("Set bet from trade?##tradeBet", ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            var (bpi, bgil) = pendingBetPrompt!.Value;
+            var bplayer     = State.Players[bpi];
+            ImGui.Text($"Set {bplayer.DisplayName}'s bet to {bgil:N0} gil?");
+            ImGui.Spacing();
+            if (ImGui.Button("Yes"))
+            {
+                Apply(new SetPlayerBet(bpi, bgil.ToString()));
+                pendingBetPrompt = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("No"))
+            {
+                pendingBetPrompt = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.EndPopup();
         }
 
         if (ImGui.SmallButton("Config"))

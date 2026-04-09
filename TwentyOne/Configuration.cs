@@ -37,7 +37,8 @@ public class Configuration : IPluginConfiguration
     public bool NarrationPanelOpen { get; set; } = true;
 
     // ── Trade ──────────────────────────────────────────────────────────────────
-    public bool AutoTradeEnabled { get; set; } = false;
+    public bool AutoTradeEnabled   { get; set; } = false;
+    public bool AutoBetFromTrades  { get; set; } = false;
 
     // ── Targeting ──────────────────────────────────────────────────────────────
     public bool AutoTargetEnabled { get; set; } = false;

@@ -93,6 +93,13 @@ public class ConfigWindow : Window, IDisposable
             config.Save();
         }
 
+        var autoBet = config.AutoBetFromTrades;
+        if (ImGui.Checkbox("Auto-fill bet from trade (betting phase)", ref autoBet))
+        {
+            config.AutoBetFromTrades = autoBet;
+            config.Save();
+        }
+
         var autoTarget = config.AutoTargetEnabled;
         if (ImGui.Checkbox("Auto-target active player on their turn", ref autoTarget))
         {
