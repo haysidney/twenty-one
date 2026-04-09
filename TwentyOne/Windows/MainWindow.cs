@@ -523,7 +523,8 @@ private static unsafe void SendChatMessage(string message)
             {
                 ImGui.Text($"= {scoreStr}");
                 var rec = GameEngine.DealerRecommendation(State.DealerHand);
-                if (rec.Length > 0 && Phase == GamePhase.DealerTurn)
+                var allBust = State.Players.Count > 0 && State.Players.All(p => p.Hands.All(h => h.State == HandState.Bust));
+                if (rec.Length > 0 && Phase == GamePhase.DealerTurn && !allBust)
                 {
                     ImGui.SameLine();
                     var rc = rec == "HIT"
