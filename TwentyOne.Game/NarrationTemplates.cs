@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 
 namespace TwentyOne.Game;
 
@@ -81,6 +82,44 @@ public class NarrationTemplates
     public List<string> PayoutBjWin { get; set; } = ["{name}: Blackjack!{bet}{amount}"];
     public List<string> PayoutLose  { get; set; } = ["{name}: Lose{bet}{amount}"];
     public List<string> PayoutPush  { get; set; } = ["{name}: Push{bet}"];
+
+    // Newtonsoft.Json reuses existing List instances and appends to them.
+    // Clear all lists before deserialization so defaults don't accumulate on reload.
+    [OnDeserializing]
+    internal void OnDeserializing(StreamingContext _)
+    {
+        BettingOpen         = [];
+        DealerTurnStart     = [];
+        DealerHitAnnounce   = [];
+        DealerHit           = [];
+        DealerBust          = [];
+        DealerBJ            = [];
+        DealerStand         = [];
+        PlayerHitAnnounce   = [];
+        PlayerTurnStart     = [];
+        PlayerAfterHit      = [];
+        PlayerHit           = [];
+        PlayerBust          = [];
+        PlayerBJ            = [];
+        PlayerStand         = [];
+        PlayerDouble        = [];
+        PlayerSplitAce      = [];
+        PlayerBetRequest    = [];
+        PlayerBetConfirm    = [];
+        PlayerDoubleRequest = [];
+        PlayerSplitRequest  = [];
+        PlayerSplit         = [];
+        PlayerSplitRoll     = [];
+        DealDealerCard      = [];
+        DealPlayerHand      = [];
+        PayoutSplitCombined = [];
+        PayoutDealerBust    = [];
+        PayoutDealerStands  = [];
+        PayoutWin           = [];
+        PayoutBjWin         = [];
+        PayoutLose          = [];
+        PayoutPush          = [];
+    }
 
     public static string Fmt(string template, params (string Key, string Value)[] vars)
     {
