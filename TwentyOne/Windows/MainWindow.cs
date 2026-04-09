@@ -685,24 +685,32 @@ private static unsafe void SendChatMessage(string message)
                         var tradeButtonW = hasWorld
                             ? ImGui.CalcTextSize("Trade").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X
                             : 0;
-                        ImGui.SetNextItemWidth(betCellRight - ImGui.GetCursorPosX() - tradeButtonW - confirmButtonW);
-                        if (Phase != GamePhase.Betting) ImGui.BeginDisabled();
-                        var betVal = betEdits.TryGetValue(pi, out var e) ? e : p.Bet;
-                        if (ImGui.InputText($"##bet{pi}", ref betVal, 16, ImGuiInputTextFlags.EnterReturnsTrue))
+                        if (Phase != GamePhase.Betting)
                         {
-                            betEdits.Remove(pi);
-                            Apply(new SetPlayerBet(pi, betVal));
+                            var parsedBet = GameEngine.ParseBet(p.Bet);
+                            var betLabel  = parsedBet > 0 ? GameEngine.FormatGil(parsedBet) : p.Bet;
+                            ImGui.AlignTextToFramePadding();
+                            ImGui.TextDisabled(betLabel);
+                            if (ImGui.IsItemHovered())
+                            {
+                                ImGui.SetTooltip("Click to copy bet");
+                                if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                                    ImGui.SetClipboardText(p.Bet);
+                            }
                         }
                         else
                         {
-                            betEdits[pi] = betVal;
-                        }
-                        if (Phase != GamePhase.Betting) ImGui.EndDisabled();
-                        if (Phase != GamePhase.Betting && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                        {
-                            ImGui.SetTooltip("Click to copy bet");
-                            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                                ImGui.SetClipboardText(betVal);
+                            ImGui.SetNextItemWidth(betCellRight - ImGui.GetCursorPosX() - tradeButtonW - confirmButtonW);
+                            var betVal = betEdits.TryGetValue(pi, out var e) ? e : p.Bet;
+                            if (ImGui.InputText($"##bet{pi}", ref betVal, 16, ImGuiInputTextFlags.EnterReturnsTrue))
+                            {
+                                betEdits.Remove(pi);
+                                Apply(new SetPlayerBet(pi, betVal));
+                            }
+                            else
+                            {
+                                betEdits[pi] = betVal;
+                            }
                         }
                         if (hasWorld)
                         {
@@ -746,7 +754,7 @@ private static unsafe void SendChatMessage(string message)
                         // Show the effective bet for this split hand (read-only)
                         var eb = GameEngine.GetEffectiveBet(p, hand);
                         ImGui.AlignTextToFramePadding();
-                        ImGui.TextDisabled(eb > 0 ? eb.ToString("0.##") : p.Bet);
+                        ImGui.TextDisabled(eb > 0 ? GameEngine.FormatGil(eb) : (GameEngine.ParseBet(p.Bet) > 0 ? GameEngine.FormatGil(GameEngine.ParseBet(p.Bet)) : p.Bet));
                     }
 
                     // ── Cards column ──────────────────────────────────────────
