@@ -63,8 +63,7 @@ public unsafe class BankWindow : Window, IDisposable
             config.Save();
         }
 
-        var profit = config.GilEnd - config.GilStart;
-        ImGui.Text($"Profit: {profit:N0} gil");
+        var difference = config.GilEnd - config.GilStart;
 
         ImGui.Separator();
 
@@ -77,11 +76,8 @@ public unsafe class BankWindow : Window, IDisposable
             config.Save();
         }
 
-        var profitAfterTips = profit;
-
         ImGui.Separator();
         ImGui.Text("Tips");
-
 
         long tipTotal = 0;
         for (int i = 0; i < config.Tips.Count; i++)
@@ -117,7 +113,11 @@ public unsafe class BankWindow : Window, IDisposable
         }
 
         ImGui.Separator();
-        var split = profitAfterTips - tipTotal;
+        ImGui.Text($"Difference: {difference:N0} gil");
+        var profit = difference - tipTotal;
+        ImGui.Text($"Profit: {profit:N0} gil");
+        ImGui.Separator();
+        var split = profit;
         var venueOwes   = split > 0 ? (long)Math.Floor(split * config.DealerCutPct / 100.0) : 0;
         var dealerKeeps = split > 0 ? split - venueOwes + tipTotal : tipTotal;
         ImGui.Text($"Dealer receives: {dealerKeeps:N0} gil");
