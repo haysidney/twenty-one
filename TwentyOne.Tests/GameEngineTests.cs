@@ -1623,6 +1623,20 @@ public class SplitHandTests
     }
 
     [Fact]
+    public void CanHitDealer_False_WhenAllPlayersBJ_AndDealerCannotHaveBJ()
+    {
+        // Dealer upcard = 4; all players have BJ → CanGoToPayout is true → Hit must be suppressed
+        var state = new GameState
+        {
+            Phase      = GamePhase.DealerTurn,
+            DealerHand = new Hand { Cards = [4], State = HandState.Playing },
+            Players    = [new Player { Nickname = "Lorah", Bet = "100",
+                Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
+        };
+        Assert.False(GameEngine.CanHitDealer(state));
+    }
+
+    [Fact]
     public void AnnounceSplit_NarratesWithAmount()
     {
         var state = new GameState

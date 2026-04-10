@@ -139,6 +139,7 @@ public static class GameEngine
         var allBust = state.Players.Count > 0
                    && state.Players.All(p => p.Hands.All(h => h.State == HandState.Bust));
         return !allBust
+            && !CanGoToPayout(state)
             && DealerRecommendation(state.DealerHand) == "HIT"
             && HandValue(state.DealerHand.Cards) <= 21;
     }
