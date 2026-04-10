@@ -168,6 +168,7 @@ public static class GameEngine
 
         if (playerBJ && dealerBJ) return PayoutResult.Push;
         if (playerBJ)             return PayoutResult.BjWin;
+        if (dealerBJ)             return PayoutResult.Lose;
         if (dealerBust)           return PayoutResult.Win;
         if (state.DealerHand.Cards.Count == 0) return PayoutResult.None;
 

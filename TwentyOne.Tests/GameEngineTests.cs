@@ -515,6 +515,21 @@ public class PayoutTests
         Assert.Equal(PayoutResult.Push, GameEngine.GetPayoutResult(state, 0));
     }
 
+    [Fact]
+    public void DealerBlackjack_PlayerStand21_Loses()
+    {
+        // Player has 21 via three cards (not BJ); dealer has natural BJ — player loses
+        var state = PayoutState([7, 7, 7], HandState.Stand, [1, 10]);
+        Assert.Equal(PayoutResult.Lose, GameEngine.GetPayoutResult(state, 0));
+    }
+
+    [Fact]
+    public void DealerBlackjack_PlayerStandLower_Loses()
+    {
+        var state = PayoutState([10, 9], HandState.Stand, [1, 10]);
+        Assert.Equal(PayoutResult.Lose, GameEngine.GetPayoutResult(state, 0));
+    }
+
     [Theory]
     [InlineData(BlackjackPayout.ThreeToTwo, "+150")]   // 100 * 1.5 = 150
     [InlineData(BlackjackPayout.SixToFive,  "+120")]   // 100 * 1.2 = 120
