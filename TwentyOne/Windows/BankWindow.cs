@@ -112,15 +112,21 @@ public unsafe class BankWindow : Window, IDisposable
             }
         }
 
-        ImGui.Separator();
-        ImGui.Text($"Difference: {difference:N0} gil");
         var profit = difference - tipTotal;
-        ImGui.Text($"Profit: {profit:N0} gil");
         ImGui.Separator();
-        var split = profit;
-        var venueOwes   = split > 0 ? (long)Math.Floor(split * config.DealerCutPct / 100.0) : 0;
-        var dealerKeeps = split > 0 ? split - venueOwes + tipTotal : tipTotal;
-        ImGui.Text($"Dealer receives: {dealerKeeps:N0} gil");
-        ImGui.Text($"Venue receives: {venueOwes:N0} gil");
+        var venueOwes   = profit > 0 ? (long)Math.Floor(profit * config.DealerCutPct / 100.0) : 0;
+        var dealerKeeps = profit > 0 ? profit - venueOwes + tipTotal : tipTotal;
+        CopyableGilRow("Difference", difference);
+        CopyableGilRow("Profit", profit);
+        ImGui.Separator();
+        CopyableGilRow("Dealer receives", dealerKeeps);
+        CopyableGilRow("Venue receives", venueOwes);
+    }
+
+    private static void CopyableGilRow(string label, long value)
+    {
+        ImGui.Text($"{label}: {value:N0} gil");
+        if (ImGui.IsItemClicked()) ImGui.SetClipboardText(value.ToString());
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Click to copy"u8);
     }
 }
