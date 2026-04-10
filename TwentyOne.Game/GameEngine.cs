@@ -115,11 +115,11 @@ public static class GameEngine
         hand.Cards.Count == 2 && hand.State == HandState.Playing && !hand.Doubled
         && (hand.Bet.Length > 0 ? ParseBet(hand.Bet) : ParseBet(playerBet)) > 0;
 
-    // Split is allowed on any 2-card Playing hand where both cards share the same CardValue.
+    // Split is allowed on any 2-card Playing hand where both cards share the same rank.
     // Re-splits (splitting a split hand) are supported.
     public static bool CanSplit(Hand hand) =>
         hand.Cards.Count == 2 && hand.State == HandState.Playing
-        && CardValue(hand.Cards[0]) == CardValue(hand.Cards[1]);
+        && hand.Cards[0] == hand.Cards[1];
 
     // Hit is allowed on a Playing hand that already has ≥2 cards (1-card split hands are auto-hit).
     public static bool CanHit(Hand hand) =>

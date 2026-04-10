@@ -1303,11 +1303,19 @@ public class SplitHandTests
     }
 
     [Fact]
-    public void CanSplit_TenValueCards_True()
+    public void CanSplit_SameRankTenValue_True()
     {
-        // 10, J, Q, K all have CardValue 10 — split allowed
-        var hand = new Hand { Cards = [10, 12], State = HandState.Playing };
+        // Q+Q: same rank, split allowed
+        var hand = new Hand { Cards = [12, 12], State = HandState.Playing };
         Assert.True(GameEngine.CanSplit(hand));
+    }
+
+    [Fact]
+    public void CanSplit_DifferentRankTenValue_False()
+    {
+        // 10+Q: both worth 10 but different rank, no split
+        var hand = new Hand { Cards = [10, 12], State = HandState.Playing };
+        Assert.False(GameEngine.CanSplit(hand));
     }
 
     [Fact]
