@@ -33,21 +33,25 @@ public sealed class Plugin : IDalamudPlugin
     private MainWindow        MainWindow        { get; init; }
     private ConfigWindow      ConfigWindow      { get; init; }
     private BankWindow        BankWindow        { get; init; }
-    private PlayerStatsWindow PlayerStatsWindow { get; init; }
+    private PlayerStatsWindow  PlayerStatsWindow  { get; init; }
+    private RoundHistoryWindow RoundHistoryWindow { get; init; }
 
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.EnsureVenues();
 
-        BankWindow        = new BankWindow(Configuration);
-        ConfigWindow      = new ConfigWindow(Configuration, BankWindow);
-        PlayerStatsWindow = new PlayerStatsWindow(Configuration);
-        MainWindow        = new MainWindow(Configuration, ConfigWindow, BankWindow, PlayerStatsWindow, ChatGui, ObjectTable, TargetManager);
+        BankWindow         = new BankWindow(Configuration);
+        ConfigWindow       = new ConfigWindow(Configuration, BankWindow);
+        PlayerStatsWindow  = new PlayerStatsWindow(Configuration);
+        MainWindow         = new MainWindow(Configuration, ConfigWindow, BankWindow, PlayerStatsWindow, ChatGui, ObjectTable, TargetManager);
+        RoundHistoryWindow = new RoundHistoryWindow(Configuration, MainWindow);
+        MainWindow.SetRoundHistoryWindow(RoundHistoryWindow);
         ContextMenu.OnMenuOpened += OnMenuOpened;
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(BankWindow);
         WindowSystem.AddWindow(PlayerStatsWindow);
+        WindowSystem.AddWindow(RoundHistoryWindow);
         WindowSystem.AddWindow(MainWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)

@@ -20,10 +20,17 @@ namespace TwentyOne.Windows;
 
 public partial class MainWindow : Window, IDisposable
 {
-    private readonly Configuration    config;
-    private readonly ConfigWindow     configWindow;
-    private readonly BankWindow       bankWindow;
-    private readonly PlayerStatsWindow playerStatsWindow;
+    private readonly Configuration      config;
+    private readonly ConfigWindow       configWindow;
+    private readonly BankWindow         bankWindow;
+    private readonly PlayerStatsWindow  playerStatsWindow;
+    private          RoundHistoryWindow roundHistoryWindow = null!;
+
+    // History viewer mode: non-null when viewing a historical round.
+    private GameState?       savedCurrentState;
+    private List<GameState>? savedUndoStack;
+    private List<GameState>? savedRedoStack;
+    private bool             isHistoryView => savedCurrentState != null;
     private readonly IChatGui      chatGui;
     private readonly IObjectTable  objectTable;
     private readonly ITargetManager targetManager;
@@ -87,9 +94,32 @@ public partial class MainWindow : Window, IDisposable
         chatGui.ChatMessage += OnChatMessage;
     }
 
+    public void SetRoundHistoryWindow(RoundHistoryWindow w) => roundHistoryWindow = w;
+
     public void Dispose()
     {
         chatGui.ChatMessage -= OnChatMessage;
+    }
+
+    public void RestoreHistoricalRound(GameState snapshot)
+    {
+        savedCurrentState = config.GameState;
+        savedUndoStack    = [..config.UndoStack];
+        savedRedoStack    = [..config.RedoStack];
+        config.GameState  = snapshot;
+        config.UndoStack.Clear();
+        config.RedoStack.Clear();
+    }
+
+    public void ExitHistoryView()
+    {
+        if (savedCurrentState == null) return;
+        config.GameState  = savedCurrentState;
+        config.UndoStack  = savedUndoStack ?? [];
+        config.RedoStack  = savedRedoStack ?? [];
+        savedCurrentState = null;
+        savedUndoStack    = null;
+        savedRedoStack    = null;
     }
 
     // Called from Plugin.OnMenuOpened (runs on framework thread via context menu callback).
@@ -212,7 +242,11 @@ public partial class MainWindow : Window, IDisposable
     // Called immediately after Apply(new GoToPayout()) to record round results.
     private void UpdatePlayerStats()
     {
-        var state = config.GameState;
+        if (isHistoryView) return;
+
+        var state   = config.GameState;
+        var bankNet = 0m;
+
         for (var pi = 0; pi < state.Players.Count; pi++)
         {
             var p   = state.Players[pi];
@@ -251,7 +285,18 @@ public partial class MainWindow : Window, IDisposable
             stat.TotalWon += net;
             if (p.Hands.Any(h => h.State == HandState.Blackjack))
                 stat.Blackjacks++;
+
+            bankNet -= net; // bank gains when player loses
         }
+
+        var roundNum = config.RoundHistory.Count + 1;
+        config.RoundHistory.Add(new RoundHistoryEntry
+        {
+            RoundNumber = roundNum,
+            Snapshot    = state,
+            BankNet     = bankNet,
+        });
+
         config.Save();
     }
 
@@ -571,6 +616,17 @@ private static unsafe void SendChatMessage(string message)
             ImGui.EndPopup();
         }
 
+        if (isHistoryView)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.85f, 0.3f, 1f));
+            ImGui.TextUnformatted("Viewing previous round");
+            ImGui.PopStyleColor();
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Exit History View"))
+                ExitHistoryView();
+            ImGui.Separator();
+        }
+
         if (ImGui.SmallButton("Config"))
             configWindow.Toggle();
         ImGui.SameLine();
@@ -579,6 +635,9 @@ private static unsafe void SendChatMessage(string message)
         ImGui.SameLine();
         if (ImGui.SmallButton("Stats"))
             playerStatsWindow.Toggle();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("History"))
+            roundHistoryWindow.Toggle();
 
         var canUndo = config.UndoStack.Count > 0;
         var canRedo = config.RedoStack.Count > 0;

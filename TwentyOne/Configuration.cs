@@ -57,6 +57,9 @@ public class VenueSettings
     // ── Player stats ───────────────────────────────────────────────────────────
     // Key: "{FullName}@{World}" for FFXIV players, Nickname for manual players.
     public Dictionary<string, PlayerStat> PlayerStatsStore { get; set; } = [];
+
+    // ── Round history ──────────────────────────────────────────────────────────
+    public List<RoundHistoryEntry> RoundHistory { get; set; } = [];
 }
 
 [Serializable]
@@ -108,6 +111,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public int    DealerCutPct               { get => ActiveVenue.DealerCutPct;               set => ActiveVenue.DealerCutPct = value; }
     [JsonIgnore] public List<long> Tips                   { get => ActiveVenue.Tips;                       set => ActiveVenue.Tips = value; }
     [JsonIgnore] public Dictionary<string, PlayerStat> PlayerStatsStore { get => ActiveVenue.PlayerStatsStore; set => ActiveVenue.PlayerStatsStore = value; }
+    [JsonIgnore] public List<RoundHistoryEntry> RoundHistory { get => ActiveVenue.RoundHistory; set => ActiveVenue.RoundHistory = value; }
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

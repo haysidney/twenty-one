@@ -3,6 +3,15 @@ using System.Collections.Generic;
 
 namespace TwentyOne.Game;
 
+[Serializable]
+public class RoundHistoryEntry
+{
+    public int       RoundNumber { get; set; }
+    public GameState Snapshot    { get; set; } = new();
+    // Bank net from the venue's perspective: positive = bank gained, negative = bank paid out.
+    public decimal   BankNet     { get; set; }
+}
+
 public enum HandState { Playing, Stand, Bust, Blackjack }
 public enum GamePhase { Betting, Deal, PlayerTurns, DealerTurn, Payout }
 public enum BlackjackPayout { ThreeToTwo, SixToFive, EvenMoney }
