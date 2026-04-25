@@ -113,6 +113,13 @@ public class ConfigWindow : Window, IDisposable
             config.Save();
         }
 
+        var autoDeposit = config.AutoDepositFromTrades;
+        if (ImGui.Checkbox("Auto-fill bank deposit from trade", ref autoDeposit))
+        {
+            config.AutoDepositFromTrades = autoDeposit;
+            config.Save();
+        }
+
         var autoTarget = config.AutoTargetEnabled;
         if (ImGui.Checkbox("Auto-target active player on their turn", ref autoTarget))
         {

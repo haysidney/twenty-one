@@ -30,8 +30,9 @@ public class VenueSettings
     public bool NarrationPanelOpen         { get; set; } = true;
 
     // ── Trade ──────────────────────────────────────────────────────────────────
-    public bool AutoTradeEnabled  { get; set; } = false;
-    public bool AutoBetFromTrades { get; set; } = false;
+    public bool AutoTradeEnabled       { get; set; } = false;
+    public bool AutoBetFromTrades      { get; set; } = false;
+    public bool AutoDepositFromTrades  { get; set; } = false;
 
     // ── Targeting ──────────────────────────────────────────────────────────────
     public bool AutoTargetEnabled   { get; set; } = false;
@@ -105,6 +106,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public bool   NarrationPanelOpen         { get => ActiveVenue.NarrationPanelOpen;         set => ActiveVenue.NarrationPanelOpen = value; }
     [JsonIgnore] public bool   AutoTradeEnabled           { get => ActiveVenue.AutoTradeEnabled;            set => ActiveVenue.AutoTradeEnabled = value; }
     [JsonIgnore] public bool   AutoBetFromTrades          { get => ActiveVenue.AutoBetFromTrades;           set => ActiveVenue.AutoBetFromTrades = value; }
+    [JsonIgnore] public bool   AutoDepositFromTrades      { get => ActiveVenue.AutoDepositFromTrades;       set => ActiveVenue.AutoDepositFromTrades = value; }
     [JsonIgnore] public bool   AutoTargetEnabled          { get => ActiveVenue.AutoTargetEnabled;           set => ActiveVenue.AutoTargetEnabled = value; }
     [JsonIgnore] public bool   RemindTargetEnabled        { get => ActiveVenue.RemindTargetEnabled;         set => ActiveVenue.RemindTargetEnabled = value; }
     [JsonIgnore] public bool   ChatEnabled                { get => ActiveVenue.ChatEnabled;                 set => ActiveVenue.ChatEnabled = value; }
