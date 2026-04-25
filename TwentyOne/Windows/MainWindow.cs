@@ -696,8 +696,6 @@ private static unsafe void SendChatMessage(string message)
             ImGui.SetNextWindowSize(new Vector2(380, 480), ImGuiCond.FirstUseEver);
             if (ImGui.Begin("Bank##bankManage", ref bankWinOpen, ImGuiWindowFlags.NoCollapse))
             {
-                ImGui.TextUnformatted($"{bmp.DisplayName}'s Bank");
-                ImGui.Separator();
                 if (!config.PlayerStatsStore.TryGetValue(bmpKey, out var bmpStat))
                 {
                     bmpStat = new PlayerStat { DisplayName = bmp.DisplayName };
