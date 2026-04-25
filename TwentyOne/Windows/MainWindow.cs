@@ -343,7 +343,6 @@ public partial class MainWindow : Window, IDisposable
                                                 BlackjackPayout.EvenMoney => 1.0m,
                                                 _                         => 1.5m,
                                             }), 2),
-                    PayoutResult.Lose  => -GameEngine.GetEffectiveBet(p2, p2.Hands[hi2]),
                     _                  => 0m,
                 };
                 net2 += delta2;
@@ -1254,7 +1253,6 @@ private static unsafe void SendChatMessage(string message)
                                                                 BlackjackPayout.EvenMoney => 1.0m,
                                                                 _                         => 1.5m,
                                                             }), 2),
-                                    PayoutResult.Lose  => -GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
                                     _                  => 0m,
                                 };
                             }
