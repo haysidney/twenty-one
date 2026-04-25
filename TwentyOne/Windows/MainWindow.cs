@@ -760,7 +760,6 @@ private static unsafe void SendChatMessage(string message)
                         Apply(new AnnounceBankRemind(bankManagePlayerIndex, bmpBank));
                     if (ImGui.IsItemHovered())
                         ImGui.SetTooltip("Remind player of their bet and bank balance");
-                    ImGui.SameLine();
                 }
 
                 // Shortfall announce
@@ -768,6 +767,7 @@ private static unsafe void SendChatMessage(string message)
                 var shortfall2 = parsedBet2 > 0 ? parsedBet2 - bmpBank : 0m;
                 if (shortfall2 > 0)
                 {
+                    ImGui.SameLine();
                     ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f),
                         $"Short by {GameEngine.FormatGil(shortfall2)}");
                     ImGui.SameLine();
