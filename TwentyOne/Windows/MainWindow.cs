@@ -773,8 +773,9 @@ private static unsafe void SendChatMessage(string message)
                     ImGui.SameLine();
                     if (ImGui.Button("Announce Shortfall##bankshort"))
                         Apply(new AnnounceBankShortfall(bankManagePlayerIndex, (long)Math.Ceiling(shortfall2)));
-                    ImGui.Spacing();
                 }
+
+                ImGui.Spacing();
 
                 // Transaction history
                 ImGui.Separator();
