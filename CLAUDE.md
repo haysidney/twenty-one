@@ -6,6 +6,10 @@ The FFXIVClientStructs repo is cloned at `FFXIVClientStructs/` for reference. Co
 
 It's a plugin meant for a dealer to use to run a blackjack game in a venue.
 
+## Debugging
+
+Plugin config is saved to `/home/sidney/.xlcore/pluginConfigs/TwentyOne.json`.
+
 ## Build
 
 Build commands:
@@ -51,8 +55,9 @@ Fields that belong in `Configuration` (persisted, outside undo):
 - `GameState` — current round state
 - `UndoStack` — undo history for the current round
 - `NarrationLog` — session-wide narration history (never undone)
-- `ChatEnabled`, `ChatChannel` — venue settings
-- `NarrationUseChannelCommand`, `NarrationPanelOpen` — UI preferences
+- `Venues` / `ActiveVenueIndex` — all venue-specific settings live in `VenueSettings`; proxy properties on `Configuration` delegate to `ActiveVenue` so call sites need not change
+
+`VenueSettings` holds all per-venue config: chat, narration templates, dealer name, auto-trade/target, gil tracker, player stats. Venue switching is allowed during `GamePhase.Betting` but blocked once a round is in progress (any other phase).
 
 ### Card input
 
