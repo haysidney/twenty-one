@@ -30,8 +30,9 @@ public class ConfigWindow : Window, IDisposable
     private bool   _narrationDirty;
     private double _narrationDirtyAt;
 
-    private string _renameBuffer  = string.Empty;
-    private bool   _renamePending = false;
+    private string _renameBuffer     = string.Empty;
+    private bool   _renamePending    = false;
+    private bool   _duplicatePending = false;
 
     private readonly FileDialogManager _fileDialogManager = new();
 
@@ -232,6 +233,29 @@ public class ConfigWindow : Window, IDisposable
             _renamePending = true;
         }
 
+        ImGui.SameLine();
+        if (ImGui.Button("Duplicate##venueDuplicate"))
+        {
+            _renameBuffer     = config.ActiveVenue.Name + " (copy)";
+            _duplicatePending = true;
+        }
+
+        var canDelete = config.Venues.Count > 1;
+        ImGui.SameLine();
+        if (!canDelete) ImGui.BeginDisabled();
+        if (ImGui.Button("Delete##venueDelete") && canDelete)
+        {
+            var removeIdx = config.ActiveVenueIndex;
+            config.Venues.RemoveAt(removeIdx);
+            config.ActiveVenueIndex = Math.Min(removeIdx, config.Venues.Count - 1);
+            bankWindow.SyncBuffers();
+            config.Save();
+        }
+        if (!canDelete) ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !canDelete)
+            ImGui.SetTooltip("Cannot delete the only venue."u8);
+
+        // ── Rename popup ──────────────────────────────────────────────────────
         if (_renamePending)
         {
             ImGui.SetNextWindowSize(new System.Numerics.Vector2(300, 0), ImGuiCond.Always);
@@ -255,6 +279,45 @@ public class ConfigWindow : Window, IDisposable
             if (ImGui.Button("Cancel##venueRenameCancel"))
             {
                 _renamePending = false;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.EndPopup();
+        }
+
+        // ── Duplicate popup ───────────────────────────────────────────────────
+        if (_duplicatePending)
+        {
+            ImGui.SetNextWindowSize(new System.Numerics.Vector2(300, 0), ImGuiCond.Always);
+            ImGui.OpenPopup("Duplicate Venue##venueDuplicatePopup");
+        }
+
+        if (ImGui.BeginPopupModal("Duplicate Venue##venueDuplicatePopup", ref _duplicatePending, ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove))
+        {
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.IsWindowAppearing()) ImGui.SetKeyboardFocusHere();
+            var confirmed = ImGui.InputText("##venueDuplicateInput", ref _renameBuffer, 64, ImGuiInputTextFlags.EnterReturnsTrue);
+            if (confirmed || ImGui.Button("OK##venueDuplicateOK"))
+            {
+                if (!string.IsNullOrWhiteSpace(_renameBuffer))
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(config.ActiveVenue);
+                    var copy = System.Text.Json.JsonSerializer.Deserialize<VenueSettings>(json)!;
+                    copy.Name = _renameBuffer.Trim();
+                    config.Venues.Add(copy);
+                    if (!roundInProgress)
+                    {
+                        config.ActiveVenueIndex = config.Venues.Count - 1;
+                        bankWindow.SyncBuffers();
+                    }
+                    config.Save();
+                }
+                _duplicatePending = false;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel##venueDuplicateCancel"))
+            {
+                _duplicatePending = false;
                 ImGui.CloseCurrentPopup();
             }
             ImGui.EndPopup();
