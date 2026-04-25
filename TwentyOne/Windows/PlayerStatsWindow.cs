@@ -7,6 +7,7 @@ using System.Text;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
+using TwentyOne.Game;
 
 namespace TwentyOne.Windows;
 
@@ -116,7 +117,7 @@ public class PlayerStatsWindow : Window, IDisposable
                     : stat.TotalWon < 0
                         ? new Vector4(1f, 0.35f, 0.35f, 1f)
                         : new Vector4(0.7f, 0.7f, 0.7f, 1f);
-                var totalStr = stat.TotalWon > 0 ? $"+{stat.TotalWon:0.##}" : $"{stat.TotalWon:0.##}";
+                var totalStr = stat.TotalWon > 0 ? $"+{GameEngine.FormatGil(stat.TotalWon)}" : GameEngine.FormatGil(stat.TotalWon);
                 ImGui.TextColored(totalColor, totalStr);
             }
 
@@ -129,7 +130,7 @@ public class PlayerStatsWindow : Window, IDisposable
             : grandTotal < 0
                 ? new Vector4(1f, 0.35f, 0.35f, 1f)
                 : new Vector4(0.7f, 0.7f, 0.7f, 1f);
-        var grandStr = grandTotal > 0 ? $"+{grandTotal:0.##}" : $"{grandTotal:0.##}";
+        var grandStr = grandTotal > 0 ? $"+{GameEngine.FormatGil(grandTotal)}" : GameEngine.FormatGil(grandTotal);
         ImGui.Spacing();
         ImGui.Text("Net (all players):");
         ImGui.SameLine();
@@ -145,7 +146,7 @@ public class PlayerStatsWindow : Window, IDisposable
             var winPct = stat.GamesPlayed > 0
                 ? $"{stat.GamesWon * 100.0 / stat.GamesPlayed:0.#}%"
                 : "-";
-            var totalStr = stat.TotalWon > 0 ? $"+{stat.TotalWon:0.##}" : $"{stat.TotalWon:0.##}";
+            var totalStr = stat.TotalWon > 0 ? $"+{GameEngine.FormatGil(stat.TotalWon)}" : GameEngine.FormatGil(stat.TotalWon);
             sb.AppendLine($"{stat.DisplayName}\t{stat.GamesPlayed}\t{stat.GamesWon}\t{stat.GamesPushed}\t{stat.GamesLost}\t{stat.Blackjacks}\t{winPct}\t{totalStr}");
         }
         return sb.ToString().TrimEnd();

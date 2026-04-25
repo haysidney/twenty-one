@@ -9,7 +9,7 @@ public class RoundHistoryEntry
     public int       RoundNumber { get; set; }
     public GameState Snapshot    { get; set; } = new();
     // Bank net from the venue's perspective: positive = bank gained, negative = bank paid out.
-    public decimal   BankNet     { get; set; }
+    public long      BankNet     { get; set; }
     // Player bank balances after payout (key = PlayerStatKey). Used by history window tooltips.
     public Dictionary<string, long> PlayerBanks { get; set; } = [];
 }

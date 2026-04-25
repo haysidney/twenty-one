@@ -26,7 +26,7 @@ public class PlayerStat
     public int     GamesPushed { get; set; } = 0;
     public int     GamesLost   { get; set; } = 0;
     public int     Blackjacks  { get; set; } = 0;
-    public decimal TotalWon    { get; set; } = 0;
+    public long    TotalWon    { get; set; } = 0;
     public long    Bank        { get; set; } = 0;
     public List<BankTransactionEntry> BankLog { get; set; } = [];
 }

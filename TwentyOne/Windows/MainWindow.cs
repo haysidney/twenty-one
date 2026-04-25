@@ -299,13 +299,13 @@ public partial class MainWindow : Window, IDisposable
                 var delta  = result switch
                 {
                     PayoutResult.Win   => GameEngine.GetEffectiveBet(p, p.Hands[hi]),
-                    PayoutResult.BjWin => Math.Round(GameEngine.GetEffectiveBet(p, p.Hands[hi])
+                    PayoutResult.BjWin => Math.Ceiling(GameEngine.GetEffectiveBet(p, p.Hands[hi])
                                             * (state.BjPayout switch
                                             {
                                                 BlackjackPayout.SixToFive => 1.2m,
                                                 BlackjackPayout.EvenMoney => 1.0m,
                                                 _                         => 1.5m,
-                                            }), 2),
+                                            })),
                     PayoutResult.Lose  => -GameEngine.GetEffectiveBet(p, p.Hands[hi]),
                     _                  => 0m,
                 };
@@ -316,7 +316,7 @@ public partial class MainWindow : Window, IDisposable
             if      (net > 0) stat.GamesWon++;
             else if (net < 0) stat.GamesLost++;
             else               stat.GamesPushed++;
-            stat.TotalWon += net;
+            stat.TotalWon += (long)net;
             if (p.Hands.Any(h => h.State == HandState.Blackjack))
                 stat.Blackjacks++;
 
@@ -341,12 +341,12 @@ public partial class MainWindow : Window, IDisposable
                 var delta2  = result2 switch
                 {
                     PayoutResult.Win   => eb2 * 2m,
-                    PayoutResult.BjWin => eb2 + Math.Round(eb2 * (state.BjPayout switch
+                    PayoutResult.BjWin => eb2 + Math.Ceiling(eb2 * (state.BjPayout switch
                                             {
                                                 BlackjackPayout.SixToFive => 1.2m,
                                                 BlackjackPayout.EvenMoney => 1.0m,
                                                 _                         => 1.5m,
-                                            }), 2),
+                                            })),
                     PayoutResult.Push  => eb2,
                     _                  => 0m,
                 };
@@ -364,7 +364,7 @@ public partial class MainWindow : Window, IDisposable
         {
             RoundNumber  = roundNum,
             Snapshot     = state,
-            BankNet      = bankNet,
+            BankNet      = (long)bankNet,
             PlayerBanks  = playerBanksSnapshot,
         });
 

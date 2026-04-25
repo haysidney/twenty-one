@@ -200,7 +200,7 @@ public static class GameEngine
         var delta  = result switch
         {
             PayoutResult.Win   => bet,
-            PayoutResult.BjWin => Math.Round(bet * BjMultiplier(state.BjPayout), 2),
+            PayoutResult.BjWin => Math.Ceiling(bet * BjMultiplier(state.BjPayout)),
             PayoutResult.Lose  => -bet,
             _                  => 0m,
         };
@@ -845,7 +845,7 @@ public static class GameEngine
                         {
                             var eb = GetEffectiveBet(p, p.Hands[hi]);
                             total += GetPayoutResult(state, pi, hi) == PayoutResult.BjWin
-                                ? Math.Round(eb * BjMultiplier(state.BjPayout), 2)
+                                ? Math.Ceiling(eb * BjMultiplier(state.BjPayout))
                                 : eb;
                         }
                         var amtStr = total > 0 ? $"+{total:0.##}" : string.Empty;
