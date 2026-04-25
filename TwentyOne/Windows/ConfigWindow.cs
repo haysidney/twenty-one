@@ -193,7 +193,7 @@ public class ConfigWindow : Window, IDisposable
 
     private void DrawVenueSelector()
     {
-        var roundInProgress = !(config.GameState.Phase == TwentyOne.Game.GamePhase.Betting && config.GameState.Players.Count == 0);
+        var roundInProgress = config.GameState.Phase != TwentyOne.Game.GamePhase.Betting;
 
         ImGui.AlignTextToFramePadding();
         ImGui.Text("Venue");
