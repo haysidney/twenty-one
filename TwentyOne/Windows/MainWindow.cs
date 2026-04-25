@@ -1728,7 +1728,7 @@ private static unsafe void SendChatMessage(string message)
                     else
                     {
                         var total = ABW("Stand") + asp + ABW("Hit") + asp + ABW("Dbl") + asp + ABW("Spl")
-                                  + (isFirstHand ? asp + ABW("X") : 0);
+                                  + (isFirstHand && !multiHand ? asp + ABW("X") : 0);
                         ImGui.SetCursorPosX(actionsCellRight - total);
 
                         var canStand = !hasAnyPending && Phase == GamePhase.PlayerTurns
