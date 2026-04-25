@@ -6,6 +6,17 @@ using TwentyOne.Game;
 
 namespace TwentyOne;
 
+public enum BankTransactionKind { Deposit, Withdrawal, Win, DoubleDown, Split }
+
+[Serializable]
+public class BankTransactionEntry
+{
+    public DateTime            Timestamp { get; set; }
+    public BankTransactionKind Kind      { get; set; }
+    public long                Amount    { get; set; }
+    public long                Balance   { get; set; }
+}
+
 [Serializable]
 public class PlayerStat
 {
@@ -17,6 +28,7 @@ public class PlayerStat
     public int     Blackjacks  { get; set; } = 0;
     public decimal TotalWon    { get; set; } = 0;
     public long    Bank        { get; set; } = 0;
+    public List<BankTransactionEntry> BankLog { get; set; } = [];
 }
 
 [Serializable]

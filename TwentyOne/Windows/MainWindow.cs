@@ -270,6 +270,9 @@ public partial class MainWindow : Window, IDisposable
     private static string PlayerStatKey(Player p) =>
         p.FullName.Length > 0 ? $"{p.FullName}@{p.World}" : p.Nickname;
 
+    private static void AddBankLog(PlayerStat stat, BankTransactionKind kind, long amount, long balance) =>
+        stat.BankLog.Add(new BankTransactionEntry { Timestamp = DateTime.Now, Kind = kind, Amount = amount, Balance = balance });
+
     // Called immediately after Apply(new GoToPayout()) to record round results.
     private void UpdatePlayerStats()
     {
@@ -347,8 +350,11 @@ public partial class MainWindow : Window, IDisposable
                 };
                 net2 += delta2;
             }
+            var prevBank2 = stat2.Bank;
             stat2.Bank = Math.Max(0, stat2.Bank + (long)Math.Round(net2));
             playerBanksSnapshot[key2] = stat2.Bank;
+            if (stat2.Bank != prevBank2)
+                AddBankLog(stat2, BankTransactionKind.Win, stat2.Bank - prevBank2, stat2.Bank);
         }
 
         var roundNum = config.RoundHistory.Count + 1;
@@ -686,8 +692,8 @@ private static unsafe void SendChatMessage(string message)
             var bmp     = State.Players[bankManagePlayerIndex];
             var bmpKey  = PlayerStatKey(bmp);
             var bankTitle = $"{bmp.DisplayName}'s Bank##bankManage";
-            ImGui.SetNextWindowSize(new Vector2(300, 0), ImGuiCond.Always);
-            if (ImGui.Begin(bankTitle, ref bankWinOpen, ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize))
+            ImGui.SetNextWindowSize(new Vector2(380, 480), ImGuiCond.FirstUseEver);
+            if (ImGui.Begin(bankTitle, ref bankWinOpen, ImGuiWindowFlags.NoCollapse))
             {
                 if (!config.PlayerStatsStore.TryGetValue(bmpKey, out var bmpStat))
                 {
@@ -721,6 +727,7 @@ private static unsafe void SendChatMessage(string message)
                 if (ImGui.Button("Confirm##bankdepconfirm"))
                 {
                     bmpStat.Bank += depAmt2;
+                    AddBankLog(bmpStat, BankTransactionKind.Deposit, depAmt2, bmpStat.Bank);
                     config.Save();
                     Apply(new AnnounceBankDeposit(bankManagePlayerIndex, depAmt2, bmpStat.Bank));
                     bankDepositBuf = string.Empty;
@@ -739,6 +746,7 @@ private static unsafe void SendChatMessage(string message)
                 if (ImGui.Button("Confirm##bankwdconfirm"))
                 {
                     bmpStat.Bank = Math.Max(0, bmpBank - wdAmt2);
+                    AddBankLog(bmpStat, BankTransactionKind.Withdrawal, wdAmt2, bmpStat.Bank);
                     config.Save();
                     Apply(new AnnounceBankWithdraw(bankManagePlayerIndex, wdAmt2, bmpStat.Bank));
                     bankWithdrawBuf = string.Empty;
@@ -768,6 +776,51 @@ private static unsafe void SendChatMessage(string message)
                     if (ImGui.Button("Announce##bankshort"))
                         Apply(new AnnounceBankShortfall(bankManagePlayerIndex, (long)Math.Ceiling(shortfall2)));
                     ImGui.Spacing();
+                }
+
+                // Transaction history
+                ImGui.Separator();
+                ImGui.Text("History");
+                var log = bmpStat.BankLog;
+                var tableH = ImGui.GetContentRegionAvail().Y;
+                if (ImGui.BeginTable("##banklog", 4,
+                    ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
+                    new Vector2(0, tableH)))
+                {
+                    ImGui.TableSetupScrollFreeze(0, 1);
+                    ImGui.TableSetupColumn("Time",    ImGuiTableColumnFlags.None, 60);
+                    ImGui.TableSetupColumn("Type",    ImGuiTableColumnFlags.None, 80);
+                    ImGui.TableSetupColumn("Amount",  ImGuiTableColumnFlags.None, 80);
+                    ImGui.TableSetupColumn("Balance", ImGuiTableColumnFlags.None, 80);
+                    ImGui.TableHeadersRow();
+
+                    for (var li = log.Count - 1; li >= 0; li--)
+                    {
+                        var entry = log[li];
+                        var isCredit = entry.Kind is BankTransactionKind.Deposit or BankTransactionKind.Win;
+                        ImGui.TableNextRow();
+                        ImGui.TableSetColumnIndex(0); ImGui.TextUnformatted(entry.Timestamp.ToString("HH:mm"));
+                        ImGui.TableSetColumnIndex(1); ImGui.TextUnformatted(entry.Kind switch
+                        {
+                            BankTransactionKind.Deposit    => "Deposit",
+                            BankTransactionKind.Withdrawal => "Withdraw",
+                            BankTransactionKind.Win        => "Win",
+                            BankTransactionKind.DoubleDown => "Double",
+                            BankTransactionKind.Split      => "Split",
+                            _                              => "?"
+                        });
+                        ImGui.TableSetColumnIndex(2);
+                        if (isCredit) ImGui.TextColored(new Vector4(0.4f, 1f, 0.4f, 1f), $"+{entry.Amount:N0}");
+                        else          ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), $"-{entry.Amount:N0}");
+                        ImGui.TableSetColumnIndex(3); ImGui.TextUnformatted($"{entry.Balance:N0}");
+                    }
+                    if (log.Count == 0)
+                    {
+                        ImGui.TableNextRow();
+                        ImGui.TableSetColumnIndex(0);
+                        ImGui.TextDisabled("No transactions");
+                    }
+                    ImGui.EndTable();
                 }
 
             }
@@ -837,6 +890,7 @@ private static unsafe void SendChatMessage(string message)
                     config.PlayerStatsStore[bobKey] = bobStat;
                 }
                 bobStat.Bank += bobgil;
+                AddBankLog(bobStat, BankTransactionKind.Deposit, bobgil, bobStat.Bank);
                 config.Save();
                 Apply(new AnnounceBankDeposit(bobpi, bobgil, bobStat.Bank));
                 pendingBetOrBankPrompt = null;
@@ -875,6 +929,7 @@ private static unsafe void SendChatMessage(string message)
                 btStat.Bank = btwd
                     ? Math.Max(0, btStat.Bank - btamt)
                     : btStat.Bank + btamt;
+                AddBankLog(btStat, btwd ? BankTransactionKind.Withdrawal : BankTransactionKind.Deposit, btamt, btStat.Bank);
                 config.Save();
                 Apply(btwd
                     ? new AnnounceBankWithdraw(btpi, btamt, btStat.Bank)
@@ -1536,6 +1591,7 @@ private static unsafe void SendChatMessage(string message)
                             if (dblBank >= (long)Math.Ceiling(dblBet) && dblStat != null)
                             {
                                 dblStat.Bank -= (long)Math.Ceiling(dblBet);
+                                AddBankLog(dblStat, BankTransactionKind.DoubleDown, (long)Math.Ceiling(dblBet), dblStat.Bank);
                                 config.Save();
                             }
                             else if (hasWorld && config.AutoTradeEnabled)
@@ -1557,6 +1613,7 @@ private static unsafe void SendChatMessage(string message)
                             if (splBank >= (long)Math.Ceiling(splBet) && splStat != null)
                             {
                                 splStat.Bank -= (long)Math.Ceiling(splBet);
+                                AddBankLog(splStat, BankTransactionKind.Split, (long)Math.Ceiling(splBet), splStat.Bank);
                                 config.Save();
                             }
                             else if (hasWorld && config.AutoTradeEnabled)

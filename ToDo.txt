@@ -51,6 +51,7 @@
 - Need a thank you for playing announcement
 
 -----
+;
 
 - Need an announcement for holding some amount for the bet next round before trading after winning a double down
 
@@ -83,3 +84,11 @@ DROPBOX SUPPORT
 Split Aces only hit once
 
 Print rules
+
+Is it obvious that the bank needs to be open for trade detection?
+
+Bank history in the bank window.
+
+Bank transactions on the undo stack?
+
+Round history duplication bug.
