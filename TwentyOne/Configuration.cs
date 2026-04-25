@@ -6,7 +6,7 @@ using TwentyOne.Game;
 
 namespace TwentyOne;
 
-public enum BankTransactionKind { Deposit, Withdrawal, Win, DoubleDown, Split }
+public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split }
 
 [Serializable]
 public class BankTransactionEntry

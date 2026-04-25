@@ -335,23 +335,25 @@ public partial class MainWindow : Window, IDisposable
             var net2 = 0m;
             for (var hi2 = 0; hi2 < p2.Hands.Count; hi2++)
             {
+                var eb2     = GameEngine.GetEffectiveBet(p2, p2.Hands[hi2]);
                 var result2 = GameEngine.GetPayoutResult(state, pi2, hi2);
+                // Return bet + profit for win/BJ, bet only for push, nothing for loss
                 var delta2  = result2 switch
                 {
-                    PayoutResult.Win   => GameEngine.GetEffectiveBet(p2, p2.Hands[hi2]),
-                    PayoutResult.BjWin => Math.Round(GameEngine.GetEffectiveBet(p2, p2.Hands[hi2])
-                                            * (state.BjPayout switch
+                    PayoutResult.Win   => eb2 * 2m,
+                    PayoutResult.BjWin => eb2 + Math.Round(eb2 * (state.BjPayout switch
                                             {
                                                 BlackjackPayout.SixToFive => 1.2m,
                                                 BlackjackPayout.EvenMoney => 1.0m,
                                                 _                         => 1.5m,
                                             }), 2),
+                    PayoutResult.Push  => eb2,
                     _                  => 0m,
                 };
                 net2 += delta2;
             }
             var prevBank2 = stat2.Bank;
-            stat2.Bank = Math.Max(0, stat2.Bank + (long)Math.Round(net2));
+            stat2.Bank += (long)Math.Round(net2);
             playerBanksSnapshot[key2] = stat2.Bank;
             if (stat2.Bank != prevBank2)
                 AddBankLog(stat2, BankTransactionKind.Win, stat2.Bank - prevBank2, stat2.Bank);
@@ -803,6 +805,7 @@ private static unsafe void SendChatMessage(string message)
                         {
                             BankTransactionKind.Deposit    => "Deposit",
                             BankTransactionKind.Withdrawal => "Withdraw",
+                            BankTransactionKind.Bet        => "Bet",
                             BankTransactionKind.Win        => "Win",
                             BankTransactionKind.DoubleDown => "Double",
                             BankTransactionKind.Split      => "Split",
@@ -1721,6 +1724,16 @@ private static unsafe void SendChatMessage(string message)
                             Apply(new SetPlayerBet(idx, val));
                     }
                     Apply(new StartDeal());
+                    // Deduct initial bets from player banks
+                    foreach (var p in State.Players)
+                    {
+                        var betAmt = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
+                        if (betAmt <= 0) continue;
+                        var betKey = PlayerStatKey(p);
+                        if (!config.PlayerStatsStore.TryGetValue(betKey, out var betStat) || betStat.Bank <= 0) continue;
+                        betStat.Bank = Math.Max(0, betStat.Bank - betAmt);
+                        AddBankLog(betStat, BankTransactionKind.Bet, betAmt, betStat.Bank);
+                    }
                     // Queue initial cards: dealer first, then each player gets both cards in a pair
                     for (var i = 0; i < State.Players.Count; i++)
                     {
