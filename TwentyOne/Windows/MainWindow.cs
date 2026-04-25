@@ -657,19 +657,12 @@ private static unsafe void SendChatMessage(string message)
             }
         }
 
-        // ── Bank manage modal ──────────────────────────────────────────────────
+        // ── Bank manage window ─────────────────────────────────────────────────
         if (bankManagePlayerIndex >= 0 && bankManagePlayerIndex < State.Players.Count)
-            ImGui.OpenPopup("Bank##bankManage");
-        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, new Vector4(0, 0, 0, 0));
-        var showBankModal = ImGui.BeginPopupModal("Bank##bankManage", ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.PopStyleColor();
-        if (showBankModal)
         {
-            if (bankManagePlayerIndex < 0 || bankManagePlayerIndex >= State.Players.Count)
-            {
-                ImGui.CloseCurrentPopup();
-            }
-            else
+            var bankWinOpen = true;
+            ImGui.SetNextWindowSize(new Vector2(300, 0), ImGuiCond.Always);
+            if (ImGui.Begin("Bank##bankManage", ref bankWinOpen, ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize))
             {
                 var bmp     = State.Players[bankManagePlayerIndex];
                 var bmpKey  = PlayerStatKey(bmp);
@@ -758,17 +751,15 @@ private static unsafe void SendChatMessage(string message)
                     ImGui.Spacing();
                 }
 
-                ImGui.Separator();
-                if (ImGui.Button("Close##bankclose"))
-                {
-                    bankManagePlayerIndex = -1;
-                    bankDepositBuf        = string.Empty;
-                    bankWithdrawBuf       = string.Empty;
-                    pendingDepositFor     = null;
-                    ImGui.CloseCurrentPopup();
-                }
             }
-            ImGui.EndPopup();
+            ImGui.End();
+            if (!bankWinOpen)
+            {
+                bankManagePlayerIndex = -1;
+                bankDepositBuf        = string.Empty;
+                bankWithdrawBuf       = string.Empty;
+                pendingDepositFor     = null;
+            }
         }
 
         // ── Trade bet prompt modal ─────────────────────────────────────────────
