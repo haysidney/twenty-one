@@ -73,8 +73,6 @@
 
 - Go back to previous night's stats
 
-- Export stats should go to file
-
 - 5 card charlie
 
 DONT WRONG IN THE DOUBLE AND SPLIT ANNOUNCEMENT
@@ -85,10 +83,4 @@ Split Aces only hit once
 
 Print rules
 
-Is it obvious that the bank needs to be open for trade detection?
-
-Bank history in the bank window.
-
 Bank transactions on the undo stack?
-
-Round history duplication bug.

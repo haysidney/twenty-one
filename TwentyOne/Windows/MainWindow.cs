@@ -1809,11 +1809,9 @@ private static unsafe void SendChatMessage(string message)
         ImGui.Separator();
         ImGui.Spacing();
 
-        var narPanelOpen = config.NarrationPanelOpen;
-        if (ImGui.CollapsingHeader("Chat Narration", ref narPanelOpen, ImGuiTreeNodeFlags.DefaultOpen))
+        ImGui.Text("Chat Narration");
+        ImGui.Separator();
         {
-            if (narPanelOpen != config.NarrationPanelOpen) { config.NarrationPanelOpen = narPanelOpen; config.Save(); }
-
             var narUseCmd = config.NarrationUseChannelCommand;
             if (ImGui.Checkbox("Add channel command", ref narUseCmd))
             {
@@ -1859,11 +1857,6 @@ private static unsafe void SendChatMessage(string message)
                     ImGui.SetScrollHereY(1.0f);
             }
             ImGui.EndChild();
-        }
-        else if (narPanelOpen != config.NarrationPanelOpen)
-        {
-            config.NarrationPanelOpen = narPanelOpen;
-            config.Save();
         }
     }
 }
