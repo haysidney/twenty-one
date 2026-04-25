@@ -1,3 +1,7 @@
+## Meta
+
+After completing any feature or significant design decision, update CLAUDE.md to reflect it. Keep architecture sections current — future sessions depend on this file for context.
+
 ## Project
 
 This is a Final Fantasy XIV plugin that uses the Dalamud API (https://dalamud.dev/api/).
@@ -56,10 +60,17 @@ Fields that belong in `Configuration` (persisted, outside undo):
 - `UndoStack` — undo history for the current round
 - `NarrationLog` — session-wide narration history (never undone)
 - `Venues` / `ActiveVenueIndex` — all venue-specific settings live in `VenueSettings`; proxy properties on `Configuration` delegate to `ActiveVenue` so call sites need not change
+- `VenueMemory` — global `Dictionary<string, string>` mapping housing address key (`"{territory}:{ward}:{plot}"`) to venue GUID; updated when user manually switches venues in a housing zone
 
-`VenueSettings` holds all per-venue config: chat, narration templates, dealer name, auto-trade/target, gil tracker, player stats, round history. Venue switching is allowed during `GamePhase.Betting` but blocked once a round is in progress (any other phase).
+`VenueSettings` holds all per-venue config: chat, narration templates, dealer name, auto-trade/target, gil tracker, player stats, round history. Each venue has a stable `Guid Id` (never changes, survives renames). Venue switching is allowed during `GamePhase.Betting` but blocked once a round is in progress (any other phase).
 
 `VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round). Each entry stores the `GameState` at payout, the bank net for that round, and a round number. Appended by `UpdatePlayerStats` after `GoToPayout`.
+
+### Venue memory
+
+`Configuration.VenueMemory` records which venue the user chose at each housing location. Address keys are `"{territory}:{ward}:{plot}"` (1-indexed). `Plugin.GetCurrentHousingAddressKey()` handles both outdoor housing districts and indoor house interiors (via `LastOutdoorHousingTerritoryId`, updated on `TerritoryChanged`). Outdoor housing territory IDs: Mist=339, Lavender Beds=340, The Goblet=341, Shirogane=641, Empyreum=979. When deleting a venue, all `VenueMemory` entries referencing its GUID must be removed.
+
+`MainWindow` shows a dismissible suggestion banner when the current location has a remembered venue that differs from the active one. The banner resets on territory change.
 
 ### History viewer mode
 
