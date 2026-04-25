@@ -18,7 +18,7 @@ public unsafe class BankWindow : Window, IDisposable
         : base("Bank##TwentyOneBank")
     {
         this.config = config;
-        Flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize;
+        Flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.AlwaysAutoResize;
 
         SyncBuffers();
     }
