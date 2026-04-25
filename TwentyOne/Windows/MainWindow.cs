@@ -1393,101 +1393,43 @@ private static unsafe void SendChatMessage(string message)
                     var statusCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     if (Phase == GamePhase.Payout)
                     {
-                        var isMultiHand = p.Hands.Count > 1;
-                        var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
-                        var red   = new Vector4(1f, 0.35f, 0.35f, 1f);
-                        var grey  = new Vector4(0.55f, 0.55f, 0.55f, 1f);
-                        if (isMultiHand && !isFirstHand)
+                        var (lbl, col) = PayoutDisplay(State, pi, hi);
+                        if (lbl.Length > 0)
                         {
-                            // Non-first split hand: label only, no copy button
-                            var (lbl, col) = PayoutDisplay(State, pi, hi);
-                            if (lbl.Length > 0)
+                            ImGui.TextColored(col, lbl);
+                            if (ImGui.IsItemHovered())
                             {
-                                ImGui.TextColored(col, lbl);
-                                if (ImGui.IsItemHovered())
-                                {
-                                    var amt = GameEngine.PayoutAmountString(State, pi, hi);
-                                    ImGui.SetTooltip(amt.Length > 0 ? $"{lbl} {amt}" : lbl);
-                                }
+                                var amt = GameEngine.PayoutAmountString(State, pi, hi);
+                                ImGui.SetTooltip(amt.Length > 0 ? $"{lbl} {amt}" : lbl);
                             }
                         }
-                        else
+                        if (p.Hands.Count == 1)
                         {
-                            // Single hand, or first hand of a split: compute combined totals
-                            var handCount = isMultiHand ? p.Hands.Count : 1;
                             var totalOwed = 0m;
-                            var netDelta  = 0m;
-                            for (var hh = 0; hh < handCount; hh++)
+                            var result    = GameEngine.GetPayoutResult(State, pi, 0);
+                            var eb        = GameEngine.GetEffectiveBet(p, p.Hands[0]);
+                            var d         = GameEngine.PayoutDelta(State, pi, 0) ?? 0m;
+                            totalOwed = result switch
                             {
-                                var hhi    = isMultiHand ? hh : hi;
-                                var result = GameEngine.GetPayoutResult(State, pi, hhi);
-                                var eb     = GameEngine.GetEffectiveBet(p, p.Hands[hhi]);
-                                var d      = GameEngine.PayoutDelta(State, pi, hhi) ?? 0m;
-                                netDelta  += d;
-                                totalOwed += result switch
-                                {
-                                    PayoutResult.Win or PayoutResult.BjWin => eb + d,
-                                    PayoutResult.Push                      => eb,
-                                    _                                      => 0m,
-                                };
-                            }
-
-                            string dispLabel;
-                            Vector4 dispColor;
-                            if (isMultiHand)
+                                PayoutResult.Win or PayoutResult.BjWin => eb + d,
+                                PayoutResult.Push                      => eb,
+                                _                                      => 0m,
+                            };
+                            if (totalOwed > 0)
                             {
-                                if (netDelta > 0)      (dispLabel, dispColor) = ($"Win +{GameEngine.FormatGil(netDelta)}",  green);
-                                else if (netDelta < 0) (dispLabel, dispColor) = ($"Lose {GameEngine.FormatGil(netDelta)}", red);
-                                else                   (dispLabel, dispColor) = ("Push",                                    grey);
-                            }
-                            else
-                            {
-                                var (lbl, col) = PayoutDisplay(State, pi, hi);
-                                var amt = GameEngine.PayoutAmountString(State, pi, hi);
-                                dispLabel = amt.Length > 0 ? $"{lbl} {amt}" : lbl;
-                                dispColor = col;
-                            }
-
-                            if (dispLabel.Length > 0)
-                            {
-                                ImGui.TextColored(dispColor, dispLabel);
+                                var ctrlHeld   = ImGui.GetIO().KeyCtrl;
+                                var initBet    = GameEngine.ParseBet(p.Bet);
+                                var keepBetVal = totalOwed - initBet;
+                                var copyVal    = ctrlHeld ? $"{keepBetVal:0.##}" : $"{totalOwed:0.##}";
+                                var copyW      = ImGui.CalcTextSize("Copy").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+                                ImGui.SameLine();
+                                ImGui.SetCursorPosX(statusCellRight - copyW + ImGui.GetStyle().ItemSpacing.X);
+                                if (ImGui.SmallButton($"Copy##{pi}payout"))
+                                    ImGui.SetClipboardText(copyVal);
                                 if (ImGui.IsItemHovered())
-                                {
-                                    if (isMultiHand)
-                                    {
-                                        var lines = new System.Text.StringBuilder();
-                                        for (var hh = 0; hh < p.Hands.Count; hh++)
-                                        {
-                                            var (hlbl, _) = PayoutDisplay(State, pi, hh);
-                                            var hamt = GameEngine.PayoutAmountString(State, pi, hh);
-                                            lines.AppendLine($"Hand {hh + 1}: {(hamt.Length > 0 ? $"{hlbl} {hamt}" : hlbl)}");
-                                        }
-                                        var netStr = netDelta > 0 ? $"+{GameEngine.FormatGil(netDelta)}" : GameEngine.FormatGil(netDelta);
-                                        lines.Append($"Net: {netStr}");
-                                        ImGui.SetTooltip(lines.ToString());
-                                    }
-                                    else
-                                    {
-                                        var d = GameEngine.PayoutDelta(State, pi, hi);
-                                        if (d != null) ImGui.SetTooltip($"{d.Value:0.##}");
-                                    }
-                                }
-                                if (totalOwed > 0)
-                                {
-                                    var ctrlHeld   = ImGui.GetIO().KeyCtrl;
-                                    var initBet    = GameEngine.ParseBet(p.Bet);
-                                    var keepBetVal = totalOwed - initBet;
-                                    var copyVal    = ctrlHeld ? $"{keepBetVal:0.##}" : $"{totalOwed:0.##}";
-                                    var copyW      = ImGui.CalcTextSize("Copy").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
-                                    ImGui.SameLine();
-                                    ImGui.SetCursorPosX(statusCellRight - copyW + ImGui.GetStyle().ItemSpacing.X);
-                                    if (ImGui.SmallButton($"Copy##{pi}payout"))
-                                        ImGui.SetClipboardText(copyVal);
-                                    if (ImGui.IsItemHovered())
-                                        ImGui.SetTooltip(ctrlHeld
-                                            ? $"Copy (keep initial bet): {keepBetVal:0.##}"
-                                            : $"Copy total owed: {totalOwed:0.##}\nCtrl+Click to copy minus initial bet: {keepBetVal:0.##}");
-                                }
+                                    ImGui.SetTooltip(ctrlHeld
+                                        ? $"Copy (keep initial bet): {keepBetVal:0.##}"
+                                        : $"Copy total owed: {totalOwed:0.##}\nCtrl+Click to copy minus initial bet: {keepBetVal:0.##}");
                             }
                         }
                     }
@@ -1632,6 +1574,58 @@ private static unsafe void SendChatMessage(string message)
                             ImGui.PopStyleColor(3);
                             if (!canRemove) ImGui.EndDisabled();
                         }
+                    }
+                }
+
+                // ── Net summary row for split hands at payout ─────────────────
+                if (Phase == GamePhase.Payout && p.Hands.Count > 1)
+                {
+                    var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
+                    var red   = new Vector4(1f, 0.35f, 0.35f, 1f);
+                    var grey  = new Vector4(0.55f, 0.55f, 0.55f, 1f);
+                    var totalOwed = 0m;
+                    var netDelta  = 0m;
+                    for (var hh = 0; hh < p.Hands.Count; hh++)
+                    {
+                        var result = GameEngine.GetPayoutResult(State, pi, hh);
+                        var eb     = GameEngine.GetEffectiveBet(p, p.Hands[hh]);
+                        var d      = GameEngine.PayoutDelta(State, pi, hh) ?? 0m;
+                        netDelta  += d;
+                        totalOwed += result switch
+                        {
+                            PayoutResult.Win or PayoutResult.BjWin => eb + d,
+                            PayoutResult.Push                      => eb,
+                            _                                      => 0m,
+                        };
+                    }
+
+                    ImGui.TableNextRow();
+                    ImGui.TableSetColumnIndex(5);
+                    var netCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+
+                    string netLabel;
+                    Vector4 netColor;
+                    if (netDelta > 0)      (netLabel, netColor) = ($"Net: +{GameEngine.FormatGil(netDelta)}", green);
+                    else if (netDelta < 0) (netLabel, netColor) = ($"Net: {GameEngine.FormatGil(netDelta)}",  red);
+                    else                   (netLabel, netColor) = ("Net: Even",                                grey);
+
+                    ImGui.TextColored(netColor, netLabel);
+
+                    if (totalOwed > 0)
+                    {
+                        var ctrlHeld   = ImGui.GetIO().KeyCtrl;
+                        var initBet    = GameEngine.ParseBet(p.Bet);
+                        var keepBetVal = totalOwed - initBet;
+                        var copyVal    = ctrlHeld ? $"{keepBetVal:0.##}" : $"{totalOwed:0.##}";
+                        var copyW      = ImGui.CalcTextSize("Copy").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+                        ImGui.SameLine();
+                        ImGui.SetCursorPosX(netCellRight - copyW + ImGui.GetStyle().ItemSpacing.X);
+                        if (ImGui.SmallButton($"Copy##{pi}payout"))
+                            ImGui.SetClipboardText(copyVal);
+                        if (ImGui.IsItemHovered())
+                            ImGui.SetTooltip(ctrlHeld
+                                ? $"Copy (keep initial bet): {keepBetVal:0.##}"
+                                : $"Copy total owed: {totalOwed:0.##}\nCtrl+Click to copy minus initial bet: {keepBetVal:0.##}");
                     }
                 }
             }
