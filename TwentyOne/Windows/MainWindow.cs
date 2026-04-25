@@ -771,7 +771,7 @@ private static unsafe void SendChatMessage(string message)
                     ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f),
                         $"Short by {GameEngine.FormatGil(shortfall2)}");
                     ImGui.SameLine();
-                    if (ImGui.Button("Announce##bankshort"))
+                    if (ImGui.Button("Announce Shortfall##bankshort"))
                         Apply(new AnnounceBankShortfall(bankManagePlayerIndex, (long)Math.Ceiling(shortfall2)));
                     ImGui.Spacing();
                 }
