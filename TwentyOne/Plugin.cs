@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.SubKinds;
@@ -24,8 +25,45 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static ITargetManager TargetManager { get; private set; } = null!;
     [PluginService] internal static IContextMenu ContextMenu { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
+    [PluginService] internal static IClientState ClientState { get; private set; } = null!;
 
     private const string CommandName = "/twentyone";
+
+    // Outdoor housing territory IDs.
+    private static readonly HashSet<ushort> OutdoorHousingTerritories = [339, 340, 341, 641, 979];
+
+    // Last outdoor housing territory seen — used to resolve indoor addresses.
+    internal static ushort LastOutdoorHousingTerritoryId { get; private set; }
+
+    /// <summary>Returns the current housing address key, or null if not in a housing zone.</summary>
+    internal static unsafe string? GetCurrentHousingAddressKey()
+    {
+        var territory = ClientState.TerritoryType;
+        ushort districtTerritory;
+        if (OutdoorHousingTerritories.Contains(territory))
+        {
+            districtTerritory = territory;
+        }
+        else
+        {
+            var hmCheck = HousingManager.Instance();
+            if (hmCheck == null || !hmCheck->IsInside()) return null;
+            if (LastOutdoorHousingTerritoryId == 0) return null;
+            districtTerritory = LastOutdoorHousingTerritoryId;
+        }
+        var hm = HousingManager.Instance();
+        if (hm == null) return null;
+        var ward = hm->GetCurrentWard();
+        var plot = hm->GetCurrentPlot();
+        if (ward < 0 || plot < 0) return null;
+        return $"{districtTerritory}:{ward + 1}:{plot + 1}";
+    }
+
+    private void OnTerritoryChanged(ushort territory)
+    {
+        if (OutdoorHousingTerritories.Contains(territory))
+            LastOutdoorHousingTerritoryId = territory;
+    }
 
     public Configuration Configuration { get; init; }
 
@@ -44,9 +82,10 @@ public sealed class Plugin : IDalamudPlugin
         BankWindow         = new BankWindow(Configuration);
         ConfigWindow       = new ConfigWindow(Configuration, BankWindow);
         PlayerStatsWindow  = new PlayerStatsWindow(Configuration);
-        MainWindow         = new MainWindow(Configuration, ConfigWindow, BankWindow, PlayerStatsWindow, ChatGui, ObjectTable, TargetManager);
+        MainWindow         = new MainWindow(Configuration, ConfigWindow, BankWindow, PlayerStatsWindow, ChatGui, ObjectTable, TargetManager, ClientState);
         RoundHistoryWindow = new RoundHistoryWindow(Configuration, MainWindow);
         MainWindow.SetRoundHistoryWindow(RoundHistoryWindow);
+        ClientState.TerritoryChanged += OnTerritoryChanged;
         ContextMenu.OnMenuOpened += OnMenuOpened;
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(BankWindow);
@@ -145,6 +184,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
+        ClientState.TerritoryChanged -= OnTerritoryChanged;
         ContextMenu.OnMenuOpened -= OnMenuOpened;
 
         WindowSystem.RemoveAllWindows();

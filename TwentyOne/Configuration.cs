@@ -22,6 +22,7 @@ public class PlayerStat
 public class VenueSettings
 {
     public string Name { get; set; } = "Venue 1";
+    public Guid   Id   { get; set; } = Guid.NewGuid();
 
     // ── Narration ──────────────────────────────────────────────────────────────
     public bool NarrationUseChannelCommand { get; set; } = false;
@@ -83,11 +84,17 @@ public class Configuration : IPluginConfiguration
     public List<VenueSettings> Venues           { get; set; } = [];
     public int                 ActiveVenueIndex { get; set; } = 0;
 
+    // Global address → venue GUID map. Key: "{district}:{ward}:{plot}" (1-indexed).
+    public Dictionary<string, string> VenueMemory { get; set; } = [];
+
     // Ensures at least one venue exists (handles first-ever launch / old configs).
     public void EnsureVenues()
     {
         if (Venues.Count == 0) Venues.Add(new VenueSettings());
         ActiveVenueIndex = Math.Clamp(ActiveVenueIndex, 0, Venues.Count - 1);
+        // Migration: assign GUIDs to venues that were saved before this field existed.
+        foreach (var v in Venues)
+            if (v.Id == Guid.Empty) v.Id = Guid.NewGuid();
     }
 
     [JsonIgnore] public VenueSettings ActiveVenue => Venues[ActiveVenueIndex];

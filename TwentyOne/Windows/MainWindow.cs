@@ -31,9 +31,14 @@ public partial class MainWindow : Window, IDisposable
     private List<GameState>? savedUndoStack;
     private List<GameState>? savedRedoStack;
     private bool             isHistoryView => savedCurrentState != null;
-    private readonly IChatGui      chatGui;
-    private readonly IObjectTable  objectTable;
+    private readonly IChatGui       chatGui;
+    private readonly IObjectTable   objectTable;
     private readonly ITargetManager targetManager;
+    private readonly IClientState   clientState;
+
+    // Venue memory suggestion banner state.
+    private ushort lastSeenTerritory;
+    private bool   venueMemoryDismissed;
 
     // Betting-phase UI state
     private string newPlayerName  = string.Empty;
@@ -76,7 +81,8 @@ public partial class MainWindow : Window, IDisposable
 
     public MainWindow(Configuration config, ConfigWindow configWindow, BankWindow bankWindow,
                       PlayerStatsWindow playerStatsWindow,
-                      IChatGui chatGui, IObjectTable objectTable, ITargetManager targetManager)
+                      IChatGui chatGui, IObjectTable objectTable, ITargetManager targetManager,
+                      IClientState clientState)
         : base("Twenty One##TwentyOneMain")
     {
         this.config            = config;
@@ -84,8 +90,9 @@ public partial class MainWindow : Window, IDisposable
         this.bankWindow        = bankWindow;
         this.playerStatsWindow = playerStatsWindow;
         this.chatGui           = chatGui;
-        this.objectTable    = objectTable;
-        this.targetManager  = targetManager;
+        this.objectTable       = objectTable;
+        this.targetManager     = targetManager;
+        this.clientState       = clientState;
         SizeConstraints   = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(640, 320),
@@ -95,6 +102,17 @@ public partial class MainWindow : Window, IDisposable
     }
 
     public void SetRoundHistoryWindow(RoundHistoryWindow w) => roundHistoryWindow = w;
+
+    // Returns (venueIndex, venueName) if VenueMemory has a suggestion for the current location.
+    private (int Index, string Name)? GetVenueMemorySuggestion()
+    {
+        var addrKey = Plugin.GetCurrentHousingAddressKey();
+        if (addrKey == null) return null;
+        if (!config.VenueMemory.TryGetValue(addrKey, out var guid)) return null;
+        var idx = config.Venues.FindIndex(v => v.Id.ToString() == guid);
+        if (idx < 0 || idx == config.ActiveVenueIndex) return null;
+        return (idx, config.Venues[idx].Name);
+    }
 
     public void Dispose()
     {
@@ -549,6 +567,14 @@ private static unsafe void SendChatMessage(string message)
 
     public override void Draw()
     {
+        // Reset venue-memory banner when the territory changes.
+        var currentTerritory = clientState.TerritoryType;
+        if (currentTerritory != lastSeenTerritory)
+        {
+            lastSeenTerritory    = currentTerritory;
+            venueMemoryDismissed = false;
+        }
+
         // Drain outgoing queue — hold a roll entry until the previous roll's response has arrived
         var isPublicChannel = config.ChatChannel is "/say" or "/yell" or "/shout";
         var cooldownMs = isPublicChannel ? config.PublicChatCooldownMs : config.PrivateChatCooldownMs;
@@ -624,6 +650,25 @@ private static unsafe void SendChatMessage(string message)
             ImGui.SameLine();
             if (ImGui.SmallButton("Exit History View"))
                 ExitHistoryView();
+            ImGui.Separator();
+        }
+
+        if (!venueMemoryDismissed && !isHistoryView && GetVenueMemorySuggestion() is var suggestion && suggestion.HasValue)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.4f, 0.85f, 1f, 1f));
+            ImGui.TextUnformatted($"The last time you were here you used \"{suggestion.Value.Name}\". Switch to it?");
+            ImGui.PopStyleColor();
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Yes##venueMemoryYes"))
+            {
+                config.ActiveVenueIndex = suggestion.Value.Index;
+                bankWindow.SyncBuffers();
+                config.Save();
+                venueMemoryDismissed = true;
+            }
+            ImGui.SameLine();
+            if (ImGui.SmallButton("X##venueMemoryDismiss"))
+                venueMemoryDismissed = true;
             ImGui.Separator();
         }
 

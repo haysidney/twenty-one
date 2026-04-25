@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using Dalamud.Bindings.ImGui;
@@ -205,6 +206,8 @@ public class ConfigWindow : Window, IDisposable
         if (roundInProgress) ImGui.BeginDisabled();
         if (ImGui.Combo("##venue", ref idx, venueNames, venueNames.Length) && idx != config.ActiveVenueIndex)
         {
+            if (Plugin.GetCurrentHousingAddressKey() is { } addrKey)
+                config.VenueMemory[addrKey] = config.Venues[idx].Id.ToString();
             config.ActiveVenueIndex = idx;
             bankWindow.SyncBuffers();
             config.Save();
@@ -245,9 +248,12 @@ public class ConfigWindow : Window, IDisposable
         if (!canDelete) ImGui.BeginDisabled();
         if (ImGui.Button("Delete##venueDelete") && canDelete)
         {
-            var removeIdx = config.ActiveVenueIndex;
+            var removeIdx  = config.ActiveVenueIndex;
+            var removedGuid = config.Venues[removeIdx].Id.ToString();
             config.Venues.RemoveAt(removeIdx);
             config.ActiveVenueIndex = Math.Min(removeIdx, config.Venues.Count - 1);
+            foreach (var k in config.VenueMemory.Keys.Where(k => config.VenueMemory[k] == removedGuid).ToList())
+                config.VenueMemory.Remove(k);
             bankWindow.SyncBuffers();
             config.Save();
         }
@@ -308,6 +314,7 @@ public class ConfigWindow : Window, IDisposable
                     var json = System.Text.Json.JsonSerializer.Serialize(config.ActiveVenue);
                     var copy = System.Text.Json.JsonSerializer.Deserialize<VenueSettings>(json)!;
                     copy.Name = _renameBuffer.Trim();
+                    copy.Id   = Guid.NewGuid();
                     config.Venues.Add(copy);
                     if (!roundInProgress)
                     {
