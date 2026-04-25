@@ -728,7 +728,6 @@ private static unsafe void SendChatMessage(string message)
                 {
                     bmpStat.Bank += depAmt2;
                     AddBankLog(bmpStat, BankTransactionKind.Deposit, depAmt2, bmpStat.Bank);
-                    config.Save();
                     Apply(new AnnounceBankDeposit(bankManagePlayerIndex, depAmt2, bmpStat.Bank));
                     bankDepositBuf = string.Empty;
                 }
@@ -747,7 +746,6 @@ private static unsafe void SendChatMessage(string message)
                 {
                     bmpStat.Bank = Math.Max(0, bmpBank - wdAmt2);
                     AddBankLog(bmpStat, BankTransactionKind.Withdrawal, wdAmt2, bmpStat.Bank);
-                    config.Save();
                     Apply(new AnnounceBankWithdraw(bankManagePlayerIndex, wdAmt2, bmpStat.Bank));
                     bankWithdrawBuf = string.Empty;
                 }
@@ -891,7 +889,6 @@ private static unsafe void SendChatMessage(string message)
                 }
                 bobStat.Bank += bobgil;
                 AddBankLog(bobStat, BankTransactionKind.Deposit, bobgil, bobStat.Bank);
-                config.Save();
                 Apply(new AnnounceBankDeposit(bobpi, bobgil, bobStat.Bank));
                 pendingBetOrBankPrompt = null;
                 ImGui.CloseCurrentPopup();
@@ -930,7 +927,6 @@ private static unsafe void SendChatMessage(string message)
                     ? Math.Max(0, btStat.Bank - btamt)
                     : btStat.Bank + btamt;
                 AddBankLog(btStat, btwd ? BankTransactionKind.Withdrawal : BankTransactionKind.Deposit, btamt, btStat.Bank);
-                config.Save();
                 Apply(btwd
                     ? new AnnounceBankWithdraw(btpi, btamt, btStat.Bank)
                     : new AnnounceBankDeposit (btpi, btamt, btStat.Bank));
