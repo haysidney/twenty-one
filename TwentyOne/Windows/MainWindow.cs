@@ -298,16 +298,17 @@ public partial class MainWindow : Window, IDisposable
                 var result = GameEngine.GetPayoutResult(state, pi, hi);
                 var delta  = result switch
                 {
-                    PayoutResult.Win   => GameEngine.GetEffectiveBet(p, p.Hands[hi]),
-                    PayoutResult.BjWin => Math.Ceiling(GameEngine.GetEffectiveBet(p, p.Hands[hi])
-                                            * (state.BjPayout switch
-                                            {
-                                                BlackjackPayout.SixToFive => 1.2m,
-                                                BlackjackPayout.EvenMoney => 1.0m,
-                                                _                         => 1.5m,
-                                            })),
-                    PayoutResult.Lose  => -GameEngine.GetEffectiveBet(p, p.Hands[hi]),
-                    _                  => 0m,
+                    PayoutResult.Win        => GameEngine.GetEffectiveBet(p, p.Hands[hi]),
+                    PayoutResult.BjWin      => Math.Ceiling(GameEngine.GetEffectiveBet(p, p.Hands[hi])
+                                                * (state.BjPayout switch
+                                                {
+                                                    BlackjackPayout.SixToFive => 1.2m,
+                                                    BlackjackPayout.EvenMoney => 1.0m,
+                                                    _                         => 1.5m,
+                                                })),
+                    PayoutResult.CharlieWin => GameEngine.GetEffectiveBet(p, p.Hands[hi]),
+                    PayoutResult.Lose       => -GameEngine.GetEffectiveBet(p, p.Hands[hi]),
+                    _                       => 0m,
                 };
                 net += delta;
             }
@@ -337,18 +338,19 @@ public partial class MainWindow : Window, IDisposable
             {
                 var eb2     = GameEngine.GetEffectiveBet(p2, p2.Hands[hi2]);
                 var result2 = GameEngine.GetPayoutResult(state, pi2, hi2);
-                // Return bet + profit for win/BJ, bet only for push, nothing for loss
+                // Return bet + profit for win/BJ/charlie, bet only for push, nothing for loss
                 var delta2  = result2 switch
                 {
-                    PayoutResult.Win   => eb2 * 2m,
-                    PayoutResult.BjWin => eb2 + Math.Ceiling(eb2 * (state.BjPayout switch
-                                            {
-                                                BlackjackPayout.SixToFive => 1.2m,
-                                                BlackjackPayout.EvenMoney => 1.0m,
-                                                _                         => 1.5m,
-                                            })),
-                    PayoutResult.Push  => eb2,
-                    _                  => 0m,
+                    PayoutResult.Win        => eb2 * 2m,
+                    PayoutResult.BjWin      => eb2 + Math.Ceiling(eb2 * (state.BjPayout switch
+                                                {
+                                                    BlackjackPayout.SixToFive => 1.2m,
+                                                    BlackjackPayout.EvenMoney => 1.0m,
+                                                    _                         => 1.5m,
+                                                })),
+                    PayoutResult.CharlieWin => eb2 * 2m,
+                    PayoutResult.Push       => eb2,
+                    _                       => 0m,
                 };
                 net2 += delta2;
             }
@@ -622,11 +624,12 @@ private static unsafe void SendChatMessage(string message)
 
         return GameEngine.GetPayoutResult(state, playerIndex, handIndex) switch
         {
-            PayoutResult.Win   => ("Win",    green),
-            PayoutResult.BjWin => ("BJ Win", gold),
-            PayoutResult.Lose  => ("Lose",   red),
-            PayoutResult.Push  => ("Push",   grey),
-            _                  => (string.Empty, default),
+            PayoutResult.Win        => ("Win",     green),
+            PayoutResult.BjWin      => ("BJ Win",  gold),
+            PayoutResult.CharlieWin => ("Charlie", green),
+            PayoutResult.Lose       => ("Lose",    red),
+            PayoutResult.Push       => ("Push",    grey),
+            _                       => (string.Empty, default),
         };
     }
 
@@ -1201,15 +1204,16 @@ private static unsafe void SendChatMessage(string message)
                                 var br = GameEngine.GetPayoutResult(State, pi, bhi);
                                 bankDelta += br switch
                                 {
-                                    PayoutResult.Win   => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
-                                    PayoutResult.BjWin => Math.Round(GameEngine.GetEffectiveBet(p, p.Hands[bhi])
-                                                            * (State.BjPayout switch
-                                                            {
-                                                                BlackjackPayout.SixToFive => 1.2m,
-                                                                BlackjackPayout.EvenMoney => 1.0m,
-                                                                _                         => 1.5m,
-                                                            }), 2),
-                                    _                  => 0m,
+                                    PayoutResult.Win        => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
+                                    PayoutResult.BjWin      => Math.Round(GameEngine.GetEffectiveBet(p, p.Hands[bhi])
+                                                                * (State.BjPayout switch
+                                                                {
+                                                                    BlackjackPayout.SixToFive => 1.2m,
+                                                                    BlackjackPayout.EvenMoney => 1.0m,
+                                                                    _                         => 1.5m,
+                                                                }), 2),
+                                    PayoutResult.CharlieWin => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
+                                    _                       => 0m,
                                 };
                             }
                         }
@@ -1274,9 +1278,9 @@ private static unsafe void SendChatMessage(string message)
                             sumNetDelta  += d;
                             sumTotalOwed += result switch
                             {
-                                PayoutResult.Win or PayoutResult.BjWin => eb + d,
-                                PayoutResult.Push                      => eb,
-                                _                                      => 0m,
+                                PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin => eb + d,
+                                PayoutResult.Push                                                  => eb,
+                                _                                                                  => 0m,
                             };
                         }
 
@@ -1529,15 +1533,16 @@ private static unsafe void SendChatMessage(string message)
                                 var br = GameEngine.GetPayoutResult(State, pi, bhi);
                                 bankDelta += br switch
                                 {
-                                    PayoutResult.Win   => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
-                                    PayoutResult.BjWin => Math.Round(GameEngine.GetEffectiveBet(p, p.Hands[bhi])
-                                                            * (State.BjPayout switch
-                                                            {
-                                                                BlackjackPayout.SixToFive => 1.2m,
-                                                                BlackjackPayout.EvenMoney => 1.0m,
-                                                                _                         => 1.5m,
-                                                            }), 2),
-                                    _                  => 0m,
+                                    PayoutResult.Win        => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
+                                    PayoutResult.BjWin      => Math.Round(GameEngine.GetEffectiveBet(p, p.Hands[bhi])
+                                                                * (State.BjPayout switch
+                                                                {
+                                                                    BlackjackPayout.SixToFive => 1.2m,
+                                                                    BlackjackPayout.EvenMoney => 1.0m,
+                                                                    _                         => 1.5m,
+                                                                }), 2),
+                                    PayoutResult.CharlieWin => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
+                                    _                       => 0m,
                                 };
                             }
                         }
@@ -1641,9 +1646,9 @@ private static unsafe void SendChatMessage(string message)
                             var d         = GameEngine.PayoutDelta(State, pi, 0) ?? 0m;
                             totalOwed = result switch
                             {
-                                PayoutResult.Win or PayoutResult.BjWin => eb + d,
-                                PayoutResult.Push                      => eb,
-                                _                                      => 0m,
+                                PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin => eb + d,
+                                PayoutResult.Push                                                  => eb,
+                                _                                                                  => 0m,
                             };
                             if (totalOwed > 0)
                             {

@@ -74,7 +74,7 @@ public class RoundHistoryWindow : Window
                     .Select(hi => GameEngine.GetPayoutResult(state, pi, hi))
                     .ToList();
 
-                var anyWin  = results.Any(r => r is PayoutResult.Win or PayoutResult.BjWin);
+                var anyWin  = results.Any(r => r is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin);
                 var anyLose = results.Any(r => r == PayoutResult.Lose);
                 var allPush = results.All(r => r == PayoutResult.Push);
 
