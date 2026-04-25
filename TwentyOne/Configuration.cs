@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
 using Dalamud.Configuration;
+using Newtonsoft.Json;
 using TwentyOne.Game;
 
 namespace TwentyOne;
