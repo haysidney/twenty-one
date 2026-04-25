@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 
 namespace TwentyOne.Windows;
@@ -11,6 +13,7 @@ namespace TwentyOne.Windows;
 public class PlayerStatsWindow : Window, IDisposable
 {
     private readonly Configuration config;
+    private readonly FileDialogManager _fileDialogManager = new();
 
     public PlayerStatsWindow(Configuration config)
         : base("Player Stats##TwentyOneStats")
@@ -28,14 +31,32 @@ public class PlayerStatsWindow : Window, IDisposable
 
     public override void Draw()
     {
+        _fileDialogManager.Draw();
+
         if (ImGui.Button("Reset Stats"))
         {
             config.PlayerStatsStore.Clear();
             config.Save();
         }
         ImGui.SameLine();
+        var shiftHeld = ImGui.GetIO().KeyShift;
         if (ImGui.Button("Export"))
-            ImGui.SetClipboardText(BuildExportText());
+        {
+            if (shiftHeld)
+            {
+                _fileDialogManager.SaveFileDialog(
+                    "Export Player Stats", "TSV{.tsv}", "player-stats", ".tsv",
+                    (ok, path) => { if (ok) File.WriteAllText(path, BuildExportText()); });
+            }
+            else
+            {
+                ImGui.SetClipboardText(BuildExportText());
+            }
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(shiftHeld
+                ? "Save player stats to a TSV file."u8
+                : "Copy player stats to clipboard as TSV. Shift+click to save to file."u8);
 
         ImGui.Spacing();
         ImGui.Separator();
