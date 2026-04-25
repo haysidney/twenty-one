@@ -114,7 +114,7 @@ public class ConfigWindow : Window, IDisposable
         }
 
         var autoDeposit = config.AutoDepositFromTrades;
-        if (ImGui.Checkbox("Auto-fill bank deposit from trade", ref autoDeposit))
+        if (ImGui.Checkbox("Prompt to update bank when trade detected", ref autoDeposit))
         {
             config.AutoDepositFromTrades = autoDeposit;
             config.Save();

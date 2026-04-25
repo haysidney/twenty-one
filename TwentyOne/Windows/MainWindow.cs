@@ -50,6 +50,8 @@ public partial class MainWindow : Window, IDisposable
     private int    bankManagePlayerIndex = -1;
     private string bankDepositBuf        = string.Empty;
     private string bankWithdrawBuf       = string.Empty;
+    // prompt shown when a trade with the bank player completes: (playerIndex, amount, isWithdraw)
+    private (int PlayerIndex, long Amount, bool IsWithdraw)? pendingBankTradePrompt;
 
     // pending hit: null = not waiting; IsPublic=true means /random was sent, false means /dice
     private (bool IsDealer, int PlayerIndex, int HandIndex, bool IsPublic)? pendingHit;
@@ -58,13 +60,12 @@ public partial class MainWindow : Window, IDisposable
     // pending trade confirmation for double/split: set when dealer clicks the button, cleared on confirm/cancel
     private (int PlayerIndex, int HandIndex)? pendingDouble;
     private (int PlayerIndex, int HandIndex)? pendingSplit;
-    // trade bet detection: track in-progress trade partner + received gil
+    // trade bet detection: track in-progress trade partner + received/gave gil
     private (string FullName, string World)? pendingTradePartner;
     private long                              pendingTradeGil;
+    private long                              pendingGaveGil;
     // prompt to set a player's bet after a completed trade; shown as a modal
     private (int PlayerIndex, long Gil)?      pendingBetPrompt;
-    // set while bank manage modal is open and auto-deposit from trade is enabled
-    private int?                              pendingDepositFor;
     // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
     // IsFirstCard=true → emit AnnouncePlayerDeal before rolling
     private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex, bool IsFirstCard)> autoDealQueue = new();
@@ -480,13 +481,17 @@ private static unsafe void SendChatMessage(string message)
     [GeneratedRegex(@"^You receive ([\d,]+) gil\.$")]
     private static partial Regex TradeGilRegex();
 
+    // "You hand over 1,234 gil." — gil given during trade
+    [GeneratedRegex(@"^You hand over ([\d,]+) gil\.$")]
+    private static partial Regex GaveGilRegex();
+
     private void OnChatMessage(XivChatType type, int timestamp,
         ref SeString sender, ref SeString message, ref bool isHandled)
     {
-        // ── Trade detection (bet auto-fill + deposit auto-fill) ───────────────
-        var isBetPhase    = config.AutoBetFromTrades   && Phase == GamePhase.Betting;
-        var isDepositMode = config.AutoDepositFromTrades && pendingDepositFor.HasValue;
-        if (isBetPhase || isDepositMode)
+        // ── Trade detection (bet auto-fill + bank deposit/withdraw) ──────────
+        var isBetPhase      = config.AutoBetFromTrades    && Phase == GamePhase.Betting;
+        var isBankMonitor   = config.AutoDepositFromTrades && bankManagePlayerIndex >= 0 && bankManagePlayerIndex < State.Players.Count;
+        if (isBetPhase || isBankMonitor)
         {
             var msgText = message.TextValue;
 
@@ -504,7 +509,12 @@ private static unsafe void SendChatMessage(string message)
             {
                 pendingTradeGil = gil;
             }
-            else if (msgText == "Trade complete." && pendingTradePartner.HasValue && pendingTradeGil > 0)
+            else if (GaveGilRegex().Match(msgText) is { Success: true } m3
+                     && long.TryParse(m3.Groups[1].Value.Replace(",", ""), out var gave))
+            {
+                pendingGaveGil = gave;
+            }
+            else if (msgText == "Trade complete." && pendingTradePartner.HasValue)
             {
                 var (fullName, world) = pendingTradePartner.Value;
                 var pi = State.Players.FindIndex(p =>
@@ -512,18 +522,25 @@ private static unsafe void SendChatMessage(string message)
                     (world.Length == 0 || string.Equals(p.World, world, StringComparison.OrdinalIgnoreCase)));
                 if (pi >= 0)
                 {
-                    if (isDepositMode && pendingDepositFor == pi)
-                        bankDepositBuf = pendingTradeGil.ToString();
-                    else if (isBetPhase)
+                    if (isBankMonitor && pi == bankManagePlayerIndex)
+                    {
+                        if (pendingTradeGil > 0)
+                            pendingBankTradePrompt = (pi, pendingTradeGil, false);
+                        else if (pendingGaveGil > 0)
+                            pendingBankTradePrompt = (pi, pendingGaveGil, true);
+                    }
+                    else if (isBetPhase && pendingTradeGil > 0)
                         pendingBetPrompt = (pi, pendingTradeGil);
                 }
                 pendingTradePartner = null;
                 pendingTradeGil     = 0;
+                pendingGaveGil      = 0;
             }
             else if (msgText == "Trade canceled." || msgText == "Trade cancelled.")
             {
                 pendingTradePartner = null;
                 pendingTradeGil     = 0;
+                pendingGaveGil      = 0;
             }
         }
 
@@ -674,9 +691,18 @@ private static unsafe void SendChatMessage(string message)
                 }
                 var bmpBank = bmpStat.Bank;
 
+                ImGui.AlignTextToFramePadding();
                 ImGui.Text($"{bmp.DisplayName}");
                 ImGui.SameLine();
                 ImGui.TextDisabled($"Bank: {bmpBank:N0}");
+                if (ImGui.IsItemClicked()) ImGui.SetClipboardText(bmpBank.ToString());
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Click to copy");
+                if (bmp.World.Length > 0)
+                {
+                    ImGui.SameLine();
+                    if (ImGui.Button("Trade##bankmantradetop"))
+                        Plugin.TradePlayer(bmp.FullName, bmp.World);
+                }
                 ImGui.Separator();
                 ImGui.Spacing();
 
@@ -684,21 +710,7 @@ private static unsafe void SendChatMessage(string message)
                 ImGui.AlignTextToFramePadding(); ImGui.Text("Deposit"); ImGui.SameLine(80);
                 ImGui.SetNextItemWidth(140);
                 ImGui.InputText("##bankdep", ref bankDepositBuf, 20);
-                ImGui.SetCursorPosX(80);
-                var hasWorld2 = bmp.World.Length > 0;
-                if (hasWorld2)
-                {
-                    if (ImGui.Button("Trade##bankdeptrade"))
-                    {
-                        if (config.AutoDepositFromTrades) pendingDepositFor = bankManagePlayerIndex;
-                        Plugin.TradePlayer(bmp.FullName, bmp.World);
-                    }
-                    if (ImGui.IsItemHovered())
-                        ImGui.SetTooltip(config.AutoDepositFromTrades
-                            ? "Open trade (amount auto-fills on complete)"
-                            : "Open trade");
-                    ImGui.SameLine();
-                }
+                ImGui.SameLine();
                 var canDep2 = long.TryParse(bankDepositBuf, out var depAmt2) && depAmt2 > 0;
                 if (!canDep2) ImGui.BeginDisabled();
                 if (ImGui.Button("Confirm##bankdepconfirm"))
@@ -706,7 +718,6 @@ private static unsafe void SendChatMessage(string message)
                     bmpStat.Bank += depAmt2;
                     config.Save();
                     bankDepositBuf = string.Empty;
-                    pendingDepositFor = null;
                 }
                 if (!canDep2) ImGui.EndDisabled();
 
@@ -747,7 +758,7 @@ private static unsafe void SendChatMessage(string message)
                     ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f),
                         $"Short by {GameEngine.FormatGil(shortfall2)}");
                     ImGui.SameLine();
-                    if (ImGui.SmallButton("Announce##bankshort"))
+                    if (ImGui.Button("Announce##bankshort"))
                         Apply(new AnnounceBankShortfall(bankManagePlayerIndex, (long)Math.Ceiling(shortfall2)));
                     ImGui.Spacing();
                 }
@@ -756,10 +767,10 @@ private static unsafe void SendChatMessage(string message)
             ImGui.End();
             if (!bankWinOpen)
             {
-                bankManagePlayerIndex = -1;
-                bankDepositBuf        = string.Empty;
-                bankWithdrawBuf       = string.Empty;
-                pendingDepositFor     = null;
+                bankManagePlayerIndex    = -1;
+                bankDepositBuf           = string.Empty;
+                bankWithdrawBuf          = string.Empty;
+                pendingBankTradePrompt   = null;
             }
         }
 
@@ -791,6 +802,42 @@ private static unsafe void SendChatMessage(string message)
             ImGui.EndPopup();
         }
 
+        // ── Bank trade prompt modal ────────────────────────────────────────────
+        if (pendingBankTradePrompt.HasValue)
+            ImGui.OpenPopup("Bank trade##bankTradePrompt");
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, new Vector4(0, 0, 0, 0));
+        var showBankModal = ImGui.BeginPopupModal("Bank trade##bankTradePrompt", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.PopStyleColor();
+        if (showBankModal)
+        {
+            var (btpi, btamt, btwd) = pendingBankTradePrompt!.Value;
+            var btplayer = State.Players[btpi];
+            var btKey    = PlayerStatKey(btplayer);
+            if (!config.PlayerStatsStore.TryGetValue(btKey, out var btStat))
+            {
+                btStat = new PlayerStat { DisplayName = btplayer.DisplayName };
+                config.PlayerStatsStore[btKey] = btStat;
+            }
+            var verb = btwd ? "Withdraw" : "Deposit";
+            ImGui.Text($"{verb} {btamt:N0} gil {(btwd ? "from" : "to")} {btplayer.DisplayName}'s bank?");
+            ImGui.Spacing();
+            if (ImGui.Button("Yes##bankTradeYes"))
+            {
+                btStat.Bank = btwd
+                    ? Math.Max(0, btStat.Bank - btamt)
+                    : btStat.Bank + btamt;
+                config.Save();
+                pendingBankTradePrompt = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("No##bankTradeNo"))
+            {
+                pendingBankTradePrompt = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.EndPopup();
+        }
 
         if (isHistoryView)
         {
