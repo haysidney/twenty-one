@@ -66,6 +66,8 @@ public partial class MainWindow : Window, IDisposable
     private long                              pendingGaveGil;
     // prompt to set a player's bet after a completed trade; shown as a modal
     private (int PlayerIndex, long Gil)?      pendingBetPrompt;
+    // prompt shown when both AutoBetFromTrades and AutoDepositFromTrades are on during Betting phase
+    private (int PlayerIndex, long Gil)?      pendingBetOrBankPrompt;
     // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
     // IsFirstCard=true → emit AnnouncePlayerDeal before rolling
     private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex, bool IsFirstCard)> autoDealQueue = new();
@@ -491,8 +493,8 @@ private static unsafe void SendChatMessage(string message)
         ref SeString sender, ref SeString message, ref bool isHandled)
     {
         // ── Trade detection (bet auto-fill + bank deposit/withdraw) ──────────
-        var isBetPhase      = config.AutoBetFromTrades    && Phase == GamePhase.Betting;
-        var isBankMonitor   = config.AutoDepositFromTrades && bankManagePlayerIndex >= 0 && bankManagePlayerIndex < State.Players.Count;
+        var isBetPhase    = config.AutoBetFromTrades    && Phase == GamePhase.Betting;
+        var isBankMonitor = config.AutoDepositFromTrades;
         if (isBetPhase || isBankMonitor)
         {
             var msgText = message.TextValue;
@@ -524,15 +526,17 @@ private static unsafe void SendChatMessage(string message)
                     (world.Length == 0 || string.Equals(p.World, world, StringComparison.OrdinalIgnoreCase)));
                 if (pi >= 0)
                 {
-                    if (isBankMonitor && pi == bankManagePlayerIndex)
+                    if (pendingGaveGil > 0 && isBankMonitor)
+                        pendingBankTradePrompt = (pi, pendingGaveGil, true);
+                    else if (pendingTradeGil > 0)
                     {
-                        if (pendingTradeGil > 0)
+                        if (isBetPhase && isBankMonitor)
+                            pendingBetOrBankPrompt = (pi, pendingTradeGil);
+                        else if (isBetPhase)
+                            pendingBetPrompt = (pi, pendingTradeGil);
+                        else if (isBankMonitor)
                             pendingBankTradePrompt = (pi, pendingTradeGil, false);
-                        else if (pendingGaveGil > 0)
-                            pendingBankTradePrompt = (pi, pendingGaveGil, true);
                     }
-                    else if (isBetPhase && pendingTradeGil > 0)
-                        pendingBetPrompt = (pi, pendingTradeGil);
                 }
                 pendingTradePartner = null;
                 pendingTradeGil     = 0;
@@ -771,10 +775,9 @@ private static unsafe void SendChatMessage(string message)
             ImGui.End();
             if (!bankWinOpen)
             {
-                bankManagePlayerIndex    = -1;
-                bankDepositBuf           = string.Empty;
-                bankWithdrawBuf          = string.Empty;
-                pendingBankTradePrompt   = null;
+                bankManagePlayerIndex = -1;
+                bankDepositBuf        = string.Empty;
+                bankWithdrawBuf       = string.Empty;
             }
         }
 
@@ -801,6 +804,49 @@ private static unsafe void SendChatMessage(string message)
             if (ImGui.Button("No"))
             {
                 pendingBetPrompt = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.EndPopup();
+        }
+
+        // ── Bet-or-bank trade prompt modal (both options on, Betting phase) ──────
+        if (pendingBetOrBankPrompt.HasValue)
+            ImGui.OpenPopup("Trade received##betOrBank");
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, new Vector4(0, 0, 0, 0));
+        var showBetOrBankModal = ImGui.BeginPopupModal("Trade received##betOrBank", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.PopStyleColor();
+        if (showBetOrBankModal)
+        {
+            var (bobpi, bobgil) = pendingBetOrBankPrompt!.Value;
+            var bobPlayer = State.Players[bobpi];
+            ImGui.Text($"Received {bobgil:N0} gil from {bobPlayer.DisplayName}.");
+            ImGui.Spacing();
+            if (ImGui.Button("Set as bet##bobBet"))
+            {
+                betEdits.Remove(bobpi);
+                Apply(new SetPlayerBet(bobpi, bobgil.ToString()));
+                pendingBetOrBankPrompt = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Bank deposit##bobBank"))
+            {
+                var bobKey = PlayerStatKey(bobPlayer);
+                if (!config.PlayerStatsStore.TryGetValue(bobKey, out var bobStat))
+                {
+                    bobStat = new PlayerStat { DisplayName = bobPlayer.DisplayName };
+                    config.PlayerStatsStore[bobKey] = bobStat;
+                }
+                bobStat.Bank += bobgil;
+                config.Save();
+                Apply(new AnnounceBankDeposit(bobpi, bobgil, bobStat.Bank));
+                pendingBetOrBankPrompt = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Ignore##bobIgnore"))
+            {
+                pendingBetOrBankPrompt = null;
                 ImGui.CloseCurrentPopup();
             }
             ImGui.EndPopup();
