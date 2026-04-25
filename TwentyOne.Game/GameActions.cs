@@ -40,6 +40,10 @@ public record AnnounceBankRemind(int PlayerIndex, long Bank) : GameAction;
 // Bank shortfall request — sent when dealer shift+clicks Deposit and bank < bet
 public record AnnounceBankShortfall(int PlayerIndex, long ShortfallAmount) : GameAction;
 
+// Bank deposit/withdraw narration — logged after direct bank mutations
+public record AnnounceBankDeposit (int PlayerIndex, long Amount, long NewBalance) : GameAction;
+public record AnnounceBankWithdraw(int PlayerIndex, long Amount, long NewBalance) : GameAction;
+
 // Phase transitions
 public record StartDeal : GameAction;
 public record BeginPlayerTurns : GameAction;

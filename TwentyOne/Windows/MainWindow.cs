@@ -176,6 +176,8 @@ public partial class MainWindow : Window, IDisposable
                          and not AnnounceBetConfirm
                          and not AnnounceBankRemind
                          and not AnnounceBankShortfall
+                         and not AnnounceBankDeposit
+                         and not AnnounceBankWithdraw
                          and not AnnounceDouble
                          and not AnnounceDoubleConfirm
                          and not AnnounceSplit
@@ -717,6 +719,7 @@ private static unsafe void SendChatMessage(string message)
                 {
                     bmpStat.Bank += depAmt2;
                     config.Save();
+                    Apply(new AnnounceBankDeposit(bankManagePlayerIndex, depAmt2, bmpStat.Bank));
                     bankDepositBuf = string.Empty;
                 }
                 if (!canDep2) ImGui.EndDisabled();
@@ -734,6 +737,7 @@ private static unsafe void SendChatMessage(string message)
                 {
                     bmpStat.Bank = Math.Max(0, bmpBank - wdAmt2);
                     config.Save();
+                    Apply(new AnnounceBankWithdraw(bankManagePlayerIndex, wdAmt2, bmpStat.Bank));
                     bankWithdrawBuf = string.Empty;
                 }
                 if (!canWd2) ImGui.EndDisabled();
@@ -827,6 +831,9 @@ private static unsafe void SendChatMessage(string message)
                     ? Math.Max(0, btStat.Bank - btamt)
                     : btStat.Bank + btamt;
                 config.Save();
+                Apply(btwd
+                    ? new AnnounceBankWithdraw(btpi, btamt, btStat.Bank)
+                    : new AnnounceBankDeposit (btpi, btamt, btStat.Bank));
                 pendingBankTradePrompt = null;
                 ImGui.CloseCurrentPopup();
             }

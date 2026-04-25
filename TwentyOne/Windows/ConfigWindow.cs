@@ -433,8 +433,10 @@ public class ConfigWindow : Window, IDisposable
             NtListRow("Open##ntBO",         "",                                Defaults.BettingOpen,     ctrlHeld, t.BettingOpen);
             NtListRow("Bet req##ntBR",      "{name}",                          Defaults.PlayerBetRequest,    ctrlHeld, t.PlayerBetRequest);
             NtListRow("Bet confirm##ntBC",  "{name}  {amount}",                Defaults.PlayerBetConfirm,    ctrlHeld, t.PlayerBetConfirm);
-            NtListRow("Bank remind##ntBKR", "{name}  {amount}  {bank}",        Defaults.PlayerBankRemind,    ctrlHeld, t.PlayerBankRemind);
-            NtListRow("Bank short##ntBKS",  "{name}  {amount}",                Defaults.PlayerBankShortfall, ctrlHeld, t.PlayerBankShortfall);
+            NtListRow("Bank remind##ntBKR",   "{name}  {amount}  {bank}", Defaults.PlayerBankRemind,    ctrlHeld, t.PlayerBankRemind);
+            NtListRow("Bank short##ntBKS",    "{name}  {amount}",         Defaults.PlayerBankShortfall, ctrlHeld, t.PlayerBankShortfall);
+            NtListRow("Bank deposit##ntBKD",  "{name}  {amount}  {bank}", Defaults.PlayerBankDeposit,   ctrlHeld, t.PlayerBankDeposit);
+            NtListRow("Bank withdraw##ntBKW", "{name}  {amount}  {bank}", Defaults.PlayerBankWithdraw,  ctrlHeld, t.PlayerBankWithdraw);
 
             ImGui.Spacing();
             ImGui.TextDisabled("Deal announcements");

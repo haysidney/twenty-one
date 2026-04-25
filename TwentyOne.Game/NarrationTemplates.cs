@@ -65,6 +65,10 @@ public class NarrationTemplates
     // {name} = player display name, {amount} = shortfall amount
     public List<string> PlayerBankShortfall { get; set; } = ["{name}, please trade {amount} to cover your bet."];
 
+    // Bank deposit/withdraw log entries — {name} = player, {amount} = changed amount, {bank} = new balance
+    public List<string> PlayerBankDeposit  { get; set; } = ["{name} deposited {amount}. Bank: {bank}."];
+    public List<string> PlayerBankWithdraw { get; set; } = ["{name} withdrew {amount}. Bank: {bank}."];
+
     // Trade-request announcements (sent when dealer clicks Double/Split, before confirming trade)
     // {amount} = the extra chips required
     public List<string> PlayerDoubleRequest { get; set; } = ["{name} would like to double down! Please trade {amount} gil to the dealer."];

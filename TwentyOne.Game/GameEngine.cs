@@ -710,6 +710,27 @@ public static class GameEngine
                 return (state, effects);
             }
 
+            // ── AnnounceBankDeposit / AnnounceBankWithdraw ───────────────────
+            case AnnounceBankDeposit a:
+            {
+                var player = state.Players[a.PlayerIndex];
+                Narrate(t.PlayerBankDeposit,
+                    ("name",   player.DisplayName),
+                    ("amount", FormatGil(a.Amount)),
+                    ("bank",   FormatGil(a.NewBalance)));
+                return (state, effects);
+            }
+
+            case AnnounceBankWithdraw a:
+            {
+                var player = state.Players[a.PlayerIndex];
+                Narrate(t.PlayerBankWithdraw,
+                    ("name",   player.DisplayName),
+                    ("amount", FormatGil(a.Amount)),
+                    ("bank",   FormatGil(a.NewBalance)));
+                return (state, effects);
+            }
+
             // ── AnnounceDealerDeal / AnnouncePlayerDeal ──────────────────────
             case AnnounceDealerDeal:
                 Narrate(t.DealDealerCard, ("dealer", dealerName));
