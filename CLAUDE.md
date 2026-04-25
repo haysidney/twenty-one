@@ -57,7 +57,16 @@ Fields that belong in `Configuration` (persisted, outside undo):
 - `NarrationLog` — session-wide narration history (never undone)
 - `Venues` / `ActiveVenueIndex` — all venue-specific settings live in `VenueSettings`; proxy properties on `Configuration` delegate to `ActiveVenue` so call sites need not change
 
-`VenueSettings` holds all per-venue config: chat, narration templates, dealer name, auto-trade/target, gil tracker, player stats. Venue switching is allowed during `GamePhase.Betting` but blocked once a round is in progress (any other phase).
+`VenueSettings` holds all per-venue config: chat, narration templates, dealer name, auto-trade/target, gil tracker, player stats, round history. Venue switching is allowed during `GamePhase.Betting` but blocked once a round is in progress (any other phase).
+
+`VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round). Each entry stores the `GameState` at payout, the bank net for that round, and a round number. Appended by `UpdatePlayerStats` after `GoToPayout`.
+
+### History viewer mode
+
+`MainWindow.isHistoryView` is true when the user is viewing a previous round via `RoundHistoryWindow`. While active:
+- `UpdatePlayerStats` is a no-op (no stats changes, no new history entry).
+- The current `GameState`, `UndoStack`, and `RedoStack` are saved in-memory and restored on `ExitHistoryView`.
+- A banner is shown at the top of `MainWindow`; all other UI renders normally against the historical snapshot.
 
 ### Card input
 
