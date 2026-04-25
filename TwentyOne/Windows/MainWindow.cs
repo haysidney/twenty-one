@@ -983,6 +983,17 @@ private static unsafe void SendChatMessage(string message)
         ImGui.SameLine();
         if (ImGui.SmallButton("History"))
             roundHistoryWindow.Toggle();
+        ImGui.SameLine();
+        var canClear = config.RoundHistory.Count > 0 && ImGui.GetIO().KeyCtrl;
+        if (!canClear) ImGui.BeginDisabled();
+        if (ImGui.SmallButton("Clear History"))
+        {
+            config.RoundHistory.Clear();
+            config.Save();
+        }
+        if (!canClear) ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Hold Ctrl and click to clear all round history");
 
         var canUndo = config.UndoStack.Count > 0;
         var canRedo = config.RedoStack.Count > 0;
