@@ -240,7 +240,7 @@ public class ConfigWindow : Window, IDisposable
             _duplicatePending = true;
         }
 
-        var canDelete = config.Venues.Count > 1;
+        var canDelete = config.Venues.Count > 1 && ImGui.GetIO().KeyCtrl;
         ImGui.SameLine();
         if (!canDelete) ImGui.BeginDisabled();
         if (ImGui.Button("Delete##venueDelete") && canDelete)
@@ -252,8 +252,13 @@ public class ConfigWindow : Window, IDisposable
             config.Save();
         }
         if (!canDelete) ImGui.EndDisabled();
-        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !canDelete)
-            ImGui.SetTooltip("Cannot delete the only venue."u8);
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+        {
+            if (config.Venues.Count == 1)
+                ImGui.SetTooltip("Cannot delete the only venue."u8);
+            else if (!ImGui.GetIO().KeyCtrl)
+                ImGui.SetTooltip("Hold Ctrl to delete this venue."u8);
+        }
 
         // ── Rename popup ──────────────────────────────────────────────────────
         if (_renamePending)
