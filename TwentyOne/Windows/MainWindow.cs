@@ -1077,6 +1077,237 @@ private static unsafe void SendChatMessage(string message)
                 var hasNickname = p.Nickname.Length > 0;
                 var multiHand = p.Hands.Count > 1;
 
+                // ── Summary row for split players ─────────────────────────────
+                if (multiHand)
+                {
+                    ImGui.TableNextRow();
+
+                    // Name
+                    ImGui.TableSetColumnIndex(0);
+                    var sumNameCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                    if (renamingIndex == pi)
+                    {
+                        var okW = ImGui.CalcTextSize("OK").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+                        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - okW);
+                        var submitted = ImGui.InputText($"##rename{pi}", ref renamingBuffer, 64,
+                            ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll);
+                        ImGui.SameLine();
+                        var canConfirm = renamingBuffer.Length > 0 || p.World.Length > 0;
+                        if (!canConfirm) ImGui.BeginDisabled();
+                        if (ImGui.SmallButton($"OK##{pi}ok") || submitted)
+                        {
+                            if (canConfirm) Apply(new RenamePlayer(pi, renamingBuffer));
+                            renamingIndex = -1;
+                        }
+                        if (!canConfirm) ImGui.EndDisabled();
+                    }
+                    else
+                    {
+                        ImGui.AlignTextToFramePadding();
+                        ImGui.Text(p.DisplayName);
+                        if (ImGui.IsItemHovered())
+                        {
+                            if (p.World.Length > 0)
+                                ImGui.SetTooltip($"{p.FullName}@{p.World}");
+                            if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                            {
+                                renamingIndex  = pi;
+                                renamingBuffer = p.Nickname;
+                            }
+                        }
+
+                        var winnerKey = p.FullName.Length > 0 ? p.FullName : p.Nickname;
+                        var isWinner  = config.GameState.LastRoundWinners.Contains(winnerKey);
+                        var isPusher  = !isWinner && config.GameState.LastRoundPushers.Contains(winnerKey);
+                        var sp        = ImGui.GetStyle().ItemSpacing.X;
+                        var fp        = ImGui.GetStyle().FramePadding.X;
+                        float SBW(string s) => ImGui.CalcTextSize(s).X + fp * 2;
+                        var clearW  = hasWorld && hasNickname ? SBW("C") + sp : 0;
+                        var targetW = hasWorld               ? SBW("@") + sp : 0;
+                        var renameW = SBW("R");
+                        var spadeW  = (isWinner || isPusher) ? ImGui.CalcTextSize("♠").X + sp : 0;
+                        ImGui.SameLine();
+                        ImGui.SetCursorPosX(sumNameCellRight - spadeW - targetW - renameW - clearW);
+
+                        if (isWinner)
+                        {
+                            ImGui.TextColored(new System.Numerics.Vector4(0.2f, 0.8f, 0.2f, 1f), "♠");
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Won last round"u8);
+                            ImGui.SameLine();
+                        }
+                        else if (isPusher)
+                        {
+                            ImGui.TextColored(new System.Numerics.Vector4(1f, 1f, 1f, 1f), "♠");
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Pushed last round"u8);
+                            ImGui.SameLine();
+                        }
+
+                        if (hasWorld)
+                        {
+                            if (ImGui.SmallButton($"@##{pi}target"))
+                                Plugin.TargetPlayer(p.FullName, p.World);
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Target {p.FullName}@{p.World}");
+                            ImGui.SameLine();
+                        }
+
+                        if (ImGui.SmallButton($"R##{pi}rename"))
+                        {
+                            renamingIndex  = pi;
+                            renamingBuffer = p.Nickname;
+                        }
+                        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Rename"u8);
+
+                        if (hasWorld && hasNickname)
+                        {
+                            ImGui.SameLine();
+                            if (ImGui.SmallButton($"C##{pi}clear"))
+                                Apply(new RenamePlayer(pi, ""));
+                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Clear nickname"u8);
+                        }
+                    }
+
+                    // Bet (total of all hands)
+                    ImGui.TableSetColumnIndex(1);
+                    var totalHandBets = p.Hands.Sum(h => GameEngine.GetEffectiveBet(p, h));
+                    ImGui.AlignTextToFramePadding();
+                    ImGui.TextDisabled(totalHandBets > 0 ? GameEngine.FormatGil(totalHandBets) : p.Bet);
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Click to copy total bet");
+                        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                            ImGui.SetClipboardText(totalHandBets > 0 ? $"{totalHandBets:0.##}" : p.Bet);
+                    }
+
+                    // Bank
+                    ImGui.TableSetColumnIndex(2);
+                    {
+                        var bankKey  = PlayerStatKey(p);
+                        if (!config.PlayerStatsStore.TryGetValue(bankKey, out var bankStat))
+                        {
+                            bankStat = new PlayerStat { DisplayName = p.DisplayName };
+                            config.PlayerStatsStore[bankKey] = bankStat;
+                        }
+                        var bankVal       = bankStat.Bank;
+                        var parsedBet     = GameEngine.ParseBet(p.Bet);
+                        var bankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                        var sfp           = ImGui.GetStyle().FramePadding.X;
+                        float BKW(string s) => ImGui.CalcTextSize(s).X + sfp * 2;
+
+                        var bankDelta = 0m;
+                        if (Phase == GamePhase.Payout && bankVal > 0)
+                        {
+                            for (var bhi = 0; bhi < p.Hands.Count; bhi++)
+                            {
+                                var br = GameEngine.GetPayoutResult(State, pi, bhi);
+                                bankDelta += br switch
+                                {
+                                    PayoutResult.Win   => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
+                                    PayoutResult.BjWin => Math.Round(GameEngine.GetEffectiveBet(p, p.Hands[bhi])
+                                                            * (State.BjPayout switch
+                                                            {
+                                                                BlackjackPayout.SixToFive => 1.2m,
+                                                                BlackjackPayout.EvenMoney => 1.0m,
+                                                                _                         => 1.5m,
+                                                            }), 2),
+                                    _                  => 0m,
+                                };
+                            }
+                        }
+
+                        ImGui.AlignTextToFramePadding();
+                        if (bankVal > 0)
+                        {
+                            var bankLabel = GameEngine.FormatGil(bankVal);
+                            var shortfall = parsedBet > 0 ? parsedBet - bankVal : 0m;
+                            if (shortfall > 0)
+                                ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f), bankLabel);
+                            else
+                                ImGui.TextUnformatted(bankLabel);
+                            if (ImGui.IsItemHovered())
+                            {
+                                var tipLines = new System.Text.StringBuilder();
+                                if (shortfall > 0)
+                                    tipLines.AppendLine($"Short by {GameEngine.FormatGil(shortfall)}");
+                                if (Phase == GamePhase.Payout && bankDelta != 0)
+                                {
+                                    var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
+                                    tipLines.AppendLine($"This round: {deltaStr}");
+                                    tipLines.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankDelta))}");
+                                }
+                                tipLines.Append("Click to copy");
+                                ImGui.SetTooltip(tipLines.ToString());
+                                if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                                    ImGui.SetClipboardText(bankVal.ToString());
+                            }
+                        }
+                        else
+                        {
+                            ImGui.TextDisabled("—");
+                        }
+
+                        var manageW = BKW("Manage");
+                        ImGui.SameLine();
+                        if (ImGui.GetCursorPosX() < bankCellRight - manageW)
+                            ImGui.SetCursorPosX(bankCellRight - manageW);
+                        if (ImGui.SmallButton($"Manage##{pi}bank"))
+                        {
+                            bankManagePlayerIndex = pi;
+                            bankDepositBuf        = string.Empty;
+                            bankWithdrawBuf       = string.Empty;
+                        }
+                    }
+
+                    // Status (net payout summary or blank)
+                    ImGui.TableSetColumnIndex(5);
+                    if (Phase == GamePhase.Payout)
+                    {
+                        var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
+                        var red   = new Vector4(1f, 0.35f, 0.35f, 1f);
+                        var grey  = new Vector4(0.55f, 0.55f, 0.55f, 1f);
+                        var sumTotalOwed = 0m;
+                        var sumNetDelta  = 0m;
+                        for (var hh = 0; hh < p.Hands.Count; hh++)
+                        {
+                            var result = GameEngine.GetPayoutResult(State, pi, hh);
+                            var eb     = GameEngine.GetEffectiveBet(p, p.Hands[hh]);
+                            var d      = GameEngine.PayoutDelta(State, pi, hh) ?? 0m;
+                            sumNetDelta  += d;
+                            sumTotalOwed += result switch
+                            {
+                                PayoutResult.Win or PayoutResult.BjWin => eb + d,
+                                PayoutResult.Push                      => eb,
+                                _                                      => 0m,
+                            };
+                        }
+
+                        var sumCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                        string sumLabel;
+                        Vector4 sumColor;
+                        if (sumNetDelta > 0)      (sumLabel, sumColor) = ($"Net: +{GameEngine.FormatGil(sumNetDelta)}", green);
+                        else if (sumNetDelta < 0) (sumLabel, sumColor) = ($"Net: {GameEngine.FormatGil(sumNetDelta)}",  red);
+                        else                      (sumLabel, sumColor) = ("Net: Even",                                   grey);
+
+                        ImGui.TextColored(sumColor, sumLabel);
+
+                        if (sumTotalOwed > 0)
+                        {
+                            var ctrlHeld   = ImGui.GetIO().KeyCtrl;
+                            var initBet    = GameEngine.ParseBet(p.Bet);
+                            var keepBetVal = sumTotalOwed - initBet;
+                            var copyVal    = ctrlHeld ? $"{keepBetVal:0.##}" : $"{sumTotalOwed:0.##}";
+                            var copyW      = ImGui.CalcTextSize("Copy").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+                            ImGui.SameLine();
+                            ImGui.SetCursorPosX(sumCellRight - copyW + ImGui.GetStyle().ItemSpacing.X);
+                            if (ImGui.SmallButton($"Copy##{pi}payout"))
+                                ImGui.SetClipboardText(copyVal);
+                            if (ImGui.IsItemHovered())
+                                ImGui.SetTooltip(ctrlHeld
+                                    ? $"Copy (keep initial bet): {keepBetVal:0.##}"
+                                    : $"Copy total owed: {sumTotalOwed:0.##}\nCtrl+Click to copy minus initial bet: {keepBetVal:0.##}");
+                        }
+                    }
+                }
+
                 for (var hi = 0; hi < p.Hands.Count; hi++)
                 {
                     var hand        = p.Hands[hi];
@@ -1092,7 +1323,7 @@ private static unsafe void SendChatMessage(string message)
                     // ── Name column ───────────────────────────────────────────
                     ImGui.TableSetColumnIndex(0);
                     var nameCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                    if (isFirstHand)
+                    if (isFirstHand && !multiHand)
                     {
                         if (renamingIndex == pi)
                         {
@@ -1177,14 +1408,13 @@ private static unsafe void SendChatMessage(string message)
                     }
                     else
                     {
-                        // Subsequent split-hand rows: show indented label
                         ImGui.AlignTextToFramePadding();
-                        ImGui.TextDisabled($"  ↳ Hand {hi + 1}");
+                        ImGui.TextDisabled($"--> Hand {hi + 1}");
                     }
 
                     // ── Bet column ────────────────────────────────────────────
                     ImGui.TableSetColumnIndex(1);
-                    if (isFirstHand)
+                    if (isFirstHand && !multiHand)
                     {
                         var betCellRight   = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                         var confirmButtonW = Phase == GamePhase.Betting
@@ -1276,7 +1506,7 @@ private static unsafe void SendChatMessage(string message)
 
                     // ── Bank column ───────────────────────────────────────────
                     ImGui.TableSetColumnIndex(2);
-                    if (isFirstHand)
+                    if (isFirstHand && !multiHand)
                     {
                         var bankKey  = PlayerStatKey(p);
                         if (!config.PlayerStatsStore.TryGetValue(bankKey, out var bankStat))
@@ -1562,7 +1792,7 @@ private static unsafe void SendChatMessage(string message)
                         }
                         if (!canSplit) ImGui.EndDisabled();
 
-                        if (isFirstHand)
+                        if (isFirstHand && !multiHand)
                         {
                             ImGui.SameLine();
                             var canRemove = Phase == GamePhase.Betting;
@@ -1577,57 +1807,6 @@ private static unsafe void SendChatMessage(string message)
                     }
                 }
 
-                // ── Net summary row for split hands at payout ─────────────────
-                if (Phase == GamePhase.Payout && p.Hands.Count > 1)
-                {
-                    var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
-                    var red   = new Vector4(1f, 0.35f, 0.35f, 1f);
-                    var grey  = new Vector4(0.55f, 0.55f, 0.55f, 1f);
-                    var totalOwed = 0m;
-                    var netDelta  = 0m;
-                    for (var hh = 0; hh < p.Hands.Count; hh++)
-                    {
-                        var result = GameEngine.GetPayoutResult(State, pi, hh);
-                        var eb     = GameEngine.GetEffectiveBet(p, p.Hands[hh]);
-                        var d      = GameEngine.PayoutDelta(State, pi, hh) ?? 0m;
-                        netDelta  += d;
-                        totalOwed += result switch
-                        {
-                            PayoutResult.Win or PayoutResult.BjWin => eb + d,
-                            PayoutResult.Push                      => eb,
-                            _                                      => 0m,
-                        };
-                    }
-
-                    ImGui.TableNextRow();
-                    ImGui.TableSetColumnIndex(5);
-                    var netCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-
-                    string netLabel;
-                    Vector4 netColor;
-                    if (netDelta > 0)      (netLabel, netColor) = ($"Net: +{GameEngine.FormatGil(netDelta)}", green);
-                    else if (netDelta < 0) (netLabel, netColor) = ($"Net: {GameEngine.FormatGil(netDelta)}",  red);
-                    else                   (netLabel, netColor) = ("Net: Even",                                grey);
-
-                    ImGui.TextColored(netColor, netLabel);
-
-                    if (totalOwed > 0)
-                    {
-                        var ctrlHeld   = ImGui.GetIO().KeyCtrl;
-                        var initBet    = GameEngine.ParseBet(p.Bet);
-                        var keepBetVal = totalOwed - initBet;
-                        var copyVal    = ctrlHeld ? $"{keepBetVal:0.##}" : $"{totalOwed:0.##}";
-                        var copyW      = ImGui.CalcTextSize("Copy").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
-                        ImGui.SameLine();
-                        ImGui.SetCursorPosX(netCellRight - copyW + ImGui.GetStyle().ItemSpacing.X);
-                        if (ImGui.SmallButton($"Copy##{pi}payout"))
-                            ImGui.SetClipboardText(copyVal);
-                        if (ImGui.IsItemHovered())
-                            ImGui.SetTooltip(ctrlHeld
-                                ? $"Copy (keep initial bet): {keepBetVal:0.##}"
-                                : $"Copy total owed: {totalOwed:0.##}\nCtrl+Click to copy minus initial bet: {keepBetVal:0.##}");
-                    }
-                }
             }
 
             if (removeAt >= 0)
