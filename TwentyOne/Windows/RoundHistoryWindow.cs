@@ -27,6 +27,18 @@ public class RoundHistoryWindow : Window
     public override void Draw()
     {
         var history = config.RoundHistory;
+
+        var canClear = history.Count > 0 && ImGui.GetIO().KeyCtrl;
+        if (!canClear) ImGui.BeginDisabled();
+        if (ImGui.SmallButton("Clear History") && canClear)
+        {
+            history.Clear();
+            config.Save();
+        }
+        if (!canClear) ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Hold Ctrl and click to clear all round history");
+
         if (history.Count == 0)
         {
             ImGui.TextUnformatted("No rounds recorded yet.");
