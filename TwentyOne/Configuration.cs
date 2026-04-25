@@ -77,9 +77,15 @@ public class Configuration : IPluginConfiguration
     public List<string> NarrationLog { get; set; } = [];
 
     // ── Venues ────────────────────────────────────────────────────────────────
-    // Default contains one entry so old configs (without "Venues" in JSON) get a clean default.
-    public List<VenueSettings> Venues           { get; set; } = [new VenueSettings()];
+    public List<VenueSettings> Venues           { get; set; } = [];
     public int                 ActiveVenueIndex { get; set; } = 0;
+
+    // Ensures at least one venue exists (handles first-ever launch / old configs).
+    public void EnsureVenues()
+    {
+        if (Venues.Count == 0) Venues.Add(new VenueSettings());
+        ActiveVenueIndex = Math.Clamp(ActiveVenueIndex, 0, Venues.Count - 1);
+    }
 
     [JsonIgnore] public VenueSettings ActiveVenue => Venues[ActiveVenueIndex];
 
