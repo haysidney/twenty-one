@@ -34,6 +34,12 @@ public record AnnounceBetRequest(int PlayerIndex) : GameAction;
 // Bet-confirm announcement — sent when dealer clicks Confirm in the Bet cell during Betting phase
 public record AnnounceBetConfirm(int PlayerIndex) : GameAction;
 
+// Bank remind — sent when dealer clicks Remind in the Bank cell; carries bank balance since it lives outside GameState
+public record AnnounceBankRemind(int PlayerIndex, long Bank) : GameAction;
+
+// Bank shortfall request — sent when dealer shift+clicks Deposit and bank < bet
+public record AnnounceBankShortfall(int PlayerIndex, long ShortfallAmount) : GameAction;
+
 // Phase transitions
 public record StartDeal : GameAction;
 public record BeginPlayerTurns : GameAction;

@@ -45,7 +45,8 @@ public partial class MainWindow : Window, IDisposable
     private int    renamingIndex  = -1;
     private string renamingBuffer = string.Empty;
     // In-progress bet edits (player index → typed string); committed to game state on Enter only.
-    private readonly Dictionary<int, string> betEdits = [];
+    private readonly Dictionary<int, string> betEdits          = [];
+    private readonly Dictionary<int, string> bankWithdrawEdits = [];
 
     // pending hit: null = not waiting; IsPublic=true means /random was sent, false means /dice
     private (bool IsDealer, int PlayerIndex, int HandIndex, bool IsPublic)? pendingHit;
@@ -59,6 +60,10 @@ public partial class MainWindow : Window, IDisposable
     private long                              pendingTradeGil;
     // prompt to set a player's bet after a completed trade; shown as a modal
     private (int PlayerIndex, long Gil)?      pendingBetPrompt;
+    // deposit flow: set when dealer clicks Deposit for a player; cleared after modal or cancel
+    private int?                              pendingDepositFor;
+    // prompt to deposit gil after a completed trade; shown as a modal
+    private (int PlayerIndex, long Gil)?      pendingDepositPrompt;
     // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
     // IsFirstCard=true → emit AnnouncePlayerDeal before rolling
     private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex, bool IsFirstCard)> autoDealQueue = new();
@@ -167,6 +172,8 @@ public partial class MainWindow : Window, IDisposable
         else if (action is not AnnounceBettingOpen
                          and not AnnounceBetRequest
                          and not AnnounceBetConfirm
+                         and not AnnounceBankRemind
+                         and not AnnounceBankShortfall
                          and not AnnounceDouble
                          and not AnnounceDoubleConfirm
                          and not AnnounceSplit
@@ -307,12 +314,45 @@ public partial class MainWindow : Window, IDisposable
             bankNet -= net; // bank gains when player loses
         }
 
+        // Auto-settle player banks and snapshot balances after settlement
+        var playerBanksSnapshot = new Dictionary<string, long>();
+        for (var pi2 = 0; pi2 < state.Players.Count; pi2++)
+        {
+            var p2  = state.Players[pi2];
+            var key2 = PlayerStatKey(p2);
+            if (!config.PlayerStatsStore.TryGetValue(key2, out var stat2)) continue;
+            if (stat2.Bank <= 0) continue;
+
+            var net2 = 0m;
+            for (var hi2 = 0; hi2 < p2.Hands.Count; hi2++)
+            {
+                var result2 = GameEngine.GetPayoutResult(state, pi2, hi2);
+                var delta2  = result2 switch
+                {
+                    PayoutResult.Win   => GameEngine.GetEffectiveBet(p2, p2.Hands[hi2]),
+                    PayoutResult.BjWin => Math.Round(GameEngine.GetEffectiveBet(p2, p2.Hands[hi2])
+                                            * (state.BjPayout switch
+                                            {
+                                                BlackjackPayout.SixToFive => 1.2m,
+                                                BlackjackPayout.EvenMoney => 1.0m,
+                                                _                         => 1.5m,
+                                            }), 2),
+                    PayoutResult.Lose  => -GameEngine.GetEffectiveBet(p2, p2.Hands[hi2]),
+                    _                  => 0m,
+                };
+                net2 += delta2;
+            }
+            stat2.Bank = Math.Max(0, stat2.Bank + (long)Math.Round(net2));
+            playerBanksSnapshot[key2] = stat2.Bank;
+        }
+
         var roundNum = config.RoundHistory.Count + 1;
         config.RoundHistory.Add(new RoundHistoryEntry
         {
-            RoundNumber = roundNum,
-            Snapshot    = state,
-            BankNet     = bankNet,
+            RoundNumber  = roundNum,
+            Snapshot     = state,
+            BankNet      = bankNet,
+            PlayerBanks  = playerBanksSnapshot,
         });
 
         config.Save();
@@ -442,13 +482,13 @@ private static unsafe void SendChatMessage(string message)
     private void OnChatMessage(XivChatType type, int timestamp,
         ref SeString sender, ref SeString message, ref bool isHandled)
     {
-        // ── Trade bet detection (betting phase only) ──────────────────────────
-        if (config.AutoBetFromTrades && Phase == GamePhase.Betting)
+        // ── Trade detection (bet auto-fill + deposit) ─────────────────────────
+        var isBetPhase   = config.AutoBetFromTrades && Phase == GamePhase.Betting;
+        var isDepositMode = pendingDepositFor.HasValue;
+        if (isBetPhase || isDepositMode)
         {
             var msgText = message.TextValue;
 
-            // Trade initiation: either party may initiate, either world.
-            // PlayerPayload present for cross-world; absent for same-world (parse text instead).
             var tradeMatch = TradeSentRegex().Match(msgText);
             if (!tradeMatch.Success) tradeMatch = TradeWishesRegex().Match(msgText);
             if (tradeMatch.Success)
@@ -458,13 +498,11 @@ private static unsafe void SendChatMessage(string message)
                     ? (payload.PlayerName, payload.World.ValueNullable?.Name.ToString() ?? string.Empty)
                     : (tradeMatch.Groups[1].Value, string.Empty);
             }
-            // Gil received
             else if (TradeGilRegex().Match(msgText) is { Success: true } m2
                      && long.TryParse(m2.Groups[1].Value.Replace(",", ""), out var gil))
             {
                 pendingTradeGil = gil;
             }
-            // Trade complete — match partner to player table and queue prompt
             else if (msgText == "Trade complete." && pendingTradePartner.HasValue && pendingTradeGil > 0)
             {
                 var (fullName, world) = pendingTradePartner.Value;
@@ -472,15 +510,23 @@ private static unsafe void SendChatMessage(string message)
                     string.Equals(p.FullName, fullName, StringComparison.OrdinalIgnoreCase) &&
                     (world.Length == 0 || string.Equals(p.World, world, StringComparison.OrdinalIgnoreCase)));
                 if (pi >= 0)
-                    pendingBetPrompt = (pi, pendingTradeGil);
+                {
+                    if (isDepositMode && pendingDepositFor == pi)
+                    {
+                        pendingDepositPrompt = (pi, pendingTradeGil);
+                        pendingDepositFor    = null;
+                    }
+                    else if (isBetPhase)
+                        pendingBetPrompt = (pi, pendingTradeGil);
+                }
                 pendingTradePartner = null;
                 pendingTradeGil     = 0;
             }
-            // Trade cancelled — clear state
             else if (msgText == "Trade canceled." || msgText == "Trade cancelled.")
             {
                 pendingTradePartner = null;
                 pendingTradeGil     = 0;
+                if (isDepositMode) pendingDepositFor = null;
             }
         }
 
@@ -642,6 +688,41 @@ private static unsafe void SendChatMessage(string message)
             ImGui.EndPopup();
         }
 
+        // ── Deposit prompt modal ───────────────────────────────────────────────
+        if (pendingDepositPrompt.HasValue)
+            ImGui.OpenPopup("Deposit to bank?##depositBank");
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, new Vector4(0, 0, 0, 0));
+        var showDepositModal = ImGui.BeginPopupModal("Deposit to bank?##depositBank", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.PopStyleColor();
+        if (showDepositModal)
+        {
+            var (dpi, dgil) = pendingDepositPrompt!.Value;
+            var dplayer     = State.Players[dpi];
+            var dkey        = PlayerStatKey(dplayer);
+            if (!config.PlayerStatsStore.TryGetValue(dkey, out var dstat))
+            {
+                dstat = new PlayerStat { DisplayName = dplayer.DisplayName };
+                config.PlayerStatsStore[dkey] = dstat;
+            }
+            ImGui.Text($"Deposit {dgil:N0} gil to {dplayer.DisplayName}'s bank?");
+            ImGui.Text($"Current bank: {dstat.Bank:N0} → {dstat.Bank + dgil:N0}");
+            ImGui.Spacing();
+            if (ImGui.Button("Yes"))
+            {
+                dstat.Bank += dgil;
+                config.Save();
+                pendingDepositPrompt = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("No"))
+            {
+                pendingDepositPrompt = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.EndPopup();
+        }
+
         if (isHistoryView)
         {
             ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.85f, 0.3f, 1f));
@@ -755,10 +836,11 @@ private static unsafe void SendChatMessage(string message)
 
         var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
                          ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
-        if (ImGui.BeginTable("##players"u8, 6, tableFlags))
+        if (ImGui.BeginTable("##players"u8, 7, tableFlags))
         {
             ImGui.TableSetupColumn("Name"u8,      ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Bet"u8,       ImGuiTableColumnFlags.WidthFixed, 70);
+            ImGui.TableSetupColumn("Bank"u8,      ImGuiTableColumnFlags.WidthFixed, 130);
             ImGui.TableSetupColumn("Cards"u8,     ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Score"u8,     ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Status"u8,    ImGuiTableColumnFlags.WidthFixed, 100);
@@ -970,8 +1052,145 @@ private static unsafe void SendChatMessage(string message)
                         ImGui.TextDisabled(eb > 0 ? GameEngine.FormatGil(eb) : (GameEngine.ParseBet(p.Bet) > 0 ? GameEngine.FormatGil(GameEngine.ParseBet(p.Bet)) : p.Bet));
                     }
 
-                    // ── Cards column ──────────────────────────────────────────
+                    // ── Bank column ───────────────────────────────────────────
                     ImGui.TableSetColumnIndex(2);
+                    if (isFirstHand)
+                    {
+                        var bankKey  = PlayerStatKey(p);
+                        if (!config.PlayerStatsStore.TryGetValue(bankKey, out var bankStat))
+                        {
+                            bankStat = new PlayerStat { DisplayName = p.DisplayName };
+                            config.PlayerStatsStore[bankKey] = bankStat;
+                        }
+                        var bankVal   = bankStat.Bank;
+                        var parsedBet = GameEngine.ParseBet(p.Bet);
+                        var bankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                        var fp  = ImGui.GetStyle().FramePadding.X;
+                        var sp  = ImGui.GetStyle().ItemSpacing.X;
+                        float BKW(string s) => ImGui.CalcTextSize(s).X + fp * 2;
+
+                        // Compute payout delta for this player (shown during Payout phase)
+                        var bankDelta = 0m;
+                        if (Phase == GamePhase.Payout && bankVal > 0)
+                        {
+                            for (var bhi = 0; bhi < p.Hands.Count; bhi++)
+                            {
+                                var br = GameEngine.GetPayoutResult(State, pi, bhi);
+                                bankDelta += br switch
+                                {
+                                    PayoutResult.Win   => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
+                                    PayoutResult.BjWin => Math.Round(GameEngine.GetEffectiveBet(p, p.Hands[bhi])
+                                                            * (State.BjPayout switch
+                                                            {
+                                                                BlackjackPayout.SixToFive => 1.2m,
+                                                                BlackjackPayout.EvenMoney => 1.0m,
+                                                                _                         => 1.5m,
+                                                            }), 2),
+                                    PayoutResult.Lose  => -GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
+                                    _                  => 0m,
+                                };
+                            }
+                        }
+
+                        // Bank balance (clickable to copy)
+                        ImGui.AlignTextToFramePadding();
+                        if (bankVal > 0)
+                        {
+                            var bankLabel = GameEngine.FormatGil(bankVal);
+                            var shortfall = parsedBet > 0 ? parsedBet - bankVal : 0m;
+                            if (shortfall > 0)
+                                ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f), bankLabel);
+                            else
+                                ImGui.TextUnformatted(bankLabel);
+                            if (ImGui.IsItemHovered())
+                            {
+                                var tipLines = new System.Text.StringBuilder();
+                                if (shortfall > 0)
+                                    tipLines.AppendLine($"Short by {GameEngine.FormatGil(shortfall)}");
+                                if (Phase == GamePhase.Payout && bankDelta != 0)
+                                {
+                                    var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
+                                    tipLines.AppendLine($"This round: {deltaStr}");
+                                    tipLines.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankDelta))}");
+                                }
+                                tipLines.Append("Click to copy");
+                                ImGui.SetTooltip(tipLines.ToString());
+                                if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                                    ImGui.SetClipboardText(bankVal.ToString());
+                            }
+                        }
+                        else
+                        {
+                            ImGui.TextDisabled("—");
+                        }
+
+                        // Deposit button (any phase); shift+click also announces shortfall if applicable
+                        if (hasWorld)
+                        {
+                            var depositW = BKW("Deposit");
+                            ImGui.SameLine();
+                            if (ImGui.GetCursorPosX() < bankCellRight - depositW)
+                                ImGui.SetCursorPosX(bankCellRight - depositW);
+                            if (ImGui.SmallButton($"Deposit##{pi}dep"))
+                            {
+                                var shortfall2 = parsedBet > 0 ? parsedBet - bankVal : 0m;
+                                if (ImGui.GetIO().KeyShift && shortfall2 > 0)
+                                    Apply(new AnnounceBankShortfall(pi, (long)Math.Ceiling(shortfall2)));
+                                pendingDepositFor = pi;
+                                Plugin.TradePlayer(p.FullName, p.World);
+                            }
+                            if (ImGui.IsItemHovered())
+                                ImGui.SetTooltip("Open trade to deposit to bank\nShift+Click to also announce shortfall");
+                        }
+
+                        // Withdraw field + button (only in Betting phase)
+                        if (Phase == GamePhase.Betting && bankVal > 0)
+                        {
+                            if (!bankWithdrawEdits.TryGetValue(pi, out var wdrawBuf))
+                                wdrawBuf = string.Empty;
+                            var remindW  = BKW("Remind") + sp;
+                            var wdrawBtnW = BKW("W") + sp;
+                            var wdrawFieldW = bankCellRight - ImGui.GetCursorPosX() - wdrawBtnW - remindW;
+                            ImGui.SetNextItemWidth(Math.Max(wdrawFieldW, 30));
+                            if (ImGui.InputText($"##wdraw{pi}", ref wdrawBuf, 16,
+                                    ImGuiInputTextFlags.EnterReturnsTrue))
+                            {
+                                if (long.TryParse(wdrawBuf, out var wamt) && wamt > 0)
+                                {
+                                    bankStat.Bank = Math.Max(0, bankVal - wamt);
+                                    config.Save();
+                                    bankWithdrawEdits.Remove(pi);
+                                }
+                            }
+                            else
+                                bankWithdrawEdits[pi] = wdrawBuf;
+                            ImGui.SameLine();
+                            var canWdraw = long.TryParse(wdrawBuf, out var wpreview) && wpreview > 0 && wpreview <= bankVal;
+                            if (!canWdraw) ImGui.BeginDisabled();
+                            if (ImGui.SmallButton($"W##{pi}wdraw"))
+                            {
+                                bankStat.Bank = Math.Max(0, bankVal - wpreview);
+                                config.Save();
+                                bankWithdrawEdits.Remove(pi);
+                            }
+                            if (!canWdraw) ImGui.EndDisabled();
+                            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                                ImGui.SetTooltip("Withdraw from bank");
+
+                            // Remind button
+                            ImGui.SameLine();
+                            var reminderDisabled = string.IsNullOrWhiteSpace(p.Bet);
+                            if (reminderDisabled) ImGui.BeginDisabled();
+                            if (ImGui.SmallButton($"Remind##{pi}bankremind"))
+                                Apply(new AnnounceBankRemind(pi, bankVal));
+                            if (reminderDisabled) ImGui.EndDisabled();
+                            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                                ImGui.SetTooltip("Remind player of their bet and bank balance");
+                        }
+                    }
+
+                    // ── Cards column ──────────────────────────────────────────
+                    ImGui.TableSetColumnIndex(3);
                     if (hand.Cards.Count > 0)
                     {
                         ImGui.AlignTextToFramePadding();
@@ -986,7 +1205,7 @@ private static unsafe void SendChatMessage(string message)
                     }
 
                     // ── Score column ──────────────────────────────────────────
-                    ImGui.TableSetColumnIndex(3);
+                    ImGui.TableSetColumnIndex(4);
                     if (hand.Cards.Count > 0)
                     {
                         var val      = GameEngine.HandValue(hand.Cards);
@@ -1002,7 +1221,7 @@ private static unsafe void SendChatMessage(string message)
                     }
 
                     // ── Status column ─────────────────────────────────────────
-                    ImGui.TableSetColumnIndex(4);
+                    ImGui.TableSetColumnIndex(5);
                     var statusCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     if (Phase == GamePhase.Payout)
                     {
@@ -1119,7 +1338,7 @@ private static unsafe void SendChatMessage(string message)
                     }
 
                     // ── Actions column ────────────────────────────────────────
-                    ImGui.TableSetColumnIndex(5);
+                    ImGui.TableSetColumnIndex(6);
                     var actionsCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     var hasAnyPending = pendingDouble.HasValue || pendingSplit.HasValue;
                     var isPendingDouble = pendingDouble.HasValue && pendingDouble.Value == (pi, hi);
@@ -1195,9 +1414,18 @@ private static unsafe void SendChatMessage(string message)
                         if (!canDouble) ImGui.BeginDisabled();
                         if (ImGui.SmallButton($"Dbl##{pi}_{hi}"))
                         {
+                            var dblBet  = GameEngine.GetEffectiveBet(p, hand);
+                            var dblKey  = PlayerStatKey(p);
+                            var dblBank = config.PlayerStatsStore.TryGetValue(dblKey, out var dblStat) ? dblStat.Bank : 0;
                             pendingDouble = (pi, hi);
                             Apply(new AnnounceDouble(pi, hi));
-                            if (hasWorld && config.AutoTradeEnabled) QueueTrade(p.FullName, p.World);
+                            if (dblBank >= (long)Math.Ceiling(dblBet) && dblStat != null)
+                            {
+                                dblStat.Bank -= (long)Math.Ceiling(dblBet);
+                                config.Save();
+                            }
+                            else if (hasWorld && config.AutoTradeEnabled)
+                                QueueTrade(p.FullName, p.World);
                         }
                         if (!canDouble) ImGui.EndDisabled();
 
@@ -1207,9 +1435,18 @@ private static unsafe void SendChatMessage(string message)
                         if (!canSplit) ImGui.BeginDisabled();
                         if (ImGui.SmallButton($"Spl##{pi}_{hi}"))
                         {
+                            var splBet  = GameEngine.GetEffectiveBet(p, hand);
+                            var splKey  = PlayerStatKey(p);
+                            var splBank = config.PlayerStatsStore.TryGetValue(splKey, out var splStat) ? splStat.Bank : 0;
                             pendingSplit = (pi, hi);
                             Apply(new AnnounceSplit(pi, hi));
-                            if (hasWorld && config.AutoTradeEnabled) QueueTrade(p.FullName, p.World);
+                            if (splBank >= (long)Math.Ceiling(splBet) && splStat != null)
+                            {
+                                splStat.Bank -= (long)Math.Ceiling(splBet);
+                                config.Save();
+                            }
+                            else if (hasWorld && config.AutoTradeEnabled)
+                                QueueTrade(p.FullName, p.World);
                         }
                         if (!canSplit) ImGui.EndDisabled();
 

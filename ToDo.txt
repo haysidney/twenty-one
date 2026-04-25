@@ -1,12 +1,10 @@
-- Trade help/automation.
-
-- Better payout screen.
-
-- Round summary
-
 - Splits/Doubles: implemented. Split ace house rule variants: currently forces stand after
   one card per standard casino rules, but some venues allow free hits on split aces.
   Consider making this configurable.
+
+- Bank shortfall on doubles/splits: currently if the bank doesn't fully cover the extra
+  bet, we fall back to the full trade flow. Could add partial-bank coverage (deduct what
+  bank has, open trade for remainder). Skipped for now as overengineered.
 
 - Shout timer for advertising
 
@@ -16,8 +14,6 @@
 
 - Figure out what the other plugin supports.
 
-- Auto trading should be an option maybe? At least for testing.
-
 - Edit game state directly (move cards around and whatnot for testing and/or unsupported house rules)
 
 - Make sure we have a test for splitting aces.
@@ -26,17 +22,11 @@
 
 - Don't bother switching channels for /random rolls. !Need to test this now
 
-- Test /l1
-
 - Test all channels on homeworld and not.
 
 - Test with a player that has the same name as the dealer.
 
 - Design a way to bank for players. Make it a player preference.
-
-- Add sounds to templates.
-
-- Shouts during big game moments
 
 - Send tell to player asking them if they'd like to play some blackjack. Optionally ask in a different channel?
 
@@ -46,12 +36,7 @@
 
 - Figure out if we should prevent certain undos
 
-- Test nonnumeric characters in the bet field
-
-- Sounds on every message
-
-- Consecutive text command input is currently restricted.
- - Change the default from 1000 to 1200				
+- Test nonnumeric characters in the bet field			
 
 - When a split wins both hands, combine the payout
 
@@ -67,24 +52,34 @@
 
 -----
 
-- auto determine bet amount
-
-- Summary 1000s to k
-
 - Need an announcement for holding some amount for the bet next round before trading after winning a double down
-
-- Happy noises for winners, sad noises for loser, medium noises for pushers, crazy noises for bjers
 
 - Need a settlement narration
 
-- If one player pushes with multiple hands because of a split, we actually need to give them money. Need to account for any of those hands that were a double down. 
+- Sit out a round
 
-- A push of a doubled down hand means they need to be given money.
+------ Immy suggestions
 
-- Fix the winnings column in the Player Stats window
+- Add commands for hit stand etc
 
-- Right align trade button
+- Allow reordering players
 
-- Remove "bet: " from the narrations
+- Keep track of paid players during payout
 
-- Add " total" to the multi-hand payout amount
+- Add amount bet and amount lost
+
+- Track VIP status?
+
+- Go back to previous night's stats
+
+- Export stats should go to file
+
+- 5 card charlie
+
+DONT WRONG IN THE DOUBLE AND SPLIT ANNOUNCEMENT
+
+DROPBOX SUPPORT
+
+Split Aces only hit once
+
+Print rules

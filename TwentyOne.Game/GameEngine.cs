@@ -689,6 +689,27 @@ public static class GameEngine
                 return (state, effects);
             }
 
+            // ── AnnounceBankRemind ───────────────────────────────────────────
+            case AnnounceBankRemind a:
+            {
+                var player = state.Players[a.PlayerIndex];
+                Narrate(t.PlayerBankRemind,
+                    ("name",   player.DisplayName),
+                    ("amount", FormatGil(ParseBet(player.Bet))),
+                    ("bank",   FormatGil(a.Bank)));
+                return (state, effects);
+            }
+
+            // ── AnnounceBankShortfall ────────────────────────────────────────
+            case AnnounceBankShortfall a:
+            {
+                var player = state.Players[a.PlayerIndex];
+                Narrate(t.PlayerBankShortfall,
+                    ("name",   player.DisplayName),
+                    ("amount", FormatGil(a.ShortfallAmount)));
+                return (state, effects);
+            }
+
             // ── AnnounceDealerDeal / AnnouncePlayerDeal ──────────────────────
             case AnnounceDealerDeal:
                 Narrate(t.DealDealerCard, ("dealer", dealerName));

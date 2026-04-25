@@ -114,6 +114,22 @@ public class RoundHistoryWindow : Window
                 ? $"+{GameEngine.FormatGil(entry.BankNet)}"
                 : GameEngine.FormatGil(entry.BankNet);
             ImGui.TextColored(netColor, netStr);
+            if (entry.PlayerBanks.Count > 0 && ImGui.IsItemHovered())
+            {
+                var prevEntry   = i + 1 < history.Count ? history[i + 1] : null;
+                var tipLines    = new System.Text.StringBuilder("Bank balances after payout:\n");
+                foreach (var (pkey, pbal) in entry.PlayerBanks)
+                {
+                    var prevBal  = prevEntry != null && prevEntry.PlayerBanks.TryGetValue(pkey, out var pb) ? pb : 0;
+                    var delta    = pbal - prevBal;
+                    var deltaStr = delta >= 0 ? $"+{GameEngine.FormatGil(delta)}" : GameEngine.FormatGil(delta);
+                    var name     = entry.Snapshot.Players
+                        .Find(pl => (pl.FullName.Length > 0 ? $"{pl.FullName}@{pl.World}" : pl.Nickname) == pkey)
+                        ?.DisplayName ?? pkey;
+                    tipLines.AppendLine($"  {name}: {GameEngine.FormatGil(pbal)} ({deltaStr})");
+                }
+                ImGui.SetTooltip(tipLines.ToString().TrimEnd());
+            }
         }
 
         ImGui.EndTable();

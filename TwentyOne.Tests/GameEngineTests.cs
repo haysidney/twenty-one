@@ -1681,6 +1681,34 @@ public class SplitHandTests
         Assert.Single(effects);
         Assert.Equal("Lorah bet=50K", ((SendChat)effects[0]).Text);
     }
+
+    [Fact]
+    public void AnnounceBankRemind_NarratesNameAmountAndBank()
+    {
+        var state = new GameState
+        {
+            Phase   = GamePhase.Betting,
+            Players = [new Player { Nickname = "Lorah", Bet = "50000" }],
+        };
+        var t = new NarrationTemplates { PlayerBankRemind = ["{name} bet={amount} bank={bank}"] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceBankRemind(0, 200000), t);
+        Assert.Single(effects);
+        Assert.Equal("Lorah bet=50K bank=200K", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void AnnounceBankShortfall_NarratesNameAndShortfall()
+    {
+        var state = new GameState
+        {
+            Phase   = GamePhase.Betting,
+            Players = [new Player { Nickname = "Lorah", Bet = "100000" }],
+        };
+        var t = new NarrationTemplates { PlayerBankShortfall = ["{name} needs {amount}"] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceBankShortfall(0, 60000), t);
+        Assert.Single(effects);
+        Assert.Equal("Lorah needs 60K", ((SendChat)effects[0]).Text);
+    }
 }
 
 public class AnnouncePlayerTurnTests

@@ -57,6 +57,14 @@ public class NarrationTemplates
     // {name} = player display name, {amount} = bet amount
     public List<string> PlayerBetConfirm { get; set; } = ["{name}, your current bet is {amount}. If you want to change it let me know."];
 
+    // Bank remind — sent from Bank column Remind button
+    // {name} = player display name, {amount} = bet amount, {bank} = bank balance
+    public List<string> PlayerBankRemind { get; set; } = ["{name}, your bet is {amount} and your bank balance is {bank}."];
+
+    // Bank shortfall request — sent when dealer shift+clicks Deposit and bank < bet
+    // {name} = player display name, {amount} = shortfall amount
+    public List<string> PlayerBankShortfall { get; set; } = ["{name}, please trade {amount} to cover your bet."];
+
     // Trade-request announcements (sent when dealer clicks Double/Split, before confirming trade)
     // {amount} = the extra chips required
     public List<string> PlayerDoubleRequest { get; set; } = ["{name} would like to double down! Please trade {amount} gil to the dealer."];

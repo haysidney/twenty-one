@@ -16,6 +16,7 @@ public class PlayerStat
     public int     GamesLost   { get; set; } = 0;
     public int     Blackjacks  { get; set; } = 0;
     public decimal TotalWon    { get; set; } = 0;
+    public long    Bank        { get; set; } = 0;
 }
 
 [Serializable]
