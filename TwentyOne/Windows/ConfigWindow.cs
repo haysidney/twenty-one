@@ -73,8 +73,19 @@ public class ConfigWindow : Window, IDisposable
         ImGui.SetNextItemWidth(70);
         if (ImGui.Combo("##bjpayout", ref bjIdx, bjOptions, bjOptions.Length))
         {
-            // BjPayout is a venue setting, not an undoable game action.
             config.GameState.BjPayout = (BlackjackPayout)bjIdx;
+            config.Save();
+        }
+
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text("Five Card Charlie");
+        ImGui.SameLine();
+        var charlieOptions = new[] { "Disabled", "Beats all", "Loses to dealer BJ" };
+        var charlieIdx     = (int)config.GameState.FiveCardCharlie;
+        ImGui.SetNextItemWidth(150);
+        if (ImGui.Combo("##fiveCardCharlie", ref charlieIdx, charlieOptions, charlieOptions.Length))
+        {
+            config.GameState.FiveCardCharlie = (FiveCardCharlieRule)charlieIdx;
             config.Save();
         }
 
@@ -490,6 +501,7 @@ public class ConfigWindow : Window, IDisposable
             NtListRow("Blackjack##ntPBJ",       "{name}  {cards}",  Defaults.PlayerBJ,            ctrlHeld, t.PlayerBJ);
             NtListRow("BJ moving along##ntPBJMA", "{name}  {cards}", Defaults.PlayerBJMovingAlong, ctrlHeld, t.PlayerBJMovingAlong);
             NtListRow("Stand##ntPS",       "{name}  {cards}  {score}",                                          Defaults.PlayerStand,       ctrlHeld, t.PlayerStand);
+            NtListRow("Charlie##ntPC",     "{name}  {card}  {cards}  {score}",                                  Defaults.PlayerCharlie,     ctrlHeld, t.PlayerCharlie);
 
             ImGui.EndTabItem();
         }
@@ -537,10 +549,11 @@ public class ConfigWindow : Window, IDisposable
             NtListRow("Header##ntPH",      "(no variables)",          Defaults.PayoutHeader,        ctrlHeld, t.PayoutHeader);
             NtListRow("Dlr Bust##ntPDB",   "{dealer}  {score}",      Defaults.PayoutDealerBust,    ctrlHeld, t.PayoutDealerBust);
             NtListRow("Dlr Stands##ntPDS", "{dealer}  {score}",      Defaults.PayoutDealerStands,  ctrlHeld, t.PayoutDealerStands);
-            NtListRow("Win##ntPW",         "{name}  {bet}  {amount}", Defaults.PayoutWin,           ctrlHeld, t.PayoutWin);
-            NtListRow("BJ Win##ntPBJ",     "{name}  {bet}  {amount}", Defaults.PayoutBjWin,         ctrlHeld, t.PayoutBjWin);
-            NtListRow("Lose##ntPL",        "{name}  {bet}  {amount}", Defaults.PayoutLose,          ctrlHeld, t.PayoutLose);
-            NtListRow("Push##ntPPush",     "{name}  {bet}",           Defaults.PayoutPush,          ctrlHeld, t.PayoutPush);
+            NtListRow("Win##ntPW",         "{name}  {bet}  {amount}", Defaults.PayoutWin,        ctrlHeld, t.PayoutWin);
+            NtListRow("BJ Win##ntPBJ",     "{name}  {bet}  {amount}", Defaults.PayoutBjWin,      ctrlHeld, t.PayoutBjWin);
+            NtListRow("Charlie##ntPCW",    "{name}  {bet}  {amount}", Defaults.PayoutCharlieWin, ctrlHeld, t.PayoutCharlieWin);
+            NtListRow("Lose##ntPL",        "{name}  {bet}  {amount}", Defaults.PayoutLose,       ctrlHeld, t.PayoutLose);
+            NtListRow("Push##ntPPush",     "{name}  {bet}",           Defaults.PayoutPush,       ctrlHeld, t.PayoutPush);
             NtListRow("Split win##ntPSW",  "{name}  {amount}",        Defaults.PayoutSplitCombined, ctrlHeld, t.PayoutSplitCombined);
 
             ImGui.EndTabItem();

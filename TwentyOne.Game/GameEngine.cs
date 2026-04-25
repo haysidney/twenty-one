@@ -63,12 +63,13 @@ public static class GameEngine
         return (low != high && high <= 21) ? $"{low}/{high}" : high.ToString();
     }
 
-    public static HandState ComputeHandState(IReadOnlyList<int> cards, HandState current, bool isFromSplit = false)
+    public static HandState ComputeHandState(IReadOnlyList<int> cards, HandState current, bool isFromSplit = false, bool fiveCardCharlie = false)
     {
         if (current == HandState.Stand) return HandState.Stand;
         var val = HandValue(cards);
         if (val > 21)                                          return HandState.Bust;
         if (!isFromSplit && cards.Count == 2 && val == 21)    return HandState.Blackjack;
+        if (fiveCardCharlie && cards.Count >= 5)               return HandState.Charlie;
         return HandState.Playing;
     }
 
@@ -166,6 +167,14 @@ public static class GameEngine
         var dealerBust = state.DealerHand.Cards.Count > 0 && dealerVal > 21;
         var dealerBJ   = state.DealerHand.Cards.Count == 2 && dealerVal == 21;
         var playerBJ   = hand.State == HandState.Blackjack;
+        var charlie    = hand.State == HandState.Charlie;
+
+        if (charlie)
+        {
+            if (dealerBJ && state.FiveCardCharlie == FiveCardCharlieRule.LosesToDealerBJ)
+                return PayoutResult.Lose;
+            return PayoutResult.CharlieWin;
+        }
 
         if (playerBJ && dealerBJ) return PayoutResult.Push;
         if (playerBJ)             return PayoutResult.BjWin;
@@ -199,10 +208,11 @@ public static class GameEngine
         var result = GetPayoutResult(state, playerIndex, handIndex);
         var delta  = result switch
         {
-            PayoutResult.Win   => bet,
-            PayoutResult.BjWin => Math.Ceiling(bet * BjMultiplier(state.BjPayout)),
-            PayoutResult.Lose  => -bet,
-            _                  => 0m,
+            PayoutResult.Win        => bet,
+            PayoutResult.BjWin      => Math.Ceiling(bet * BjMultiplier(state.BjPayout)),
+            PayoutResult.CharlieWin => bet,
+            PayoutResult.Lose       => -bet,
+            _                       => 0m,
         };
         return delta == 0 ? null : delta;
     }
@@ -223,13 +233,13 @@ public static class GameEngine
 
     // ── Internal state builders ───────────────────────────────────────────────
 
-    private static Hand AddCardToHand(Hand hand, int card)
+    private static Hand AddCardToHand(Hand hand, int card, bool fiveCardCharlie = false)
     {
         var cards = new List<int>(hand.Cards) { card };
         return new Hand
         {
             Cards       = cards,
-            State       = ComputeHandState(cards, hand.State, hand.IsFromSplit),
+            State       = ComputeHandState(cards, hand.State, hand.IsFromSplit, fiveCardCharlie),
             Doubled     = hand.Doubled,
             Bet         = hand.Bet,
             IsFromSplit = hand.IsFromSplit,
@@ -260,16 +270,16 @@ public static class GameEngine
         players.Select((p, i) => i == pi ? newPlayer : p).ToList();
 
     private static GameState With(GameState s,
-        List<Player>?       players               = null,
-        Hand?               dealerHand            = null,
-        GamePhase?          phase                 = null,
-        int?                activePlayerIndex     = null,
-        int?                activeHandIndex       = null,
-        bool?               waitingForNextPlayer  = null,
-        bool?               waitingForDealer      = null,
-        BlackjackPayout?    bjPayout              = null,
-        HashSet<string>?    lastRoundWinners      = null,
-        HashSet<string>?    lastRoundPushers      = null) =>
+        List<Player>?         players               = null,
+        Hand?                 dealerHand            = null,
+        GamePhase?            phase                 = null,
+        int?                  activePlayerIndex     = null,
+        int?                  activeHandIndex       = null,
+        bool?                 waitingForNextPlayer  = null,
+        bool?                 waitingForDealer      = null,
+        BlackjackPayout?      bjPayout              = null,
+        HashSet<string>?      lastRoundWinners      = null,
+        HashSet<string>?      lastRoundPushers      = null) =>
         new GameState
         {
             Players                   = players              ?? s.Players,
@@ -280,6 +290,7 @@ public static class GameEngine
             WaitingForNextPlayer      = waitingForNextPlayer ?? s.WaitingForNextPlayer,
             WaitingForDealer          = waitingForDealer     ?? s.WaitingForDealer,
             BjPayout                  = bjPayout             ?? s.BjPayout,
+            FiveCardCharlie           = s.FiveCardCharlie,
             LastRoundWinners          = lastRoundWinners     ?? s.LastRoundWinners,
             LastRoundPushers          = lastRoundPushers     ?? s.LastRoundPushers,
             SkipDealSummaryOnePlayer  = s.SkipDealSummaryOnePlayer,
@@ -416,8 +427,9 @@ public static class GameEngine
             {
                 var pi            = a.PlayerIndex;
                 var hi            = a.HandIndex;
-                var prevCardCount = state.Players[pi].Hands[hi].Cards.Count;
-                var newHand       = AddCardToHand(state.Players[pi].Hands[hi], a.Card);
+                var prevCardCount   = state.Players[pi].Hands[hi].Cards.Count;
+                var fiveCardCharlie = state.FiveCardCharlie != FiveCardCharlieRule.Disabled;
+                var newHand         = AddCardToHand(state.Players[pi].Hands[hi], a.Card, fiveCardCharlie);
 
                 // Forced stand: doubled hand gets exactly one card then stands.
                 // Forced stand: split aces get exactly one card then stand (per standard rules).
@@ -468,6 +480,9 @@ public static class GameEngine
                     else if (newHand.State == HandState.Blackjack)
                         Narrate(t.PlayerBJ,
                             ("name", displayName), ("cards", cards));
+                    else if (newHand.State == HandState.Charlie)
+                        Narrate(t.PlayerCharlie,
+                            ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
                     else if (newHand.Doubled && newHand.State == HandState.Stand)
                         Narrate(t.PlayerDouble,
                             ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
@@ -837,7 +852,7 @@ public static class GameEngine
                     // For split hands where every hand wins, emit one combined line.
                     var allWin = multiHand && p.Hands
                         .Select((_, hi) => GetPayoutResult(state, pi, hi))
-                        .All(r => r == PayoutResult.Win || r == PayoutResult.BjWin);
+                        .All(r => r == PayoutResult.Win || r == PayoutResult.BjWin || r == PayoutResult.CharlieWin);
                     if (allWin)
                     {
                         var total = 0m;
@@ -860,11 +875,12 @@ public static class GameEngine
                         var result = GetPayoutResult(state, pi, hi);
                         var template = result switch
                         {
-                            PayoutResult.Win   => t.PayoutWin,
-                            PayoutResult.BjWin => t.PayoutBjWin,
-                            PayoutResult.Lose  => t.PayoutLose,
-                            PayoutResult.Push  => t.PayoutPush,
-                            _                  => null,
+                            PayoutResult.Win        => t.PayoutWin,
+                            PayoutResult.BjWin      => t.PayoutBjWin,
+                            PayoutResult.CharlieWin => t.PayoutCharlieWin,
+                            PayoutResult.Lose       => t.PayoutLose,
+                            PayoutResult.Push       => t.PayoutPush,
+                            _                       => null,
                         };
                         if (template == null) continue;
 
@@ -885,14 +901,14 @@ public static class GameEngine
                 var winners = new HashSet<string>(
                     state.Players
                          .Where((p, pi) => p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
-                                            .Any(r => r is PayoutResult.Win or PayoutResult.BjWin))
+                                            .Any(r => r is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin))
                          .Select(p => p.FullName.Length > 0 ? p.FullName : p.Nickname));
                 var pushers = new HashSet<string>(
                     state.Players
                          .Where((p, pi) => p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
                                             .Any(r => r == PayoutResult.Push)
                                         && !p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
-                                            .Any(r => r is PayoutResult.Win or PayoutResult.BjWin))
+                                            .Any(r => r is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin))
                          .Select(p => p.FullName.Length > 0 ? p.FullName : p.Nickname));
                 return (With(state, phase: GamePhase.Payout, lastRoundWinners: winners, lastRoundPushers: pushers), effects);
             }
@@ -914,6 +930,7 @@ public static class GameEngine
                     ActivePlayerIndex = -1,
                     ActiveHandIndex   = -1,
                     BjPayout                 = state.BjPayout,
+                    FiveCardCharlie          = state.FiveCardCharlie,
                     LastRoundWinners         = state.LastRoundWinners,
                     LastRoundPushers         = state.LastRoundPushers,
                     SkipDealSummaryOnePlayer = state.SkipDealSummaryOnePlayer,

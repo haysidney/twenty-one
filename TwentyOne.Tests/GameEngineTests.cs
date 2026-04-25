@@ -929,6 +929,40 @@ public class NarrationTemplateTests
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 8), t, dealerName: "Vera");
         Assert.Contains("Vera:", ((SendChat)effects[0]).Text);
     }
+
+    [Fact]
+    public void PlayerCharlie_UsesTemplate()
+    {
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            FiveCardCharlie   = FiveCardCharlieRule.BeatsAll,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            DealerHand        = new Hand { Cards = [7] },
+            Players           = [new Player { Nickname = "Lorah", Bet = "100",
+                Hands = [new Hand { Cards = [2, 3, 4, 5], State = HandState.Playing }] }],
+        };
+        var t = new NarrationTemplates { PlayerCharlie = ["CHARLIE {name} {card}"] };
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 6), t);
+        Assert.Equal("CHARLIE Lorah 6", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void PayoutCharlieWin_UsesTemplate()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
+            DealerHand      = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players         = [new Player { Nickname = "Lorah", Bet = "100",
+                Hands = [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] }],
+        };
+        var t = new NarrationTemplates { PayoutCharlieWin = ["CHARLIEWIN {name} {amount}"] };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
+        Assert.Contains(effects.OfType<SendChat>(), e => e.Text.StartsWith("CHARLIEWIN Lorah"));
+    }
 }
 
 public class ImmutabilityTests
@@ -2115,5 +2149,107 @@ public class LastRoundPushersTests
         };
         var (newState, _) = GameEngine.Apply(state, new NewRound());
         Assert.Contains("Lorah", newState.LastRoundPushers);
+    }
+}
+
+public class FiveCardCharlieTests
+{
+    private static GameState CharlieState(FiveCardCharlieRule rule, int[] playerCards, int[] dealerCards) => new GameState
+    {
+        Phase           = GamePhase.Payout,
+        FiveCardCharlie = rule,
+        DealerHand      = new Hand { Cards = [..dealerCards], State = HandState.Stand },
+        Players         = [new Player { Nickname = "Lorah", Bet = "100", Hands =
+            [new Hand { Cards = [..playerCards], State = HandState.Charlie }] }],
+    };
+
+    [Fact]
+    public void ComputeHandState_FiveCards_Disabled_IsPlaying()
+    {
+        var state = GameEngine.ComputeHandState([2, 3, 4, 5, 6], HandState.Playing, false, false);
+        Assert.Equal(HandState.Playing, state);
+    }
+
+    [Fact]
+    public void ComputeHandState_FiveCards_Enabled_IsCharlie()
+    {
+        var state = GameEngine.ComputeHandState([2, 3, 4, 5, 6], HandState.Playing, false, true);
+        Assert.Equal(HandState.Charlie, state);
+    }
+
+    [Fact]
+    public void ComputeHandState_FourCards_Enabled_IsPlaying()
+    {
+        var state = GameEngine.ComputeHandState([2, 3, 4, 5], HandState.Playing, false, true);
+        Assert.Equal(HandState.Playing, state);
+    }
+
+    [Fact]
+    public void Charlie_BeatsAll_WinsAgainstDealer()
+    {
+        var state = CharlieState(FiveCardCharlieRule.BeatsAll, [2, 3, 4, 5, 6], [10, 7]);
+        Assert.Equal(PayoutResult.CharlieWin, GameEngine.GetPayoutResult(state, 0));
+    }
+
+    [Fact]
+    public void Charlie_BeatsAll_WinsAgainstDealerBJ()
+    {
+        var state = CharlieState(FiveCardCharlieRule.BeatsAll, [2, 3, 4, 5, 6], [1, 10]);
+        Assert.Equal(PayoutResult.CharlieWin, GameEngine.GetPayoutResult(state, 0));
+    }
+
+    [Fact]
+    public void Charlie_LosesToDealerBJ_WinsNormally()
+    {
+        var state = CharlieState(FiveCardCharlieRule.LosesToDealerBJ, [2, 3, 4, 5, 6], [10, 7]);
+        Assert.Equal(PayoutResult.CharlieWin, GameEngine.GetPayoutResult(state, 0));
+    }
+
+    [Fact]
+    public void Charlie_LosesToDealerBJ_LosesAgainstDealerBJ()
+    {
+        var state = CharlieState(FiveCardCharlieRule.LosesToDealerBJ, [2, 3, 4, 5, 6], [1, 10]);
+        Assert.Equal(PayoutResult.Lose, GameEngine.GetPayoutResult(state, 0));
+    }
+
+    [Fact]
+    public void Charlie_PayoutDelta_IsEvenMoney()
+    {
+        var state = CharlieState(FiveCardCharlieRule.BeatsAll, [2, 3, 4, 5, 6], [10, 7]);
+        Assert.Equal("+100", GameEngine.PayoutAmountString(state, 0));
+    }
+
+    [Fact]
+    public void AddPlayerCard_FifthCard_Enabled_NarratesCharlie()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.PlayerTurns,
+            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            DealerHand = new Hand { Cards = [7] },
+            Players    = [new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands    = [new Hand { Cards = [2, 3, 4, 5], State = HandState.Playing }],
+            }],
+        };
+        var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 6));
+        Assert.Equal(HandState.Charlie, newState.Players[0].Hands[0].State);
+        Assert.Contains(effects.OfType<SendChat>(), e => e.Text.Contains("Five Card Charlie"));
+    }
+
+    [Fact]
+    public void NewRound_PreservesFiveCardCharlieRule()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.Payout,
+            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
+            Players         = [new Player { Nickname = "Lorah", Hands = [new Hand()] }],
+        };
+        var (newState, _) = GameEngine.Apply(state, new NewRound());
+        Assert.Equal(FiveCardCharlieRule.LosesToDealerBJ, newState.FiveCardCharlie);
     }
 }

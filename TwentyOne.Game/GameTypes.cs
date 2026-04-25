@@ -14,10 +14,11 @@ public class RoundHistoryEntry
     public Dictionary<string, long> PlayerBanks { get; set; } = [];
 }
 
-public enum HandState { Playing, Stand, Bust, Blackjack }
+public enum HandState { Playing, Stand, Bust, Blackjack, Charlie }
 public enum GamePhase { Betting, Deal, PlayerTurns, DealerTurn, Payout }
 public enum BlackjackPayout { ThreeToTwo, SixToFive, EvenMoney }
-public enum PayoutResult { None, Win, BjWin, Lose, Push }
+public enum PayoutResult { None, Win, BjWin, CharlieWin, Lose, Push }
+public enum FiveCardCharlieRule { Disabled, BeatsAll, LosesToDealerBJ }
 
 [Serializable]
 public class Hand
@@ -62,6 +63,7 @@ public class GameState
     public bool WaitingForNextPlayer { get; set; } = false;
     public bool WaitingForDealer { get; set; } = false;
     public BlackjackPayout BjPayout { get; set; } = BlackjackPayout.ThreeToTwo;
+    public FiveCardCharlieRule FiveCardCharlie { get; set; } = FiveCardCharlieRule.Disabled;
     // FullNames (or Nicknames for manual players) of players who won last round.
     public HashSet<string> LastRoundWinners { get; set; } = [];
     // FullNames (or Nicknames for manual players) of players who pushed last round.

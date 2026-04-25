@@ -49,6 +49,9 @@ public class NarrationTemplates
     // Split ace mandatory card — card dealt, hand auto-stood per split-ace rule
     public List<string> PlayerSplitAce { get; set; } = ["{name} draws {card} — {cards} = {score} (split aces, auto-stand)"];
 
+    // Five Card Charlie — {name} {card} {cards} {score}
+    public List<string> PlayerCharlie { get; set; } = ["{name} — Five Card Charlie! {card} | {cards} = {score}"];
+
     // Bet-collection request (sent when dealer shift+clicks Trade during Betting)
     // {name} = player display name
     public List<string> PlayerBetRequest { get; set; } = ["{name}, please trade your bet to me."];
@@ -103,10 +106,11 @@ public class NarrationTemplates
     public List<string> PayoutDealerBust   { get; set; } = ["{dealer} busts ({score})"];
     public List<string> PayoutDealerStands { get; set; } = ["{dealer} {score}"];
     // {name} may include "(Hand N)"; {bet} = "100g" or ""; {amount} = "+150g" or "-100g" or ""
-    public List<string> PayoutWin   { get; set; } = ["{name}: Win (bet: {bet}) {amount}"];
-    public List<string> PayoutBjWin { get; set; } = ["{name}: Blackjack! (bet: {bet}) {amount}"];
-    public List<string> PayoutLose  { get; set; } = ["{name}: Lose (bet: {bet}) {amount}"];
-    public List<string> PayoutPush  { get; set; } = ["{name}: Push (bet: {bet})"];
+    public List<string> PayoutWin        { get; set; } = ["{name}: Win (bet: {bet}) {amount}"];
+    public List<string> PayoutBjWin      { get; set; } = ["{name}: Blackjack! (bet: {bet}) {amount}"];
+    public List<string> PayoutCharlieWin { get; set; } = ["{name}: Five Card Charlie! (bet: {bet}) {amount}"];
+    public List<string> PayoutLose       { get; set; } = ["{name}: Lose (bet: {bet}) {amount}"];
+    public List<string> PayoutPush       { get; set; } = ["{name}: Push (bet: {bet})"];
 
     // Newtonsoft.Json reuses existing List instances and appends to them.
     // Clear all lists before deserialization so defaults don't accumulate on reload.
