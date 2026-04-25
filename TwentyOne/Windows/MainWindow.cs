@@ -661,11 +661,12 @@ private static unsafe void SendChatMessage(string message)
         if (bankManagePlayerIndex >= 0 && bankManagePlayerIndex < State.Players.Count)
         {
             var bankWinOpen = true;
+            var bmp     = State.Players[bankManagePlayerIndex];
+            var bmpKey  = PlayerStatKey(bmp);
+            var bankTitle = $"{bmp.DisplayName}'s Bank##bankManage";
             ImGui.SetNextWindowSize(new Vector2(300, 0), ImGuiCond.Always);
-            if (ImGui.Begin("Bank##bankManage", ref bankWinOpen, ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize))
+            if (ImGui.Begin(bankTitle, ref bankWinOpen, ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize))
             {
-                var bmp     = State.Players[bankManagePlayerIndex];
-                var bmpKey  = PlayerStatKey(bmp);
                 if (!config.PlayerStatsStore.TryGetValue(bmpKey, out var bmpStat))
                 {
                     bmpStat = new PlayerStat { DisplayName = bmp.DisplayName };
@@ -680,14 +681,14 @@ private static unsafe void SendChatMessage(string message)
                 ImGui.Spacing();
 
                 // Deposit
-                ImGui.Text("Deposit"); ImGui.SameLine(80);
+                ImGui.AlignTextToFramePadding(); ImGui.Text("Deposit"); ImGui.SameLine(80);
                 ImGui.SetNextItemWidth(140);
                 ImGui.InputText("##bankdep", ref bankDepositBuf, 20);
-                ImGui.SameLine();
+                ImGui.SetCursorPosX(80);
                 var hasWorld2 = bmp.World.Length > 0;
                 if (hasWorld2)
                 {
-                    if (ImGui.SmallButton("Trade##bankdeptrade"))
+                    if (ImGui.Button("Trade##bankdeptrade"))
                     {
                         if (config.AutoDepositFromTrades) pendingDepositFor = bankManagePlayerIndex;
                         Plugin.TradePlayer(bmp.FullName, bmp.World);
@@ -712,7 +713,7 @@ private static unsafe void SendChatMessage(string message)
                 ImGui.Spacing();
 
                 // Withdraw
-                ImGui.Text("Withdraw"); ImGui.SameLine(80);
+                ImGui.AlignTextToFramePadding(); ImGui.Text("Withdraw"); ImGui.SameLine(80);
                 ImGui.SetNextItemWidth(140);
                 ImGui.InputText("##bankwd", ref bankWithdrawBuf, 20);
                 ImGui.SameLine();
