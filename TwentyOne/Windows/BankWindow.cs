@@ -25,6 +25,11 @@ public unsafe class BankWindow : Window, IDisposable
         };
         Flags = ImGuiWindowFlags.NoCollapse;
 
+        SyncBuffers();
+    }
+
+    public void SyncBuffers()
+    {
         gilStartBuf = config.GilStart.ToString();
         gilEndBuf   = config.GilEnd.ToString();
     }

@@ -39,8 +39,8 @@ public sealed class Plugin : IDalamudPlugin
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
-        ConfigWindow      = new ConfigWindow(Configuration);
         BankWindow        = new BankWindow(Configuration);
+        ConfigWindow      = new ConfigWindow(Configuration, BankWindow);
         PlayerStatsWindow = new PlayerStatsWindow(Configuration);
         MainWindow        = new MainWindow(Configuration, ConfigWindow, BankWindow, PlayerStatsWindow, ChatGui, ObjectTable, TargetManager);
         ContextMenu.OnMenuOpened += OnMenuOpened;

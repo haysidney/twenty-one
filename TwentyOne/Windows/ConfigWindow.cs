@@ -12,11 +12,13 @@ namespace TwentyOne.Windows;
 public class ConfigWindow : Window, IDisposable
 {
     private readonly Configuration config;
+    private readonly BankWindow    bankWindow;
 
-    public ConfigWindow(Configuration config)
+    public ConfigWindow(Configuration config, BankWindow bankWindow)
         : base("Twenty One — Settings##TwentyOneConfig")
     {
-        this.config = config;
+        this.config     = config;
+        this.bankWindow = bankWindow;
         SizeConstraints = new WindowSizeConstraints { MinimumSize = new Vector2(400, 200), MaximumSize = new Vector2(float.MaxValue, float.MaxValue) };
         Flags = ImGuiWindowFlags.NoCollapse;
     }
@@ -27,6 +29,9 @@ public class ConfigWindow : Window, IDisposable
 
     private bool   _narrationDirty;
     private double _narrationDirtyAt;
+
+    private string _renameBuffer  = string.Empty;
+    private bool   _renamePending = false;
 
     private readonly FileDialogManager _fileDialogManager = new();
 
@@ -51,6 +56,12 @@ public class ConfigWindow : Window, IDisposable
             config.Save();
             _narrationDirty = false;
         }
+
+        DrawVenueSelector();
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
 
         ImGui.AlignTextToFramePadding();
         ImGui.Text("Blackjack Payout");
@@ -177,6 +188,77 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Spacing();
 
         DrawNarrationTemplates();
+    }
+
+    private void DrawVenueSelector()
+    {
+        var roundInProgress = !(config.GameState.Phase == TwentyOne.Game.GamePhase.Betting && config.GameState.Players.Count == 0);
+
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text("Venue");
+        ImGui.SameLine();
+
+        var venueNames = config.Venues.ConvertAll(v => v.Name).ToArray();
+        var idx = config.ActiveVenueIndex;
+        ImGui.SetNextItemWidth(180);
+        if (roundInProgress) ImGui.BeginDisabled();
+        if (ImGui.Combo("##venue", ref idx, venueNames, venueNames.Length) && idx != config.ActiveVenueIndex)
+        {
+            config.ActiveVenueIndex = idx;
+            bankWindow.SyncBuffers();
+            config.Save();
+        }
+        if (roundInProgress) ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && roundInProgress)
+            ImGui.SetTooltip("Cannot switch venues while a round is in progress."u8);
+
+        ImGui.SameLine();
+        if (ImGui.Button("+##venueAdd"))
+        {
+            config.Venues.Add(new VenueSettings { Name = $"Venue {config.Venues.Count + 1}" });
+            if (!roundInProgress)
+            {
+                config.ActiveVenueIndex = config.Venues.Count - 1;
+                bankWindow.SyncBuffers();
+            }
+            config.Save();
+        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add a new venue."u8);
+
+        ImGui.SameLine();
+        if (ImGui.Button("Rename##venueRename"))
+        {
+            _renameBuffer  = config.ActiveVenue.Name;
+            _renamePending = true;
+        }
+
+        if (_renamePending)
+        {
+            ImGui.SetNextWindowSize(new System.Numerics.Vector2(300, 0), ImGuiCond.Always);
+            ImGui.OpenPopup("Rename Venue##venueRenamePopup");
+        }
+
+        if (ImGui.BeginPopupModal("Rename Venue##venueRenamePopup", ref _renamePending, ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove))
+        {
+            ImGui.SetNextItemWidth(-1);
+            if (ImGui.IsWindowAppearing()) ImGui.SetKeyboardFocusHere();
+            var confirmed = ImGui.InputText("##venueRenameInput", ref _renameBuffer, 64, ImGuiInputTextFlags.EnterReturnsTrue);
+            if (confirmed || ImGui.Button("OK##venueRenameOK"))
+            {
+                if (!string.IsNullOrWhiteSpace(_renameBuffer))
+                    config.ActiveVenue.Name = _renameBuffer.Trim();
+                config.Save();
+                _renamePending = false;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel##venueRenameCancel"))
+            {
+                _renamePending = false;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.EndPopup();
+        }
     }
 
     private void DrawNarrationTemplates()
