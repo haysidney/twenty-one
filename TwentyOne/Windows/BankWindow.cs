@@ -18,12 +18,7 @@ public unsafe class BankWindow : Window, IDisposable
         : base("Bank##TwentyOneBank")
     {
         this.config = config;
-        SizeConstraints = new WindowSizeConstraints
-        {
-            MinimumSize = new Vector2(300, 300),
-            MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
-        };
-        Flags = ImGuiWindowFlags.NoCollapse;
+        Flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize;
 
         SyncBuffers();
     }
