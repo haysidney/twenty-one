@@ -1099,6 +1099,8 @@ private static unsafe void SendChatMessage(string message)
 
         var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
                          ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
+        var tableAvailWidth = ImGui.GetContentRegionAvail().X;
+        int removeAt = -1;
         if (ImGui.BeginTable("##players"u8, 7, tableFlags))
         {
             ImGui.TableSetupColumn("Name"u8,      ImGuiTableColumnFlags.WidthStretch);
@@ -1110,7 +1112,6 @@ private static unsafe void SendChatMessage(string message)
             ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 190);
             ImGui.TableHeadersRow();
 
-            int removeAt = -1;
             (int A, int B)? reorderSwap = null;
             for (var pi = 0; pi < State.Players.Count; pi++)
             {
@@ -1878,13 +1879,6 @@ private static unsafe void SendChatMessage(string message)
 
             }
 
-            if (removeAt >= 0)
-            {
-                betEdits.Remove(removeAt);
-                var shifted = betEdits.Where(kv => kv.Key > removeAt).ToList();
-                foreach (var kv in shifted) { betEdits.Remove(kv.Key); betEdits[kv.Key - 1] = kv.Value; }
-                Apply(new RemovePlayer(removeAt));
-            }
             if (reorderSwap.HasValue)
                 (reorderIndices[reorderSwap.Value.A], reorderIndices[reorderSwap.Value.B]) =
                     (reorderIndices[reorderSwap.Value.B], reorderIndices[reorderSwap.Value.A]);
@@ -1898,7 +1892,8 @@ private static unsafe void SendChatMessage(string message)
             {
                 // Separator label row
                 ImGui.TableNextRow();
-                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ToU32(new Vector4(0.12f, 0.12f, 0.12f, 1f)));
+                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ToU32(new Vector4(0.10f, 0.10f, 0.10f, 1f)));
+                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, ToU32(new Vector4(0.10f, 0.10f, 0.10f, 1f)));
                 ImGui.TableSetColumnIndex(0);
                 ImGui.AlignTextToFramePadding();
                 ImGui.TextDisabled("Sitting out");
@@ -1911,7 +1906,6 @@ private static unsafe void SendChatMessage(string message)
 
                     // Name
                     ImGui.TableSetColumnIndex(0);
-                    var sitNameCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     ImGui.AlignTextToFramePadding();
                     ImGui.TextDisabled(sp.DisplayName);
                     if (ImGui.IsItemHovered() && sp.World.Length > 0)
@@ -1964,9 +1958,9 @@ private static unsafe void SendChatMessage(string message)
 
                     // Actions: Remove (betting only)
                     ImGui.TableSetColumnIndex(6);
-                    var sitActCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     if (Phase == GamePhase.Betting)
                     {
+                        var sitActCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                         var sitRemoveW = ImGui.CalcTextSize("X").X + ImGui.GetStyle().FramePadding.X * 2;
                         ImGui.SetCursorPosX(sitActCellRight - sitRemoveW);
                         ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.7f, 0.15f, 0.15f, 1f));
@@ -1979,6 +1973,14 @@ private static unsafe void SendChatMessage(string message)
             }
 
             ImGui.EndTable();
+        }
+
+        if (removeAt >= 0)
+        {
+            betEdits.Remove(removeAt);
+            var shifted = betEdits.Where(kv => kv.Key > removeAt).ToList();
+            foreach (var kv in shifted) { betEdits.Remove(kv.Key); betEdits[kv.Key - 1] = kv.Value; }
+            Apply(new RemovePlayer(removeAt));
         }
 
         // ── Add player (Betting only) ─────────────────────────────────────────
