@@ -574,7 +574,7 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.SameLine();
         if (ImGui.SmallButton($"+##{id}AddVariant"))
-        { value.Add([""]); MarkNarrationDirty(); }
+        { value.Add(new List<string>(defaultValue.Count > 0 ? defaultValue[0] : [""])); MarkNarrationDirty(); }
         if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add a random variant"u8);
 
         ImGui.SameLine();
