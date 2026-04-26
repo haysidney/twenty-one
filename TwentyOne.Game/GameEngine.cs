@@ -436,6 +436,7 @@ public static class GameEngine
             {
                 var pi            = a.PlayerIndex;
                 var hi            = a.HandIndex;
+                if (state.Players[pi].SittingOut) return (state, effects);
                 var prevCardCount   = state.Players[pi].Hands[hi].Cards.Count;
                 var fiveCardCharlie = state.FiveCardCharlie != FiveCardCharlieRule.Disabled;
                 var newHand         = AddCardToHand(state.Players[pi].Hands[hi], a.Card, fiveCardCharlie);

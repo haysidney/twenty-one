@@ -590,6 +590,7 @@ private static unsafe void SendChatMessage(string message)
 
     private bool PlayerHitActive(int pi, int hi)
     {
+        if (State.Players[pi].SittingOut) return false;
         var hand = State.Players[pi].Hands[hi];
         return Phase switch
         {
@@ -1497,6 +1498,7 @@ private static unsafe void SendChatMessage(string message)
                         {
                             ImGui.SetNextItemWidth(betCellRight - ImGui.GetCursorPosX() - tradeButtonW - confirmButtonW);
                             var betVal = betEdits.TryGetValue(pi, out var e) ? e : p.Bet;
+                            if (p.SittingOut) ImGui.BeginDisabled();
                             if (ImGui.InputText($"##bet{pi}", ref betVal, 16, ImGuiInputTextFlags.EnterReturnsTrue))
                             {
                                 betEdits.Remove(pi);
