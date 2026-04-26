@@ -43,6 +43,7 @@ public class Player
     public string World { get; set; } = string.Empty;
     public string Bet { get; set; } = string.Empty;
     public List<Hand> Hands { get; set; } = [];
+    public bool SittingOut { get; set; } = false;
 
     // Nickname if set; else first name from FullName; else Nickname (empty for edge cases).
     public string DisplayName => Nickname.Length > 0

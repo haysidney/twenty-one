@@ -85,8 +85,9 @@ public static class GameEngine
     {
         if (state.Phase != GamePhase.DealerTurn) return false;
 
-        var allBJ = state.Players.Count > 0
-                 && state.Players.All(p => p.Hands.All(h => h.State == HandState.Blackjack));
+        var activePlayers = state.Players.Where(p => !p.SittingOut).ToList();
+        var allBJ = activePlayers.Count > 0
+                 && activePlayers.All(p => p.Hands.All(h => h.State == HandState.Blackjack));
         if (allBJ)
         {
             var dc     = state.DealerHand.Cards;
@@ -95,8 +96,8 @@ public static class GameEngine
             return dc.Count >= 2 || !couldHaveBJ;
         }
 
-        var allBust = state.Players.Count > 0
-                   && state.Players.All(p => p.Hands.All(h => h.State == HandState.Bust));
+        var allBust = activePlayers.Count > 0
+                   && activePlayers.All(p => p.Hands.All(h => h.State == HandState.Bust));
         if (allBust) return true;
 
         var dc2 = state.DealerHand.Cards;
@@ -130,7 +131,7 @@ public static class GameEngine
     public static bool IsDealComplete(GameState state) =>
         state.DealerHand.Cards.Count >= 1
         && state.Players.Count > 0
-        && state.Players.TrueForAll(p => p.Hands.Count > 0 && p.Hands[0].Cards.Count >= 2);
+        && state.Players.TrueForAll(p => p.SittingOut || p.Hands[0].Cards.Count >= 2);
 
     // Dealer may receive a card during Deal (exactly 1 card; 0 so far) or during DealerTurn (must hit).
     public static bool CanHitDealer(GameState state)
@@ -138,7 +139,7 @@ public static class GameEngine
         if (state.Phase == GamePhase.Deal) return state.DealerHand.Cards.Count < 1;
         if (state.Phase != GamePhase.DealerTurn || state.WaitingForDealer) return false;
         var allBust = state.Players.Count > 0
-                   && state.Players.All(p => p.Hands.All(h => h.State == HandState.Bust));
+                   && state.Players.All(p => p.SittingOut || p.Hands.All(h => h.State == HandState.Bust));
         return !allBust
             && !CanGoToPayout(state)
             && DealerRecommendation(state.DealerHand) == "HIT"
@@ -308,6 +309,7 @@ public static class GameEngine
         var startPi = fromPi < 0 ? 0 : fromPi;
         for (var pi = startPi; pi < players.Count; pi++)
         {
+            if (players[pi].SittingOut) continue;
             var startHi = (pi == fromPi) ? fromHi + 1 : 0;
             for (var hi = startHi; hi < players[pi].Hands.Count; hi++)
             {
@@ -316,7 +318,7 @@ public static class GameEngine
                     return (pi, hi, GamePhase.PlayerTurns);
             }
         }
-        var allBust = players.All(p => p.Hands.All(h => h.State == HandState.Bust));
+        var allBust = players.All(p => p.SittingOut || p.Hands.All(h => h.State == HandState.Bust));
         return (-1, -1, allBust ? GamePhase.Payout : GamePhase.DealerTurn);
     }
 
@@ -364,13 +366,17 @@ public static class GameEngine
 
         void NarrateDealSummary(GameState s)
         {
-            if (!(s.SkipDealSummaryOnePlayer && s.Players.Count == 1))
+            var activePlayers = s.Players.Where(p => !p.SittingOut).ToList();
+            if (!(s.SkipDealSummaryOnePlayer && activePlayers.Count == 1))
             {
                 var sb = new StringBuilder(t.DealSummaryPrefix);
+                var first = true;
                 for (var i = 0; i < s.Players.Count; i++)
                 {
-                    if (i > 0) sb.Append(", ");
-                    var p    = s.Players[i];
+                    var p = s.Players[i];
+                    if (p.SittingOut) continue;
+                    if (!first) sb.Append(", ");
+                    first = false;
                     var hand = p.Hands[0];
                     sb.Append(NarrationTemplates.Fmt(t.DealSummaryPlayer,
                         ("name",  p.DisplayName),
@@ -385,6 +391,7 @@ public static class GameEngine
             // Announce natural blackjacks immediately after the deal summary, in player order.
             foreach (var p in s.Players)
             {
+                if (p.SittingOut || p.Hands.Count == 0) continue;
                 var hand = p.Hands[0];
                 if (hand.State == HandState.Blackjack)
                     Narrate(t.PlayerBJ, ("name", p.DisplayName), ("cards", HandString(hand.Cards)));
@@ -623,7 +630,7 @@ public static class GameEngine
                 var newHands = player.Hands.ToList();
                 newHands[hi] = hand0;
                 newHands.Insert(hi + 1, hand1);
-                var newPlayer  = new Player { Nickname = player.Nickname, FullName = player.FullName, World = player.World, Bet = player.Bet, Hands = newHands };
+                var newPlayer  = new Player { Nickname = player.Nickname, FullName = player.FullName, World = player.World, Bet = player.Bet, Hands = newHands, SittingOut = player.SittingOut };
                 var newPlayers = WithPlayer(state.Players, pi, newPlayer);
                 var name       = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
                 Narrate(t.PlayerSplit, ("name", name));
@@ -849,6 +856,7 @@ public static class GameEngine
                 for (var pi = 0; pi < state.Players.Count; pi++)
                 {
                     var p         = state.Players[pi];
+                    if (p.SittingOut) continue;
                     var multiHand = p.Hands.Count > 1;
 
                     // For split hands where every hand wins, emit one combined line.
@@ -921,11 +929,12 @@ public static class GameEngine
                 {
                     Players = state.Players.Select(p => new Player
                     {
-                        Nickname = p.Nickname,
-                        FullName = p.FullName,
-                        World    = p.World,
-                        Bet      = p.Bet,
-                        Hands    = [new Hand()],
+                        Nickname   = p.Nickname,
+                        FullName   = p.FullName,
+                        World      = p.World,
+                        Bet        = p.Bet,
+                        SittingOut = p.SittingOut,
+                        Hands      = [new Hand()],
                     }).ToList(),
                     DealerHand        = new Hand(),
                     Phase             = GamePhase.Betting,
@@ -956,14 +965,22 @@ public static class GameEngine
             {
                 var p = state.Players[a.PlayerIndex];
                 return (With(state, players: WithPlayer(state.Players, a.PlayerIndex,
-                    new Player { Nickname = p.Nickname, FullName = p.FullName, World = p.World, Bet = a.Bet, Hands = p.Hands })), effects);
+                    new Player { Nickname = p.Nickname, FullName = p.FullName, World = p.World, Bet = a.Bet, Hands = p.Hands, SittingOut = p.SittingOut })), effects);
             }
 
             case RenamePlayer a:
             {
                 var p = state.Players[a.PlayerIndex];
                 return (With(state, players: WithPlayer(state.Players, a.PlayerIndex,
-                    new Player { Nickname = a.Nickname, FullName = p.FullName, World = p.World, Bet = p.Bet, Hands = p.Hands })), effects);
+                    new Player { Nickname = a.Nickname, FullName = p.FullName, World = p.World, Bet = p.Bet, Hands = p.Hands, SittingOut = p.SittingOut })), effects);
+            }
+
+            case ToggleSittingOut a:
+            {
+                if (state.Phase != GamePhase.Betting) return (state, effects);
+                var p = state.Players[a.PlayerIndex];
+                return (With(state, players: WithPlayer(state.Players, a.PlayerIndex,
+                    new Player { Nickname = p.Nickname, FullName = p.FullName, World = p.World, Bet = p.Bet, Hands = p.Hands, SittingOut = !p.SittingOut })), effects);
             }
 
             case ReorderPlayers a:

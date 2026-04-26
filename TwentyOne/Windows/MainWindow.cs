@@ -286,6 +286,7 @@ public partial class MainWindow : Window, IDisposable
         for (var pi = 0; pi < state.Players.Count; pi++)
         {
             var p   = state.Players[pi];
+            if (p.SittingOut) continue;
             var key = PlayerStatKey(p);
             if (!config.PlayerStatsStore.TryGetValue(key, out var stat))
             {
@@ -331,6 +332,7 @@ public partial class MainWindow : Window, IDisposable
         for (var pi2 = 0; pi2 < state.Players.Count; pi2++)
         {
             var p2  = state.Players[pi2];
+            if (p2.SittingOut) continue;
             var key2 = PlayerStatKey(p2);
             if (!config.PlayerStatsStore.TryGetValue(key2, out var stat2)) continue;
             if (stat2.Bank <= 0) continue;
@@ -1034,7 +1036,7 @@ private static unsafe void SendChatMessage(string message)
             {
                 ImGui.Text($"= {scoreStr}");
                 var rec = GameEngine.DealerRecommendation(State.DealerHand);
-                var allBust = State.Players.Count > 0 && State.Players.All(p => p.Hands.All(h => h.State == HandState.Bust));
+                var allBust = State.Players.Count > 0 && State.Players.All(p => p.SittingOut || p.Hands.All(h => h.State == HandState.Bust));
                 if (rec.Length > 0 && Phase == GamePhase.DealerTurn && !allBust)
                 {
                     ImGui.SameLine();
@@ -1721,7 +1723,24 @@ private static unsafe void SendChatMessage(string message)
                     else
                     {
                         DrawHandStateLabel(hand);
-                        if (isActiveHand && !State.WaitingForNextPlayer)
+                        if (Phase == GamePhase.Betting && hi == 0)
+                        {
+                            var sitLabel = p.SittingOut ? "Resume" : "Sit Out";
+                            var sitW = ImGui.CalcTextSize(sitLabel).X + ImGui.GetStyle().FramePadding.X * 2;
+                            ImGui.SameLine();
+                            ImGui.SetCursorPosX(statusCellRight - sitW);
+                            if (p.SittingOut)
+                            {
+                                ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.55f, 0.35f, 0.1f, 1f));
+                                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.65f, 0.45f, 0.15f, 1f));
+                                ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.75f, 0.55f, 0.2f, 1f));
+                            }
+                            if (ImGui.SmallButton($"{sitLabel}##{pi}sitout"))
+                                Apply(new ToggleSittingOut(pi));
+                            if (p.SittingOut)
+                                ImGui.PopStyleColor(3);
+                        }
+                        else if (isActiveHand && !State.WaitingForNextPlayer)
                         {
                             var remindW = ImGui.CalcTextSize("Remind").X + ImGui.GetStyle().FramePadding.X * 2;
                             ImGui.SameLine();
@@ -1940,9 +1959,10 @@ private static unsafe void SendChatMessage(string message)
                     Apply(new AnnounceBettingOpen());
                 ImGui.SameLine();
                 var effectiveBets = State.Players.Select((p, i) =>
-                    betEdits.TryGetValue(i, out var e) ? e : p.Bet);
+                    betEdits.TryGetValue(i, out var e) ? e : p.Bet).ToList();
                 var canDeal = State.Players.Count > 0
-                           && effectiveBets.All(b => !string.IsNullOrWhiteSpace(b))
+                           && State.Players.Any(p => !p.SittingOut)
+                           && State.Players.Select((p, i) => p.SittingOut || !string.IsNullOrWhiteSpace(effectiveBets[i])).All(x => x)
                            && !isReorderMode;
                 if (!canDeal) ImGui.BeginDisabled();
                 if (ImGui.Button("Start Deal →"))
@@ -1955,9 +1975,10 @@ private static unsafe void SendChatMessage(string message)
                             Apply(new SetPlayerBet(idx, val));
                     }
                     Apply(new StartDeal());
-                    // Deduct initial bets from player banks
+                    // Deduct initial bets from player banks (skip sitting-out players)
                     foreach (var p in State.Players)
                     {
+                        if (p.SittingOut) continue;
                         var betAmt = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
                         if (betAmt <= 0) continue;
                         var betKey = PlayerStatKey(p);
@@ -1965,9 +1986,10 @@ private static unsafe void SendChatMessage(string message)
                         betStat.Bank = Math.Max(0, betStat.Bank - betAmt);
                         AddBankLog(betStat, BankTransactionKind.Bet, betAmt, betStat.Bank);
                     }
-                    // Queue initial cards: dealer first, then each player gets both cards in a pair
+                    // Queue initial cards: dealer first, then each active player gets both cards in a pair
                     for (var i = 0; i < State.Players.Count; i++)
                     {
+                        if (State.Players[i].SittingOut) continue;
                         autoDealQueue.Enqueue((false, i, 0, true));   // first card — announce
                         autoDealQueue.Enqueue((false, i, 0, false));  // second card
                     }

@@ -2280,3 +2280,102 @@ public class FiveCardCharlieTests
         Assert.Equal(FiveCardCharlieRule.LosesToDealerBJ, newState.FiveCardCharlie);
     }
 }
+
+public class SittingOutTests
+{
+    private static GameState BettingWithPlayers() => new GameState
+    {
+        Phase   = GamePhase.Betting,
+        Players =
+        [
+            new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand()] },
+            new Player { Nickname = "Bekki", Bet = "100", Hands = [new Hand()] },
+        ],
+    };
+
+    [Fact]
+    public void ToggleSittingOut_SetsSittingOut()
+    {
+        var (ns, _) = GameEngine.Apply(BettingWithPlayers(), new ToggleSittingOut(1));
+        Assert.True(ns.Players[1].SittingOut);
+        Assert.False(ns.Players[0].SittingOut);
+    }
+
+    [Fact]
+    public void ToggleSittingOut_Toggles()
+    {
+        var (s1, _) = GameEngine.Apply(BettingWithPlayers(), new ToggleSittingOut(0));
+        var (s2, _) = GameEngine.Apply(s1, new ToggleSittingOut(0));
+        Assert.False(s2.Players[0].SittingOut);
+    }
+
+    [Fact]
+    public void ToggleSittingOut_IgnoredOutsideBetting()
+    {
+        var state = new GameState { Phase = GamePhase.PlayerTurns, Players = [new Player { Nickname = "Lorah", Hands = [new Hand()] }] };
+        var (ns, _) = GameEngine.Apply(state, new ToggleSittingOut(0));
+        Assert.False(ns.Players[0].SittingOut);
+    }
+
+    [Fact]
+    public void NewRound_PreservesSittingOut()
+    {
+        var state = BettingWithPlayers();
+        state.Players[1].SittingOut = true;
+        var (ns, _) = GameEngine.Apply(state, new NewRound());
+        Assert.False(ns.Players[0].SittingOut);
+        Assert.True(ns.Players[1].SittingOut);
+    }
+
+    [Fact]
+    public void IsDealComplete_SittingOutPlayerExcluded()
+    {
+        var state = new GameState
+        {
+            Phase   = GamePhase.Deal,
+            Players =
+            [
+                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 10] }] },
+                new Player { Nickname = "Bekki", SittingOut = true, Hands = [new Hand()] },
+            ],
+            DealerHand = new Hand { Cards = [7] },
+        };
+        Assert.True(GameEngine.IsDealComplete(state));
+    }
+
+    [Fact]
+    public void AdvanceFrom_SkipsSittingOutPlayer()
+    {
+        // Bekki sits out; only Lorah should get a turn.
+        var state = new GameState
+        {
+            Phase   = GamePhase.PlayerTurns,
+            Players =
+            [
+                new Player { Nickname = "Lorah", SittingOut = true, Hands = [new Hand()] },
+                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [6, 10], State = HandState.Playing }] },
+            ],
+            DealerHand = new Hand { Cards = [7] },
+        };
+        var (ns, _) = GameEngine.Apply(state, new BeginPlayerTurns());
+        Assert.Equal(1, ns.ActivePlayerIndex); // Bekki, not Lorah
+    }
+
+    [Fact]
+    public void GoToPayout_SittingOutPlayer_NotNarrated()
+    {
+        var state = new GameState
+        {
+            Phase   = GamePhase.DealerTurn,
+            Players =
+            [
+                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
+                new Player { Nickname = "Bekki", SittingOut = true, Bet = "100", Hands = [new Hand()] },
+            ],
+            DealerHand = new Hand { Cards = [7, 10], State = HandState.Playing },
+        };
+        var (_, effects) = GameEngine.Apply(state, new GoToPayout());
+        var chat = effects.OfType<SendChat>().Select(e => e.Text).ToList();
+        Assert.DoesNotContain(chat, line => line.Contains("Bekki"));
+    }
+}

@@ -60,3 +60,4 @@ public record RemovePlayer(int Index) : GameAction;
 public record SetPlayerBet(int PlayerIndex, string Bet) : GameAction;
 public record RenamePlayer(int PlayerIndex, string Nickname) : GameAction;
 public record ReorderPlayers(List<int> NewOrder) : GameAction;
+public record ToggleSittingOut(int PlayerIndex) : GameAction;
