@@ -1949,12 +1949,15 @@ private static unsafe void SendChatMessage(string message)
                     var sitStatusCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     var resumeW = ImGui.CalcTextSize("Resume").X + ImGui.GetStyle().FramePadding.X * 2;
                     ImGui.SetCursorPosX(sitStatusCellRight - resumeW);
+                    var canResume = Phase == GamePhase.Betting;
+                    if (!canResume) ImGui.BeginDisabled();
                     ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.55f, 0.35f, 0.1f, 1f));
                     ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.65f, 0.45f, 0.15f, 1f));
                     ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.75f, 0.55f, 0.2f, 1f));
                     if (ImGui.SmallButton($"Resume##{spi}sitresume"))
                         Apply(new ToggleSittingOut(spi));
                     ImGui.PopStyleColor(3);
+                    if (!canResume) ImGui.EndDisabled();
 
                     // Actions: Remove (betting only)
                     ImGui.TableSetColumnIndex(6);
