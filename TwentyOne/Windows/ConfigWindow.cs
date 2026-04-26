@@ -31,6 +31,7 @@ public class ConfigWindow : Window, IDisposable
 
     private bool   _narrationDirty;
     private (string Id, int Index)? _pendingVariantSelect;
+    private (string Id, int Index, List<List<string>> Value)? _pendingVariantDelete;
     private double _narrationDirtyAt;
 
     private string _renameBuffer     = string.Empty;
@@ -582,7 +583,6 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add a random variant"u8);
 
-        int? toRemoveVariant = null;
         var style = ImGui.GetStyle();
         var upW   = ImGui.CalcTextSize("↑").X + style.FramePadding.X * 2;
         var downW = ImGui.CalcTextSize("↓").X + style.FramePadding.X * 2;
@@ -598,18 +598,42 @@ public class ConfigWindow : Window, IDisposable
             for (var vi = 0; vi < value.Count; vi++)
             {
                 var open = true;
-                var selectFlags = _pendingVariantSelect == (id, vi) ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
+                var selectFlags = _pendingVariantSelect == (id, vi) || _pendingVariantDelete == (id, vi, value)
+                    ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
                 if (vi == value.Count - 1) _pendingVariantSelect = null;
                 if (ImGui.BeginTabItem($"Variant {vi + 1}##{id}V{vi}", ref open, selectFlags))
                 {
                     DrawVariantLines(id, vi, value[vi], defaultValue, ctrlHeld, btnW);
                     ImGui.EndTabItem();
                 }
-                if (!open) toRemoveVariant = vi;
+                if (!open) _pendingVariantDelete = (id, vi, value);
             }
             ImGui.EndTabBar();
         }
-        if (toRemoveVariant.HasValue) { value.RemoveAt(toRemoveVariant.Value); MarkNarrationDirty(); }
+
+        var popupId = $"Delete Variant?##{id}";
+        if (_pendingVariantDelete.HasValue && _pendingVariantDelete.Value.Id == id)
+            ImGui.OpenPopup(popupId);
+
+        ImGui.SetNextWindowPos(ImGui.GetMainViewport().GetCenter(), ImGuiCond.Always, new Vector2(0.5f, 0.5f));
+        if (ImGui.BeginPopupModal(popupId, ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            ImGui.Text("Delete this variant?");
+            ImGui.Spacing();
+            if (ImGui.Button("Delete", new Vector2(80, 0)))
+            {
+                if (_pendingVariantDelete is { } d) { d.Value.RemoveAt(d.Index); MarkNarrationDirty(); }
+                _pendingVariantDelete = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel", new Vector2(80, 0)))
+            {
+                _pendingVariantDelete = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.EndPopup();
+        }
 
         ImGui.Spacing();
     }
