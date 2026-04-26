@@ -1116,6 +1116,7 @@ private static unsafe void SendChatMessage(string message)
             {
                 var displayPi = isReorderMode ? reorderIndices[pi] : pi;
                 var p         = State.Players[displayPi];
+                if (p.SittingOut) continue;
                 var hasWorld    = p.World.Length > 0;
                 var hasNickname = p.Nickname.Length > 0;
                 var multiHand = p.Hands.Count > 1;
@@ -1728,20 +1729,11 @@ private static unsafe void SendChatMessage(string message)
                         DrawHandStateLabel(hand);
                         if (Phase == GamePhase.Betting && hi == 0)
                         {
-                            var sitLabel = p.SittingOut ? "Resume" : "Sit Out";
-                            var sitW = ImGui.CalcTextSize(sitLabel).X + ImGui.GetStyle().FramePadding.X * 2;
+                            var sitW = ImGui.CalcTextSize("Sit Out").X + ImGui.GetStyle().FramePadding.X * 2;
                             ImGui.SameLine();
                             ImGui.SetCursorPosX(statusCellRight - sitW);
-                            if (p.SittingOut)
-                            {
-                                ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.55f, 0.35f, 0.1f, 1f));
-                                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.65f, 0.45f, 0.15f, 1f));
-                                ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.75f, 0.55f, 0.2f, 1f));
-                            }
-                            if (ImGui.SmallButton($"{sitLabel}##{pi}sitout"))
+                            if (ImGui.SmallButton($"Sit Out##{pi}sitout"))
                                 Apply(new ToggleSittingOut(pi));
-                            if (p.SittingOut)
-                                ImGui.PopStyleColor(3);
                         }
                         else if (isActiveHand && !State.WaitingForNextPlayer)
                         {
@@ -1896,6 +1888,96 @@ private static unsafe void SendChatMessage(string message)
             if (reorderSwap.HasValue)
                 (reorderIndices[reorderSwap.Value.A], reorderIndices[reorderSwap.Value.B]) =
                     (reorderIndices[reorderSwap.Value.B], reorderIndices[reorderSwap.Value.A]);
+
+            // ── Sitting-out section ───────────────────────────────────────────
+            var sittingOutPlayers = State.Players
+                .Select((p, i) => (p, i))
+                .Where(x => x.p.SittingOut)
+                .ToList();
+            if (sittingOutPlayers.Count > 0)
+            {
+                // Separator label row
+                ImGui.TableNextRow();
+                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ToU32(new Vector4(0.12f, 0.12f, 0.12f, 1f)));
+                ImGui.TableSetColumnIndex(0);
+                ImGui.AlignTextToFramePadding();
+                ImGui.TextDisabled("Sitting out");
+
+                foreach (var (sp, spi) in sittingOutPlayers)
+                {
+                    ImGui.TableNextRow();
+                    ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ToU32(new Vector4(0.18f, 0.18f, 0.18f, 1f)));
+                    ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, ToU32(new Vector4(0.18f, 0.18f, 0.18f, 1f)));
+
+                    // Name
+                    ImGui.TableSetColumnIndex(0);
+                    var sitNameCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                    ImGui.AlignTextToFramePadding();
+                    ImGui.TextDisabled(sp.DisplayName);
+                    if (ImGui.IsItemHovered() && sp.World.Length > 0)
+                        ImGui.SetTooltip($"{sp.FullName}@{sp.World}");
+
+                    // Bank
+                    ImGui.TableSetColumnIndex(2);
+                    {
+                        var sitBankKey = PlayerStatKey(sp);
+                        var sitBankVal = config.PlayerStatsStore.TryGetValue(sitBankKey, out var sitStat) ? sitStat.Bank : 0;
+                        var sitBankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                        ImGui.AlignTextToFramePadding();
+                        if (sitBankVal > 0)
+                        {
+                            ImGui.TextDisabled(GameEngine.FormatGil(sitBankVal));
+                            if (ImGui.IsItemHovered())
+                            {
+                                ImGui.SetTooltip("Click to copy");
+                                if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                                    ImGui.SetClipboardText(sitBankVal.ToString());
+                            }
+                        }
+                        else
+                        {
+                            ImGui.TextDisabled("—");
+                        }
+                        var sitManageW = ImGui.CalcTextSize("Manage").X + ImGui.GetStyle().FramePadding.X * 2;
+                        ImGui.SameLine();
+                        if (ImGui.GetCursorPosX() < sitBankCellRight - sitManageW)
+                            ImGui.SetCursorPosX(sitBankCellRight - sitManageW);
+                        if (ImGui.SmallButton($"Manage##{spi}sitbank"))
+                        {
+                            bankManagePlayerIndex = spi;
+                            bankDepositBuf        = string.Empty;
+                            bankWithdrawBuf       = string.Empty;
+                        }
+                    }
+
+                    // Status: Resume button
+                    ImGui.TableSetColumnIndex(5);
+                    var sitStatusCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                    var resumeW = ImGui.CalcTextSize("Resume").X + ImGui.GetStyle().FramePadding.X * 2;
+                    ImGui.SetCursorPosX(sitStatusCellRight - resumeW);
+                    ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.55f, 0.35f, 0.1f, 1f));
+                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.65f, 0.45f, 0.15f, 1f));
+                    ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.75f, 0.55f, 0.2f, 1f));
+                    if (ImGui.SmallButton($"Resume##{spi}sitresume"))
+                        Apply(new ToggleSittingOut(spi));
+                    ImGui.PopStyleColor(3);
+
+                    // Actions: Remove (betting only)
+                    ImGui.TableSetColumnIndex(6);
+                    var sitActCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                    if (Phase == GamePhase.Betting)
+                    {
+                        var sitRemoveW = ImGui.CalcTextSize("X").X + ImGui.GetStyle().FramePadding.X * 2;
+                        ImGui.SetCursorPosX(sitActCellRight - sitRemoveW);
+                        ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.7f, 0.15f, 0.15f, 1f));
+                        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.25f, 0.25f, 1f));
+                        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.5f, 0.05f, 0.05f, 1f));
+                        if (ImGui.SmallButton($"X##{spi}sitremove")) removeAt = spi;
+                        ImGui.PopStyleColor(3);
+                    }
+                }
+            }
+
             ImGui.EndTable();
         }
 
