@@ -657,7 +657,7 @@ public class ConfigWindow : Window, IDisposable
         if (swap.HasValue) { (lines[swap.Value.A], lines[swap.Value.B]) = (lines[swap.Value.B], lines[swap.Value.A]); MarkNarrationDirty(); }
         if (toRemove.HasValue) { lines.RemoveAt(toRemove.Value); MarkNarrationDirty(); }
 
-        if (ImGui.SmallButton($"+##{id}_{vi}AddLine"))
+        if (ImGui.SmallButton($"Add Message##{id}_{vi}AddLine"))
         { lines.Add(""); MarkNarrationDirty(); }
     }
 
