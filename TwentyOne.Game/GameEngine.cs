@@ -327,8 +327,10 @@ public static class GameEngine
     {
         var t       = templates ?? new NarrationTemplates();
         var effects = new List<SideEffect>();
-        void Narrate(List<string> lines, params (string Key, string Value)[] vars)
+        void Narrate(List<List<string>> variants, params (string Key, string Value)[] vars)
         {
+            if (variants.Count == 0) return;
+            var lines = variants[Random.Shared.Next(variants.Count)];
             foreach (var line in lines)
             {
                 var resolved = vars.Length > 0 ? NarrationTemplates.Fmt(line, vars) : line;

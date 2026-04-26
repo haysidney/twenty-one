@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -562,7 +563,7 @@ public class ConfigWindow : Window, IDisposable
         ImGui.EndTabBar();
     }
 
-    private void NtListRow(string id, string hint, System.Collections.Generic.List<string> defaultValue, bool ctrlHeld, System.Collections.Generic.List<string> value)
+    private void NtListRow(string id, string hint, List<List<string>> defaultValue, bool ctrlHeld, List<List<string>> value)
     {
         var label = id.Contains("##") ? id[..id.IndexOf("##", StringComparison.Ordinal)] : id;
 
@@ -572,52 +573,85 @@ public class ConfigWindow : Window, IDisposable
             ImGui.SetTooltip(hint);
 
         ImGui.SameLine();
-        if (ImGui.SmallButton($"+##{id}Plus"))
-        { value.Add(""); MarkNarrationDirty(); }
+        if (ImGui.SmallButton($"+##{id}AddVariant"))
+        { value.Add([""]); MarkNarrationDirty(); }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add a random variant"u8);
 
         ImGui.SameLine();
         if (!ctrlHeld) ImGui.BeginDisabled();
         if (ImGui.SmallButton($"Reset##{id}R"))
-        { value.Clear(); value.AddRange(defaultValue); MarkNarrationDirty(); }
+        {
+            value.Clear();
+            foreach (var v in defaultValue) value.Add(new List<string>(v));
+            MarkNarrationDirty();
+        }
         if (!ctrlHeld) ImGui.EndDisabled();
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
             ImGui.SetTooltip("Hold Ctrl to reset this template to its default.");
 
-        int? toRemove = null;
-        (int A, int B)? swap = null;
+        int? toRemoveVariant = null;
         var style = ImGui.GetStyle();
         var upW   = ImGui.CalcTextSize("↑").X + style.FramePadding.X * 2;
         var downW = ImGui.CalcTextSize("↓").X + style.FramePadding.X * 2;
-        var xW    = ImGui.CalcTextSize("X").X    + style.FramePadding.X * 2;
+        var xW    = ImGui.CalcTextSize("X").X  + style.FramePadding.X * 2;
         var btnW  = upW + downW + xW + style.ItemSpacing.X * 3;
-        for (var i = 0; i < value.Count; i++)
+
+        if (value.Count == 1)
         {
-            var line = value[i];
+            DrawVariantLines(id, 0, value[0], ctrlHeld, btnW);
+        }
+        else if (value.Count > 1 && ImGui.BeginTabBar($"##{id}VarTabs"))
+        {
+            for (var vi = 0; vi < value.Count; vi++)
+            {
+                var open = true;
+                if (ImGui.BeginTabItem($"Variant {vi + 1}##{id}V{vi}", ref open))
+                {
+                    DrawVariantLines(id, vi, value[vi], ctrlHeld, btnW);
+                    ImGui.EndTabItem();
+                }
+                if (!open) toRemoveVariant = vi;
+            }
+            ImGui.EndTabBar();
+        }
+        if (toRemoveVariant.HasValue) { value.RemoveAt(toRemoveVariant.Value); MarkNarrationDirty(); }
+
+        ImGui.Spacing();
+    }
+
+    private void DrawVariantLines(string id, int vi, List<string> lines, bool ctrlHeld, float btnW)
+    {
+        int? toRemove = null;
+        (int A, int B)? swap = null;
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i];
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - btnW);
-            if (ImGui.InputText($"##{id}_{i}", ref line, 512))
-            { value[i] = line; MarkNarrationDirty(); }
+            if (ImGui.InputText($"##{id}_{vi}_{i}", ref line, 512))
+            { lines[i] = line; MarkNarrationDirty(); }
 
             ImGui.SameLine();
             if (i == 0) ImGui.BeginDisabled();
-            if (ImGui.SmallButton($"↑##{id}_{i}U")) swap = (i, i - 1);
+            if (ImGui.SmallButton($"↑##{id}_{vi}_{i}U")) swap = (i, i - 1);
             if (i == 0) ImGui.EndDisabled();
 
             ImGui.SameLine();
-            if (i == value.Count - 1) ImGui.BeginDisabled();
-            if (ImGui.SmallButton($"↓##{id}_{i}D")) swap = (i, i + 1);
-            if (i == value.Count - 1) ImGui.EndDisabled();
+            if (i == lines.Count - 1) ImGui.BeginDisabled();
+            if (ImGui.SmallButton($"↓##{id}_{vi}_{i}D")) swap = (i, i + 1);
+            if (i == lines.Count - 1) ImGui.EndDisabled();
 
             ImGui.SameLine();
             if (!ctrlHeld) ImGui.BeginDisabled();
-            if (ImGui.SmallButton($"X##{id}_{i}X")) toRemove = i;
+            if (ImGui.SmallButton($"X##{id}_{vi}_{i}X")) toRemove = i;
             if (!ctrlHeld) ImGui.EndDisabled();
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
                 ImGui.SetTooltip("Hold Ctrl to delete this line.");
         }
-        if (swap.HasValue) { (value[swap.Value.A], value[swap.Value.B]) = (value[swap.Value.B], value[swap.Value.A]); MarkNarrationDirty(); }
-        if (toRemove.HasValue) { value.RemoveAt(toRemove.Value); MarkNarrationDirty(); }
+        if (swap.HasValue) { (lines[swap.Value.A], lines[swap.Value.B]) = (lines[swap.Value.B], lines[swap.Value.A]); MarkNarrationDirty(); }
+        if (toRemove.HasValue) { lines.RemoveAt(toRemove.Value); MarkNarrationDirty(); }
 
-        ImGui.Spacing();
+        if (ImGui.SmallButton($"+##{id}_{vi}AddLine"))
+        { lines.Add(""); MarkNarrationDirty(); }
     }
 
     private static void NtRow(string id, string hint, string defaultValue, bool ctrlHeld, ref string value)

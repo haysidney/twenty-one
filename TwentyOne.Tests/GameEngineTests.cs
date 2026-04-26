@@ -657,7 +657,7 @@ public class NarrationTemplateTests
     [Fact]
     public void CustomPlayerHit_UsesTemplate()
     {
-        var t = new NarrationTemplates { PlayerHit = ["CUSTOM {name} drew {card}"] };
+        var t = new NarrationTemplates { PlayerHit = [["CUSTOM {name} drew {card}"]] };
         var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3), t);
         Assert.Equal("CUSTOM Lorah drew 3", ((SendChat)effects[0]).Text);
     }
@@ -665,7 +665,7 @@ public class NarrationTemplateTests
     [Fact]
     public void CustomPlayerBust_UsesTemplate()
     {
-        var t = new NarrationTemplates { PlayerBust = ["OUT: {name}"] };
+        var t = new NarrationTemplates { PlayerBust = [["OUT: {name}"]] };
         var state = new GameState
         {
             Phase             = GamePhase.PlayerTurns,
@@ -680,7 +680,7 @@ public class NarrationTemplateTests
     [Fact]
     public void CustomDealerHit_UsesTemplate()
     {
-        var t = new NarrationTemplates { DealerHit = ["D+{card}={score}"] };
+        var t = new NarrationTemplates { DealerHit = [["D+{card}={score}"]] };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,
@@ -693,7 +693,7 @@ public class NarrationTemplateTests
     [Fact]
     public void DealerStand_NarratedAfterFinalHit()
     {
-        var t = new NarrationTemplates { DealerStand = ["DS:{cards}={score}"] };
+        var t = new NarrationTemplates { DealerStand = [["DS:{cards}={score}"]] };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,
@@ -708,7 +708,7 @@ public class NarrationTemplateTests
     [Fact]
     public void CustomPlayerStand_UsesTemplate()
     {
-        var t = new NarrationTemplates { PlayerStand = ["{name} done ({score})"] };
+        var t = new NarrationTemplates { PlayerStand = [["{name} done ({score})"]] };
         var state = new GameState
         {
             Phase             = GamePhase.PlayerTurns,
@@ -739,7 +739,7 @@ public class NarrationTemplateTests
     [Fact]
     public void PayoutWin_UsesTemplate()
     {
-        var t = new NarrationTemplates { PayoutWin = ["W:{name}"], PayoutDealerStands = ["D"] };
+        var t = new NarrationTemplates { PayoutWin = [["W:{name}"]], PayoutDealerStands = [["D"]] };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,
@@ -753,7 +753,7 @@ public class NarrationTemplateTests
     [Fact]
     public void PayoutBjWin_UsesTemplate()
     {
-        var t = new NarrationTemplates { PayoutBjWin = ["BJ:{name}"], PayoutDealerStands = ["D"] };
+        var t = new NarrationTemplates { PayoutBjWin = [["BJ:{name}"]], PayoutDealerStands = [["D"]] };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,
@@ -767,7 +767,7 @@ public class NarrationTemplateTests
     [Fact]
     public void PayoutLose_UsesTemplate()
     {
-        var t = new NarrationTemplates { PayoutLose = ["L:{name}"], PayoutDealerStands = ["D"] };
+        var t = new NarrationTemplates { PayoutLose = [["L:{name}"]], PayoutDealerStands = [["D"]] };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,
@@ -781,7 +781,7 @@ public class NarrationTemplateTests
     [Fact]
     public void PayoutPush_UsesTemplate()
     {
-        var t = new NarrationTemplates { PayoutPush = ["P:{name}"], PayoutDealerStands = ["D"] };
+        var t = new NarrationTemplates { PayoutPush = [["P:{name}"]], PayoutDealerStands = [["D"]] };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,
@@ -802,7 +802,7 @@ public class NarrationTemplateTests
     [Fact]
     public void CustomPlayerAfterHit_UsesTemplate()
     {
-        var t = new NarrationTemplates { PlayerAfterHit = ["SCORE:{score} DO:{actions}"] };
+        var t = new NarrationTemplates { PlayerAfterHit = [["SCORE:{score} DO:{actions}"]] };
         var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3), t);
         // effects[0] = PlayerHit, effects[1] = PlayerAfterHit
         Assert.Equal(2, effects.Count);
@@ -829,7 +829,7 @@ public class NarrationTemplateTests
     [Fact]
     public void PlayerTurnStart_IncludesPlayerCards()
     {
-        var t = new NarrationTemplates { PlayerTurnStart = ["{cards}"] };
+        var t = new NarrationTemplates { PlayerTurnStart = [["{cards}"]] };
         var state = new GameState
         {
             Phase      = GamePhase.Deal,
@@ -852,7 +852,7 @@ public class NarrationTemplateTests
             DealerHand        = new Hand { Cards = [10, 7], State = HandState.Playing },
             Players           = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Stand }] }],
         };
-        var t = new NarrationTemplates { DealerTurnStart = ["Dealer: {cards} ({score})"] };
+        var t = new NarrationTemplates { DealerTurnStart = [["Dealer: {cards} ({score})"]] };
         var (_, effects) = GameEngine.Apply(state, new BeginDealerTurn(), t);
         var text = ((SendChat)effects[0]).Text;
         Assert.Contains("10", text);  // cards
@@ -862,7 +862,7 @@ public class NarrationTemplateTests
     [Fact]
     public void DealerHit_SubstitutesDealerName()
     {
-        var t     = new NarrationTemplates { DealerHit = ["{dealer}+{card}"] };
+        var t     = new NarrationTemplates { DealerHit = [["{dealer}+{card}"]] };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,
@@ -875,7 +875,7 @@ public class NarrationTemplateTests
     [Fact]
     public void DealerTurnStart_SubstitutesDealerName()
     {
-        var t     = new NarrationTemplates { DealerTurnStart = ["{dealer}: {cards}"] };
+        var t     = new NarrationTemplates { DealerTurnStart = [["{dealer}: {cards}"]] };
         var state = new GameState
         {
             Phase            = GamePhase.DealerTurn,
@@ -890,7 +890,7 @@ public class NarrationTemplateTests
     [Fact]
     public void PayoutHeader_EmittedFirst()
     {
-        var t     = new NarrationTemplates { PayoutHeader = ["SUMMARY"], PayoutDealerStands = ["D"], PayoutWin = [""] };
+        var t     = new NarrationTemplates { PayoutHeader = [["SUMMARY"]], PayoutDealerStands = [["D"]], PayoutWin = [[""]] };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,
@@ -904,7 +904,7 @@ public class NarrationTemplateTests
     [Fact]
     public void PayoutDealerBust_SubstitutesDealerName()
     {
-        var t     = new NarrationTemplates { PayoutDealerBust = ["{dealer} BUST"], PayoutWin = [""] };
+        var t     = new NarrationTemplates { PayoutDealerBust = [["{dealer} BUST"]], PayoutWin = [[""]] };
         var state = new GameState
         {
             Phase      = GamePhase.DealerTurn,
@@ -943,7 +943,7 @@ public class NarrationTemplateTests
             Players           = [new Player { Nickname = "Lorah", Bet = "100",
                 Hands = [new Hand { Cards = [2, 3, 4, 5], State = HandState.Playing }] }],
         };
-        var t = new NarrationTemplates { PlayerCharlie = ["CHARLIE {name} {card}"] };
+        var t = new NarrationTemplates { PlayerCharlie = [["CHARLIE {name} {card}"]] };
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 6), t);
         Assert.Equal("CHARLIE Lorah 6", ((SendChat)effects[0]).Text);
     }
@@ -959,7 +959,7 @@ public class NarrationTemplateTests
             Players         = [new Player { Nickname = "Lorah", Bet = "100",
                 Hands = [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] }],
         };
-        var t = new NarrationTemplates { PayoutCharlieWin = ["CHARLIEWIN {name} {amount}"] };
+        var t = new NarrationTemplates { PayoutCharlieWin = [["CHARLIEWIN {name} {amount}"]] };
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         Assert.Contains(effects.OfType<SendChat>(), e => e.Text.StartsWith("CHARLIEWIN Lorah"));
     }
@@ -1003,7 +1003,7 @@ public class AnnounceBettingOpenTests
     [Fact]
     public void AnnounceBettingOpen_CustomTemplate()
     {
-        var t = new NarrationTemplates { BettingOpen = ["Betting is now open!"] };
+        var t = new NarrationTemplates { BettingOpen = [["Betting is now open!"]] };
         var state = new GameState { Phase = GamePhase.Betting };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBettingOpen(), t);
         Assert.Equal("Betting is now open!", ((SendChat)effects[0]).Text);
@@ -1234,7 +1234,7 @@ public class DoubleDownTests
     public void AnnounceDoubleConfirm_NarratesWithName()
     {
         var state = ActiveState([5, 6]);
-        var t = new NarrationTemplates { PlayerDoubleConfirm = ["GL {name}!"] };
+        var t = new NarrationTemplates { PlayerDoubleConfirm = [["GL {name}!"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceDoubleConfirm(0, 0), t);
         Assert.Single(effects);
         Assert.Equal("GL Lorah!", ((SendChat)effects[0]).Text);
@@ -1310,7 +1310,7 @@ public class SplitHandTests
     [Fact]
     public void SplitHand_NarratesRollBeforeAutoHit()
     {
-        var t = new NarrationTemplates { PlayerSplitRoll = ["Rolling for {name}"] };
+        var t = new NarrationTemplates { PlayerSplitRoll = [["Rolling for {name}"]] };
         var (_, effects) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0), t);
         Assert.Contains(effects, e => e is SendChat c && c.Text == "Rolling for Lorah (Hand 1)");
     }
@@ -1318,7 +1318,7 @@ public class SplitHandTests
     [Fact]
     public void AdvanceToNextPlayer_NarratesRollForOneCardHand()
     {
-        var t = new NarrationTemplates { PlayerSplitRoll = ["Rolling for {name}"] };
+        var t = new NarrationTemplates { PlayerSplitRoll = [["Rolling for {name}"]] };
         var state = new GameState
         {
             Phase             = GamePhase.PlayerTurns,
@@ -1710,7 +1710,7 @@ public class SplitHandTests
             Phase   = GamePhase.Betting,
             Players = [new Player { Nickname = "Lorah", Bet = "50000" }],
         };
-        var t = new NarrationTemplates { PlayerBetConfirm = ["{name} bet={amount}"] };
+        var t = new NarrationTemplates { PlayerBetConfirm = [["{name} bet={amount}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBetConfirm(0), t);
         Assert.Single(effects);
         Assert.Equal("Lorah bet=50K", ((SendChat)effects[0]).Text);
@@ -1724,7 +1724,7 @@ public class SplitHandTests
             Phase   = GamePhase.Betting,
             Players = [new Player { Nickname = "Lorah", Bet = "50000" }],
         };
-        var t = new NarrationTemplates { PlayerBankRemind = ["{name} bet={amount} bank={bank}"] };
+        var t = new NarrationTemplates { PlayerBankRemind = [["{name} bet={amount} bank={bank}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBankRemind(0, 200000), t);
         Assert.Single(effects);
         Assert.Equal("Lorah bet=50K bank=200K", ((SendChat)effects[0]).Text);
@@ -1738,7 +1738,7 @@ public class SplitHandTests
             Phase   = GamePhase.Betting,
             Players = [new Player { Nickname = "Lorah", Bet = "100000" }],
         };
-        var t = new NarrationTemplates { PlayerBankShortfall = ["{name} needs {amount}"] };
+        var t = new NarrationTemplates { PlayerBankShortfall = [["{name} needs {amount}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBankShortfall(0, 60000), t);
         Assert.Single(effects);
         Assert.Equal("Lorah needs 60K", ((SendChat)effects[0]).Text);
@@ -1752,7 +1752,7 @@ public class SplitHandTests
             Phase   = GamePhase.Betting,
             Players = [new Player { Nickname = "Lorah" }],
         };
-        var t = new NarrationTemplates { PlayerBankDeposit = ["{name} dep={amount} bal={bank}"] };
+        var t = new NarrationTemplates { PlayerBankDeposit = [["{name} dep={amount} bal={bank}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBankDeposit(0, 50000, 150000), t);
         Assert.Single(effects);
         Assert.Equal("Lorah dep=50K bal=150K", ((SendChat)effects[0]).Text);
@@ -1766,7 +1766,7 @@ public class SplitHandTests
             Phase   = GamePhase.Betting,
             Players = [new Player { Nickname = "Lorah" }],
         };
-        var t = new NarrationTemplates { PlayerBankWithdraw = ["{name} wd={amount} bal={bank}"] };
+        var t = new NarrationTemplates { PlayerBankWithdraw = [["{name} wd={amount} bal={bank}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBankWithdraw(0, 30000, 70000), t);
         Assert.Single(effects);
         Assert.Equal("Lorah wd=30K bal=70K", ((SendChat)effects[0]).Text);
@@ -1787,7 +1787,7 @@ public class AnnouncePlayerTurnTests
             Players           = [new Player { Nickname = "Lorah", Bet = "100",
                 Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] }],
         };
-        var t = new NarrationTemplates { PlayerTurnStart = ["{name}:{score}"] };
+        var t = new NarrationTemplates { PlayerTurnStart = [["{name}:{score}"]] };
         var (newState, effects) = GameEngine.Apply(state, new AnnouncePlayerTurn(0, 0), t);
         Assert.Same(state, newState);
         Assert.Single(effects);
@@ -1823,7 +1823,7 @@ public class PayoutSplitCombinedTests
     public void SplitBothHandsWin_EmitsCombinedNarration()
     {
         var state = SplitWinState([10, 9], [10, 8], [10, 6]);
-        var t = new NarrationTemplates { PayoutSplitCombined = ["SPLIT:{name}={amount}"], PayoutDealerStands = ["D"] };
+        var t = new NarrationTemplates { PayoutSplitCombined = [["SPLIT:{name}={amount}"]], PayoutDealerStands = [["D"]] };
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.Contains(texts, s => s.StartsWith("SPLIT:Lorah="));
@@ -1835,7 +1835,7 @@ public class PayoutSplitCombinedTests
     public void SplitBothHandsWin_CombinedAmountIsSum()
     {
         var state = SplitWinState([10, 9], [10, 8], [10, 6]);
-        var t = new NarrationTemplates { PayoutSplitCombined = ["{amount}"], PayoutDealerStands = ["D"] };
+        var t = new NarrationTemplates { PayoutSplitCombined = [["{amount}"]], PayoutDealerStands = [["D"]] };
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         var combined = effects.OfType<SendChat>().Select(e => e.Text).First(s => s.Contains("+200"));
         Assert.Contains("+200", combined); // 100 + 100
@@ -1865,10 +1865,10 @@ public class PayoutSplitCombinedTests
         };
         var t = new NarrationTemplates
         {
-            PayoutSplitCombined = ["SPLIT"],
-            PayoutWin  = ["WIN:{name}"],
-            PayoutLose = ["LOSE:{name}"],
-            PayoutDealerStands = ["D"],
+            PayoutSplitCombined = [["SPLIT"]],
+            PayoutWin  = [["WIN:{name}"]],
+            PayoutLose = [["LOSE:{name}"]],
+            PayoutDealerStands = [["D"]],
         };
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
@@ -1881,7 +1881,7 @@ public class PayoutSplitCombinedTests
     public void PayoutSplitCombined_TemplateVariable_Amount()
     {
         var state = SplitWinState([10, 9], [10, 8], [10, 6]);
-        var t = new NarrationTemplates { PayoutSplitCombined = ["TOTAL={amount}"], PayoutDealerStands = ["D"] };
+        var t = new NarrationTemplates { PayoutSplitCombined = [["TOTAL={amount}"]], PayoutDealerStands = [["D"]] };
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.Contains(texts, s => s == "TOTAL=+200");
@@ -1916,7 +1916,7 @@ public class PlayerBJMovingAlongTests
                 new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }]  },
             ],
         };
-        var t = new NarrationTemplates { PlayerBJMovingAlong = ["MOVING: {name}"] };
+        var t = new NarrationTemplates { PlayerBJMovingAlong = [["MOVING: {name}"]] };
         var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.Contains(texts, s => s == "MOVING: Lorah");
@@ -1931,7 +1931,7 @@ public class PlayerBJMovingAlongTests
             DealerHand = new Hand { Cards = [7], State = HandState.Playing },
             Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
         };
-        var t = new NarrationTemplates { PlayerBJMovingAlong = ["MOVING: {name}"] };
+        var t = new NarrationTemplates { PlayerBJMovingAlong = [["MOVING: {name}"]] };
         var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.DoesNotContain(texts, s => s.StartsWith("MOVING:"));
@@ -1943,7 +1943,7 @@ public class PlayerBJMovingAlongTests
         var s = MultiPlayerBJState();
         s.WaitingForNextPlayer = true;
         var state = s;
-        var t = new NarrationTemplates { PlayerBJMovingAlong = ["MA:{name}"], PlayerTurnStart = ["{name}"] };
+        var t = new NarrationTemplates { PlayerBJMovingAlong = [["MA:{name}"]], PlayerTurnStart = [["{name}"]] };
         var (_, effects) = GameEngine.Apply(state, new AdvanceToNextPlayer(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.Contains(texts, s => s == "MA:Bekki" || s == "Bekki");
@@ -1962,7 +1962,7 @@ public class PlayerBJMovingAlongTests
                 new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }]  },
             ],
         };
-        var t = new NarrationTemplates { PlayerBJMovingAlong = ["BJ:{name} cards:{cards}"] };
+        var t = new NarrationTemplates { PlayerBJMovingAlong = [["BJ:{name} cards:{cards}"]] };
         var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.Contains(texts, s => s == "BJ:Lorah cards:A 10");
@@ -2085,7 +2085,7 @@ public class DealerBJCheckTests
             DealerHand = new Hand { Cards = [1], State = HandState.Playing },
             Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
         };
-        var t = new NarrationTemplates { DealerBJCheck = ["LUCKY CHECK"] };
+        var t = new NarrationTemplates { DealerBJCheck = [["LUCKY CHECK"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t);
         Assert.Equal("LUCKY CHECK", ((SendChat)effects[0]).Text);
     }
@@ -2099,7 +2099,7 @@ public class DealerBJCheckTests
             DealerHand = new Hand { Cards = [7], State = HandState.Playing },
             Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Stand }] }],
         };
-        var t = new NarrationTemplates { DealerHitAnnounce = ["HIT: {dealer}"], DealerBJCheck = ["LUCKY CHECK"] };
+        var t = new NarrationTemplates { DealerHitAnnounce = [["HIT: {dealer}"]], DealerBJCheck = [["LUCKY CHECK"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t, dealerName: "Vera");
         Assert.Equal("HIT: Vera", ((SendChat)effects[0]).Text);
     }
