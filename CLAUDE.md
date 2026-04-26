@@ -89,10 +89,12 @@ Use only these player names in test cases: Lorah, Bekki, Nolla. If more than 3 n
 
 ## Narration Templates
 
+`NarrationTemplates` properties are `List<List<string>>` — the outer list is random variants (one picked per use via `Random.Shared`), the inner list is the sequence of chat lines sent for that variant. Defaults always have exactly one variant. The three `DealSummary*` properties remain plain `string` (they are concatenated components, not narrated independently).
+
 Every narration string emitted via `SendChat` must have a corresponding property in `NarrationTemplates` and a row in `ConfigWindow.DrawNarrationTemplates`. When adding a new `Narrate(...)` call in `GameEngine`, always:
-1. Add a property to `NarrationTemplates` with a sensible default.
-2. Add an `NtRow(...)` entry in the appropriate `ConfigWindow` section (or a new section if needed).
-3. Add a test in `NarrationTemplateTests` verifying the new template variable(s) are substituted.
+1. Add a `List<List<string>>` property to `NarrationTemplates` with a sensible single-variant default.
+2. Add an `NtListRow(...)` entry in the appropriate `ConfigWindow` section (or a new section if needed).
+3. Add a test in `NarrationTemplateTests` verifying the new template variable(s) are substituted (initialise the property as `[["template string"]]`).
 
 ## UI Rules
 
