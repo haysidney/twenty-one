@@ -30,6 +30,7 @@ public class ConfigWindow : Window, IDisposable
     private static readonly NarrationTemplates Defaults = new();
 
     private bool   _narrationDirty;
+    private (string Id, int Index)? _pendingVariantSelect;
     private double _narrationDirtyAt;
 
     private string _renameBuffer     = string.Empty;
@@ -574,7 +575,11 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.SameLine();
         if (ImGui.SmallButton($"+##{id}AddVariant"))
-        { value.Add(new List<string>(defaultValue.Count > 0 ? defaultValue[0] : [""])); MarkNarrationDirty(); }
+        {
+            value.Add(new List<string>(defaultValue.Count > 0 ? defaultValue[0] : [""]));
+            _pendingVariantSelect = (id, value.Count - 1);
+            MarkNarrationDirty();
+        }
         if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add a random variant"u8);
 
         ImGui.SameLine();
@@ -605,7 +610,9 @@ public class ConfigWindow : Window, IDisposable
             for (var vi = 0; vi < value.Count; vi++)
             {
                 var open = true;
-                if (ImGui.BeginTabItem($"Variant {vi + 1}##{id}V{vi}", ref open))
+                var selectFlags = _pendingVariantSelect == (id, vi) ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
+                if (vi == value.Count - 1) _pendingVariantSelect = null;
+                if (ImGui.BeginTabItem($"Variant {vi + 1}##{id}V{vi}", ref open, selectFlags))
                 {
                     DrawVariantLines(id, vi, value[vi], ctrlHeld, btnW);
                     ImGui.EndTabItem();
