@@ -18,6 +18,15 @@ public class BankTransactionEntry
 }
 
 [Serializable]
+public class PlayerStatsSession
+{
+    public DateTime                      Date     { get; set; } = DateTime.Now;
+    public Dictionary<string, PlayerStat> Stats   { get; set; } = [];
+    // Sum of BankNet across all rounds in the session (from bank's perspective).
+    public long                          BankNet  { get; set; } = 0;
+}
+
+[Serializable]
 public class PlayerStat
 {
     public string  DisplayName { get; set; } = string.Empty;
@@ -74,6 +83,9 @@ public class VenueSettings
 
     // ── Round history ──────────────────────────────────────────────────────────
     public List<RoundHistoryEntry> RoundHistory { get; set; } = [];
+
+    // ── Stats sessions (one per night) ─────────────────────────────────────────
+    public List<PlayerStatsSession> StatsSessions { get; set; } = [];
 }
 
 [Serializable]
@@ -132,6 +144,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public List<long> Tips                   { get => ActiveVenue.Tips;                       set => ActiveVenue.Tips = value; }
     [JsonIgnore] public Dictionary<string, PlayerStat> PlayerStatsStore { get => ActiveVenue.PlayerStatsStore; set => ActiveVenue.PlayerStatsStore = value; }
     [JsonIgnore] public List<RoundHistoryEntry> RoundHistory { get => ActiveVenue.RoundHistory; set => ActiveVenue.RoundHistory = value; }
+    [JsonIgnore] public List<PlayerStatsSession> StatsSessions { get => ActiveVenue.StatsSessions; set => ActiveVenue.StatsSessions = value; }
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

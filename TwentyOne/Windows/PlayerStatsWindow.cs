@@ -7,14 +7,18 @@ using System.Text;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using TwentyOne.Game;
 
 namespace TwentyOne.Windows;
 
-public class PlayerStatsWindow : Window, IDisposable
+public unsafe class PlayerStatsWindow : Window, IDisposable
 {
     private readonly Configuration config;
     private readonly FileDialogManager _fileDialogManager = new();
+    private PlayerStatsHistoryWindow? _historyWindow;
+
+    public void SetHistoryWindow(PlayerStatsHistoryWindow w) => _historyWindow = w;
 
     public PlayerStatsWindow(Configuration config)
         : base("Player Stats##TwentyOneStats")
@@ -34,6 +38,35 @@ public class PlayerStatsWindow : Window, IDisposable
     {
         _fileDialogManager.Draw();
 
+        if (ImGui.Button("Start Night"))
+            ImGui.OpenPopup("StartNightConfirm##TwentyOne");
+
+        if (ImGui.BeginPopup("StartNightConfirm##TwentyOne"))
+        {
+            ImGui.TextUnformatted("Save current stats as a session and start fresh?");
+            ImGui.TextUnformatted("This will also clear tips and reset the bank tracker.");
+            ImGui.Spacing();
+            if (ImGui.Button("Confirm"))
+            {
+                StartNight();
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel"))
+                ImGui.CloseCurrentPopup();
+            ImGui.EndPopup();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Save the current night's stats as a session and reset for a new night."u8);
+
+        ImGui.SameLine();
+        if (ImGui.Button("History"))
+        {
+            if (_historyWindow != null)
+                _historyWindow.IsOpen = true;
+        }
+
+        ImGui.SameLine();
         if (ImGui.Button("Reset Stats"))
         {
             config.PlayerStatsStore.Clear();
@@ -135,6 +168,41 @@ public class PlayerStatsWindow : Window, IDisposable
         ImGui.Text("Net (all players):");
         ImGui.SameLine();
         ImGui.TextColored(grandColor, grandStr);
+    }
+
+    private void StartNight()
+    {
+        // Save current stats as a session (even if empty, to mark the boundary)
+        if (config.PlayerStatsStore.Count > 0)
+        {
+            var bankNet = config.RoundHistory.Sum(r => r.BankNet);
+            var snapshot = new PlayerStatsSession
+            {
+                Date    = DateTime.Now,
+                Stats   = new System.Collections.Generic.Dictionary<string, PlayerStat>(
+                              config.PlayerStatsStore.ToDictionary(kv => kv.Key,
+                                  kv => new PlayerStat
+                                  {
+                                      DisplayName = kv.Value.DisplayName,
+                                      GamesPlayed = kv.Value.GamesPlayed,
+                                      GamesWon    = kv.Value.GamesWon,
+                                      GamesPushed = kv.Value.GamesPushed,
+                                      GamesLost   = kv.Value.GamesLost,
+                                      Blackjacks  = kv.Value.Blackjacks,
+                                      TotalWon    = kv.Value.TotalWon,
+                                  })),
+                BankNet = bankNet,
+            };
+            config.StatsSessions.Add(snapshot);
+        }
+
+        config.PlayerStatsStore.Clear();
+        config.Tips.Clear();
+        config.RoundHistory.Clear();
+        var currentGil = (long)InventoryManager.Instance()->GetGil();
+        config.GilStart = currentGil;
+        config.GilEnd   = currentGil;
+        config.Save();
     }
 
     private string BuildExportText()
