@@ -1068,11 +1068,6 @@ private static unsafe void SendChatMessage(string message)
                 if (ImGui.SmallButton("Confirm"))
                 {
                     Apply(new ReorderPlayers(reorderIndices));
-                    var remappedBets = new Dictionary<int, string>();
-                    for (var ni = 0; ni < reorderIndices.Count; ni++)
-                        if (betEdits.TryGetValue(reorderIndices[ni], out var v)) remappedBets[ni] = v;
-                    betEdits.Clear();
-                    foreach (var kv in remappedBets) betEdits[kv.Key] = kv.Value;
                     isReorderMode = false;
                     reorderIndices = [];
                 }
@@ -1081,6 +1076,12 @@ private static unsafe void SendChatMessage(string message)
             {
                 if (ImGui.SmallButton("Reorder") && State.Players.Count > 1)
                 {
+                    foreach (var (idx, val) in betEdits.ToList())
+                    {
+                        betEdits.Remove(idx);
+                        if (val != State.Players[idx].Bet)
+                            Apply(new SetPlayerBet(idx, val));
+                    }
                     isReorderMode  = true;
                     reorderIndices = Enumerable.Range(0, State.Players.Count).ToList();
                 }
@@ -1476,14 +1477,14 @@ private static unsafe void SendChatMessage(string message)
                         var tradeButtonW = hasWorld
                             ? ImGui.CalcTextSize("Trade").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X
                             : 0;
-                        if (Phase != GamePhase.Betting)
+                        if (Phase != GamePhase.Betting || isReorderMode)
                         {
                             var eb        = GameEngine.GetEffectiveBet(p, hand);
                             var betLabel  = eb > 0 ? GameEngine.FormatGil(eb) : p.Bet;
                             var betCopy   = eb > 0 ? $"{eb:0.##}" : p.Bet;
                             ImGui.AlignTextToFramePadding();
                             ImGui.TextDisabled(betLabel);
-                            if (ImGui.IsItemHovered())
+                            if (!isReorderMode && ImGui.IsItemHovered())
                             {
                                 ImGui.SetTooltip("Click to copy bet");
                                 if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
