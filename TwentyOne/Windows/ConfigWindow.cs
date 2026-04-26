@@ -582,18 +582,6 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add a random variant"u8);
 
-        ImGui.SameLine();
-        if (!ctrlHeld) ImGui.BeginDisabled();
-        if (ImGui.SmallButton($"Reset##{id}R"))
-        {
-            value.Clear();
-            foreach (var v in defaultValue) value.Add(new List<string>(v));
-            MarkNarrationDirty();
-        }
-        if (!ctrlHeld) ImGui.EndDisabled();
-        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
-            ImGui.SetTooltip("Hold Ctrl to reset this template to its default.");
-
         int? toRemoveVariant = null;
         var style = ImGui.GetStyle();
         var upW   = ImGui.CalcTextSize("↑").X + style.FramePadding.X * 2;
@@ -603,7 +591,7 @@ public class ConfigWindow : Window, IDisposable
 
         if (value.Count == 1)
         {
-            DrawVariantLines(id, 0, value[0], ctrlHeld, btnW);
+            DrawVariantLines(id, 0, value[0], defaultValue, ctrlHeld, btnW);
         }
         else if (value.Count > 1 && ImGui.BeginTabBar($"##{id}VarTabs"))
         {
@@ -614,7 +602,7 @@ public class ConfigWindow : Window, IDisposable
                 if (vi == value.Count - 1) _pendingVariantSelect = null;
                 if (ImGui.BeginTabItem($"Variant {vi + 1}##{id}V{vi}", ref open, selectFlags))
                 {
-                    DrawVariantLines(id, vi, value[vi], ctrlHeld, btnW);
+                    DrawVariantLines(id, vi, value[vi], defaultValue, ctrlHeld, btnW);
                     ImGui.EndTabItem();
                 }
                 if (!open) toRemoveVariant = vi;
@@ -626,7 +614,7 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Spacing();
     }
 
-    private void DrawVariantLines(string id, int vi, List<string> lines, bool ctrlHeld, float btnW)
+    private void DrawVariantLines(string id, int vi, List<string> lines, List<List<string>> defaultValue, bool ctrlHeld, float btnW)
     {
         int? toRemove = null;
         (int A, int B)? swap = null;
@@ -659,6 +647,19 @@ public class ConfigWindow : Window, IDisposable
 
         if (ImGui.SmallButton($"Add Message##{id}_{vi}AddLine"))
         { lines.Add(""); MarkNarrationDirty(); }
+
+        ImGui.SameLine();
+        if (!ctrlHeld) ImGui.BeginDisabled();
+        if (ImGui.SmallButton($"Reset to Default##{id}_{vi}R"))
+        {
+            var def = defaultValue.Count > 0 ? defaultValue[0] : (List<string>)[""];
+            lines.Clear();
+            lines.AddRange(def);
+            MarkNarrationDirty();
+        }
+        if (!ctrlHeld) ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
+            ImGui.SetTooltip("Hold Ctrl to reset this variant to the default template.");
     }
 
     private static void NtRow(string id, string hint, string defaultValue, bool ctrlHeld, ref string value)
