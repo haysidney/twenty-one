@@ -1358,7 +1358,20 @@ private static unsafe void SendChatMessage(string message)
                     // ── Name column ───────────────────────────────────────────
                     ImGui.TableSetColumnIndex(0);
                     var nameCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                    if (isFirstHand && !multiHand)
+                    if (isReorderMode && isFirstHand && !multiHand)
+                    {
+                        if (pi == 0) ImGui.BeginDisabled();
+                        if (ImGui.SmallButton($"↑##{pi}reorderUp")) reorderSwap = (pi, pi - 1);
+                        if (pi == 0) ImGui.EndDisabled();
+                        ImGui.SameLine();
+                        if (pi == State.Players.Count - 1) ImGui.BeginDisabled();
+                        if (ImGui.SmallButton($"↓##{pi}reorderDown")) reorderSwap = (pi, pi + 1);
+                        if (pi == State.Players.Count - 1) ImGui.EndDisabled();
+                        ImGui.SameLine();
+                        ImGui.AlignTextToFramePadding();
+                        ImGui.TextUnformatted(p.DisplayName);
+                    }
+                    else if (isFirstHand && !multiHand)
                     {
                         if (renamingIndex == pi)
                         {
@@ -1722,20 +1735,7 @@ private static unsafe void SendChatMessage(string message)
                     var asp = ImGui.GetStyle().ItemSpacing.X;
                     float ABW(string s) => ImGui.CalcTextSize(s).X + ImGui.GetStyle().FramePadding.X * 2;
 
-                    if (isReorderMode && isFirstHand && !multiHand)
-                    {
-                        var upW   = ABW("^");
-                        var downW = ABW("v");
-                        ImGui.SetCursorPosX(actionsCellRight - upW - asp - downW);
-                        if (pi == 0) ImGui.BeginDisabled();
-                        if (ImGui.SmallButton($"^##{pi}reorderUp")) reorderSwap = (pi, pi - 1);
-                        if (pi == 0) ImGui.EndDisabled();
-                        ImGui.SameLine();
-                        if (pi == State.Players.Count - 1) ImGui.BeginDisabled();
-                        if (ImGui.SmallButton($"v##{pi}reorderDown")) reorderSwap = (pi, pi + 1);
-                        if (pi == State.Players.Count - 1) ImGui.EndDisabled();
-                    }
-                    else if (Phase == GamePhase.PlayerTurns && State.WaitingForNextPlayer
+                    if (Phase == GamePhase.PlayerTurns && State.WaitingForNextPlayer
                         && pi == ActivePlayerIndex && hi == ActiveHandIndex)
                     {
                         var moreHands = p.Hands.Skip(hi + 1).Any(h => h.State == HandState.Playing);
