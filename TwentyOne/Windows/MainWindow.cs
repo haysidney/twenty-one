@@ -1068,6 +1068,11 @@ private static unsafe void SendChatMessage(string message)
                 if (ImGui.SmallButton("Confirm"))
                 {
                     Apply(new ReorderPlayers(reorderIndices));
+                    var remappedBets = new Dictionary<int, string>();
+                    for (var ni = 0; ni < reorderIndices.Count; ni++)
+                        if (betEdits.TryGetValue(reorderIndices[ni], out var v)) remappedBets[ni] = v;
+                    betEdits.Clear();
+                    foreach (var kv in remappedBets) betEdits[kv.Key] = kv.Value;
                     isReorderMode = false;
                     reorderIndices = [];
                 }
