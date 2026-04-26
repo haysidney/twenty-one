@@ -1958,6 +1958,8 @@ private static unsafe void SendChatMessage(string message)
                         Apply(new ToggleSittingOut(spi));
                     ImGui.PopStyleColor(3);
                     if (!canResume) ImGui.EndDisabled();
+                    if (!canResume && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                        ImGui.SetTooltip("Players can only resume during the betting phase.");
 
                     // Actions: Remove (betting only)
                     ImGui.TableSetColumnIndex(6);
