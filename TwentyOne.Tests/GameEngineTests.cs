@@ -638,6 +638,33 @@ public class RosterManagementTests
         var p = new Player { FullName = "Lorah Banehene", World = "Adamantoise" };
         Assert.Equal("Lorah", p.DisplayName);
     }
+
+    [Fact]
+    public void ReorderPlayers_ChangesOrder()
+    {
+        var state = new GameState
+        {
+            Phase   = GamePhase.Betting,
+            Players = [new Player { Nickname = "Lorah" }, new Player { Nickname = "Bekki" }, new Player { Nickname = "Nolla" }],
+        };
+        var (ns, _) = GameEngine.Apply(state, new ReorderPlayers([2, 0, 1]));
+        Assert.Equal("Nolla", ns.Players[0].Nickname);
+        Assert.Equal("Lorah", ns.Players[1].Nickname);
+        Assert.Equal("Bekki", ns.Players[2].Nickname);
+    }
+
+    [Fact]
+    public void ReorderPlayers_NoOpOutsideBetting()
+    {
+        var state = new GameState
+        {
+            Phase   = GamePhase.PlayerTurns,
+            Players = [new Player { Nickname = "Lorah" }, new Player { Nickname = "Bekki" }],
+        };
+        var (ns, _) = GameEngine.Apply(state, new ReorderPlayers([1, 0]));
+        Assert.Equal("Lorah", ns.Players[0].Nickname);
+        Assert.Equal("Bekki", ns.Players[1].Nickname);
+    }
 }
 
 public class NarrationTemplateTests

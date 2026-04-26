@@ -44,6 +44,8 @@ public partial class MainWindow : Window, IDisposable
     private string newPlayerName  = string.Empty;
     private int    renamingIndex  = -1;
     private string renamingBuffer = string.Empty;
+    private bool   isReorderMode  = false;
+    private List<int> reorderIndices = [];
     // In-progress bet edits (player index → typed string); committed to game state on Enter only.
     private readonly Dictionary<int, string> betEdits = [];
     // bank management modal
@@ -1056,7 +1058,34 @@ private static unsafe void SendChatMessage(string message)
 
         // ── Player table ──────────────────────────────────────────────────────
         ImGui.Spacing();
+        ImGui.AlignTextToFramePadding();
         ImGui.Text("-- Players --");
+        if (Phase == GamePhase.Betting)
+        {
+            ImGui.SameLine();
+            if (isReorderMode)
+            {
+                if (ImGui.SmallButton("Confirm"))
+                {
+                    Apply(new ReorderPlayers(reorderIndices));
+                    isReorderMode = false;
+                    reorderIndices = [];
+                }
+            }
+            else
+            {
+                if (ImGui.SmallButton("Reorder") && State.Players.Count > 1)
+                {
+                    isReorderMode  = true;
+                    reorderIndices = Enumerable.Range(0, State.Players.Count).ToList();
+                }
+            }
+        }
+        else if (isReorderMode)
+        {
+            isReorderMode  = false;
+            reorderIndices = [];
+        }
         ImGui.Separator();
 
         var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
@@ -1073,9 +1102,11 @@ private static unsafe void SendChatMessage(string message)
             ImGui.TableHeadersRow();
 
             int removeAt = -1;
+            (int A, int B)? reorderSwap = null;
             for (var pi = 0; pi < State.Players.Count; pi++)
             {
-                var p         = State.Players[pi];
+                var displayPi = isReorderMode ? reorderIndices[pi] : pi;
+                var p         = State.Players[displayPi];
                 var hasWorld    = p.World.Length > 0;
                 var hasNickname = p.Nickname.Length > 0;
                 var multiHand = p.Hands.Count > 1;
@@ -1691,7 +1722,20 @@ private static unsafe void SendChatMessage(string message)
                     var asp = ImGui.GetStyle().ItemSpacing.X;
                     float ABW(string s) => ImGui.CalcTextSize(s).X + ImGui.GetStyle().FramePadding.X * 2;
 
-                    if (Phase == GamePhase.PlayerTurns && State.WaitingForNextPlayer
+                    if (isReorderMode && isFirstHand && !multiHand)
+                    {
+                        var upW   = ABW("^");
+                        var downW = ABW("v");
+                        ImGui.SetCursorPosX(actionsCellRight - upW - asp - downW);
+                        if (pi == 0) ImGui.BeginDisabled();
+                        if (ImGui.SmallButton($"^##{pi}reorderUp")) reorderSwap = (pi, pi - 1);
+                        if (pi == 0) ImGui.EndDisabled();
+                        ImGui.SameLine();
+                        if (pi == State.Players.Count - 1) ImGui.BeginDisabled();
+                        if (ImGui.SmallButton($"v##{pi}reorderDown")) reorderSwap = (pi, pi + 1);
+                        if (pi == State.Players.Count - 1) ImGui.EndDisabled();
+                    }
+                    else if (Phase == GamePhase.PlayerTurns && State.WaitingForNextPlayer
                         && pi == ActivePlayerIndex && hi == ActiveHandIndex)
                     {
                         var moreHands = p.Hands.Skip(hi + 1).Any(h => h.State == HandState.Playing);
@@ -1821,6 +1865,9 @@ private static unsafe void SendChatMessage(string message)
                 foreach (var kv in shifted) { betEdits.Remove(kv.Key); betEdits[kv.Key - 1] = kv.Value; }
                 Apply(new RemovePlayer(removeAt));
             }
+            if (reorderSwap.HasValue)
+                (reorderIndices[reorderSwap.Value.A], reorderIndices[reorderSwap.Value.B]) =
+                    (reorderIndices[reorderSwap.Value.B], reorderIndices[reorderSwap.Value.A]);
             ImGui.EndTable();
         }
 
@@ -1889,7 +1936,8 @@ private static unsafe void SendChatMessage(string message)
                 var effectiveBets = State.Players.Select((p, i) =>
                     betEdits.TryGetValue(i, out var e) ? e : p.Bet);
                 var canDeal = State.Players.Count > 0
-                           && effectiveBets.All(b => !string.IsNullOrWhiteSpace(b));
+                           && effectiveBets.All(b => !string.IsNullOrWhiteSpace(b))
+                           && !isReorderMode;
                 if (!canDeal) ImGui.BeginDisabled();
                 if (ImGui.Button("Start Deal →"))
                 {

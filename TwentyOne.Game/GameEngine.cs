@@ -966,6 +966,13 @@ public static class GameEngine
                     new Player { Nickname = a.Nickname, FullName = p.FullName, World = p.World, Bet = p.Bet, Hands = p.Hands })), effects);
             }
 
+            case ReorderPlayers a:
+            {
+                if (state.Phase != GamePhase.Betting) return (state, effects);
+                var newPlayers = a.NewOrder.Select(i => state.Players[i]).ToList();
+                return (With(state, players: newPlayers), effects);
+            }
+
             default:
                 return (state, effects);
         }

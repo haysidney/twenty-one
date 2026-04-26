@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace TwentyOne.Game;
 
 public abstract record GameAction;
@@ -57,3 +59,4 @@ public record AddPlayer(string Nickname, string FullName = "", string World = ""
 public record RemovePlayer(int Index) : GameAction;
 public record SetPlayerBet(int PlayerIndex, string Bet) : GameAction;
 public record RenamePlayer(int PlayerIndex, string Nickname) : GameAction;
+public record ReorderPlayers(List<int> NewOrder) : GameAction;
