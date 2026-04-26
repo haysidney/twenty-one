@@ -18,10 +18,10 @@ public class PlayerStatsHistoryWindow : Window
         this.config = config;
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(500, 300),
+            MinimumSize = new Vector2(300, 1),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
         };
-        Flags = ImGuiWindowFlags.NoCollapse;
+        Flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize;
     }
 
     public override void OnOpen() => _selectedIndex = -1;
@@ -36,18 +36,19 @@ public class PlayerStatsHistoryWindow : Window
             return;
         }
 
-        // Clamp selection in case sessions were deleted
         if (_selectedIndex >= sessions.Count) _selectedIndex = sessions.Count - 1;
 
-        var ctrlHeld = ImGui.GetIO().KeyCtrl;
+        if (_selectedIndex >= 0)
+            DrawDetail(sessions);
+        else
+            DrawList(sessions);
+    }
 
-        // Session list on the left
-        ImGui.BeginGroup();
-        var listFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.ScrollY;
-        var listHeight = ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing();
-        if (ImGui.BeginTable("##sessionlist", 3, listFlags, new Vector2(280, listHeight)))
+    private void DrawList(System.Collections.Generic.List<PlayerStatsSession> sessions)
+    {
+        var listFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit;
+        if (ImGui.BeginTable("##sessionlist", 3, listFlags))
         {
-            ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Date"u8,    ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Players"u8, ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Net"u8,     ImGuiTableColumnFlags.WidthFixed, 70);
@@ -59,7 +60,7 @@ public class PlayerStatsHistoryWindow : Window
                 ImGui.TableNextRow();
                 ImGui.TableSetColumnIndex(0);
                 ImGui.AlignTextToFramePadding();
-                var isSelected = _selectedIndex == i;
+                var isSelected = false;
                 if (ImGui.Selectable($"{session.Date:MM/dd/yy HH:mm}##sess{i}",
                         ref isSelected,
                         ImGuiSelectableFlags.SpanAllColumns))
@@ -84,34 +85,41 @@ public class PlayerStatsHistoryWindow : Window
 
             ImGui.EndTable();
         }
+    }
 
-        // Delete button below list
-        if (_selectedIndex >= 0)
-        {
-            if (!ctrlHeld) ImGui.BeginDisabled();
-            if (ImGui.Button("Delete Session") && ctrlHeld)
-            {
-                sessions.RemoveAt(_selectedIndex);
-                config.Save();
-                _selectedIndex = Math.Min(_selectedIndex, sessions.Count - 1);
-            }
-            if (!ctrlHeld) ImGui.EndDisabled();
-            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                ImGui.SetTooltip("Hold Ctrl and click to delete this session");
-        }
-        ImGui.EndGroup();
+    private void DrawDetail(System.Collections.Generic.List<PlayerStatsSession> sessions)
+    {
+        var ctrlHeld = ImGui.GetIO().KeyCtrl;
+        var sel = sessions[_selectedIndex];
 
-        if (_selectedIndex < 0 || _selectedIndex >= sessions.Count) return;
+        if (ImGui.Button("Back"))
+            _selectedIndex = -1;
 
         ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted($"{sel.Date:dddd, MMMM d, yyyy  HH:mm}");
 
-        // Stats table for selected session
-        ImGui.BeginGroup();
-        var sel = sessions[_selectedIndex];
-        ImGui.Text($"Session: {sel.Date:dddd, MMMM d, yyyy  HH:mm}");
+        ImGui.SameLine();
+        var deleteLabel = "Delete Session";
+        var deleteWidth = ImGui.CalcTextSize(deleteLabel).X + ImGui.GetStyle().FramePadding.X * 2;
+        var targetX = ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - deleteWidth;
+        if (ImGui.GetCursorPosX() < targetX) ImGui.SetCursorPosX(targetX);
+        if (!ctrlHeld) ImGui.BeginDisabled();
+        if (ImGui.Button(deleteLabel) && ctrlHeld)
+        {
+            sessions.RemoveAt(_selectedIndex);
+            config.Save();
+            _selectedIndex = -1;
+            if (!ctrlHeld) ImGui.EndDisabled();
+            return;
+        }
+        if (!ctrlHeld) ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Hold Ctrl and click to delete this session");
+
         ImGui.Spacing();
 
-        var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY;
+        var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
         if (ImGui.BeginTable("##sessStats", 8, tableFlags))
         {
             ImGui.TableSetupColumn("Player"u8,  ImGuiTableColumnFlags.WidthStretch);
@@ -173,9 +181,8 @@ public class PlayerStatsHistoryWindow : Window
                 : new Vector4(0.7f, 0.7f, 0.7f, 1f);
         var grandStr = grandTotal > 0 ? $"+{GameEngine.FormatGil(grandTotal)}" : GameEngine.FormatGil(grandTotal);
         ImGui.Spacing();
-        ImGui.Text("Net (all players):");
+        ImGui.TextUnformatted("Net (all players):");
         ImGui.SameLine();
         ImGui.TextColored(grandColor, grandStr);
-        ImGui.EndGroup();
     }
 }
