@@ -1508,6 +1508,7 @@ private static unsafe void SendChatMessage(string message)
                             {
                                 betEdits[pi] = betVal;
                             }
+                            if (p.SittingOut) ImGui.EndDisabled();
                         }
                         if (hasWorld)
                         {
