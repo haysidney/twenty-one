@@ -765,9 +765,9 @@ private static unsafe void SendChatMessage(string message)
 
                 ImGui.Spacing();
 
-                // Remind (betting phase + bank > 0 + bet set)
+                // Remind (bank > 0 + bet set)
                 var bmpBetForRemind = betEdits.TryGetValue(bankManagePlayerIndex, out var bmpPending) ? bmpPending : bmp.Bet;
-                if (Phase == GamePhase.Betting && bmpBank > 0 && !string.IsNullOrWhiteSpace(bmpBetForRemind))
+                if (bmpBank > 0 && !string.IsNullOrWhiteSpace(bmpBetForRemind))
                 {
                     if (ImGui.Button("Remind##bankremind"))
                     {
