@@ -1,9 +1,9 @@
 {
-  "name": "Single player — player busts (draws to 22)",
+  "name": "Single player — player busts (draws to 24)",
   "players": [
     { "name": "Lorah", "bet": "1000" }
   ],
-  "rolls": [7, 10, 6, 8, 4],
+  "rolls": [7, 10, 6, 8],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",

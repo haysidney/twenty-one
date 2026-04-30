@@ -9,6 +9,7 @@
     "BeginPlayerTurns",
     "Stand:0:0",
     "BeginDealerTurn",
+    "DealerHit",
     "GoToPayout",
     "NewRound"
   ]

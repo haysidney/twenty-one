@@ -1,15 +1,16 @@
 {
-  "name": "Single player — double down (player wins doubled bet)",
+  "name": "Single player — double down (player 21 beats dealer 19)",
   "players": [
     { "name": "Lorah", "bet": "1000" }
   ],
-  "rolls": [5, 6, 5, 10, 4, 7],
+  "rolls": [5, 6, 5, 10, 6, 8],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
     "Dbl:0:0",
     "ConfirmDbl:0:0",
     "BeginDealerTurn",
+    "DealerHit",
     "DealerHit",
     "GoToPayout",
     "NewRound"

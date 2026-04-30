@@ -1,10 +1,10 @@
 {
-  "name": "Two players — advance-to-next-player flow (verify WaitingForNextPlayer UI)",
+  "name": "Two players — both stand, verify AdvancePlayer flow",
   "players": [
     { "name": "Lorah", "bet": "1000" },
     { "name": "Bekki", "bet": "500" }
   ],
-  "rolls": [7, 10, 9, 10, 8, 8],
+  "rolls": [7, 10, 9, 10, 8, 10],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
@@ -12,6 +12,7 @@
     "AdvancePlayer",
     "Stand:1:0",
     "BeginDealerTurn",
+    "DealerHit",
     "GoToPayout",
     "NewRound"
   ]

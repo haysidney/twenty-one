@@ -3,12 +3,13 @@
   "players": [
     { "name": "Lorah", "bet": "1000" }
   ],
-  "rolls": [8, 10, 8, 10],
+  "rolls": [10, 10, 8, 8],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
     "Stand:0:0",
     "BeginDealerTurn",
+    "DealerHit",
     "GoToPayout",
     "NewRound"
   ]

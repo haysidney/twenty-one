@@ -1,19 +1,24 @@
 {
-  "name": "Two players — Lorah splits aces, Bekki doubles down",
+  "name": "Two players — Lorah splits 8s, Bekki doubles down",
   "players": [
     { "name": "Lorah", "bet": "1000" },
     { "name": "Bekki", "bet": "500" }
   ],
-  "rolls": [7, 1, 1, 5, 6, 10, 10, 9, 3],
+  "rolls": [6, 8, 8, 6, 5, 10, 9, 7, 9, 4],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
     "Spl:0:0",
     "ConfirmSpl:0:0",
+    "Stand:0:0",
+    "AdvancePlayer",
+    "Stand:0:1",
     "AdvancePlayer",
     "Dbl:1:0",
     "ConfirmDbl:1:0",
     "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
     "GoToPayout",
     "NewRound"
   ]

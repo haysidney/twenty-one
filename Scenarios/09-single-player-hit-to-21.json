@@ -1,14 +1,17 @@
 {
-  "name": "Single player — hits to 21 (not blackjack)",
+  "name": "Single player — hits to 21 then stands (not blackjack, player wins)",
   "players": [
     { "name": "Lorah", "bet": "1000" }
   ],
-  "rolls": [7, 6, 5, 8, 10],
+  "rolls": [5, 7, 4, 10, 6, 8],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
     "Hit:0:0",
+    "Stand:0:0",
     "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
     "GoToPayout",
     "NewRound"
   ]

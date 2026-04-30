@@ -1,5 +1,5 @@
 {
-  "name": "Single player — dealer busts (player wins)",
+  "name": "Single player — dealer busts (6+7+9=22)",
   "players": [
     { "name": "Lorah", "bet": "1000" }
   ],
@@ -9,6 +9,7 @@
     "BeginPlayerTurns",
     "Stand:0:0",
     "BeginDealerTurn",
+    "DealerHit",
     "DealerHit",
     "GoToPayout",
     "NewRound"
