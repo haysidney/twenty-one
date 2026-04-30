@@ -87,9 +87,13 @@ public class DebugWindow : Window
             if (ImGui.SmallButton("Step##scenStep"))
                 mainWindow.ExecuteNextScenarioStep();
             ImGui.SameLine();
+            if (ImGui.SmallButton("Fast Forward##scenFF"))
+                mainWindow.ScenarioFastForward = true;
+            ImGui.SameLine();
             if (ImGui.SmallButton("Abort##scenAbort"))
             {
                 mainWindow.ActiveScenario = null;
+                mainWindow.ScenarioFastForward = false;
                 mainWindow.DebugRollQueue.Clear();
             }
             var gate = mainWindow.ScenarioGateButtons;

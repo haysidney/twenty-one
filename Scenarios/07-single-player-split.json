@@ -1,9 +1,20 @@
 {
-  "name": "Single player — split 8s (dealer busts, both hands win)",
+  "name": "Single player \u2014 split 8s (dealer busts, both hands win)",
   "players": [
-    { "name": "Lorah", "bet": "1000" }
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
   ],
-  "rolls": [6, 8, 8, 10, 9, 7, 9],
+  "rolls": [
+    6,
+    8,
+    8,
+    10,
+    9,
+    7,
+    9
+  ],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
@@ -15,7 +26,6 @@
     "BeginDealerTurn",
     "DealerHit",
     "DealerHit",
-    "GoToPayout",
-    "NewRound"
+    "GoToPayout"
   ]
 }

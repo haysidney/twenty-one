@@ -1,10 +1,23 @@
 {
-  "name": "Two players — both stand, verify AdvancePlayer flow",
+  "name": "Two players \u2014 both stand, verify AdvancePlayer flow",
   "players": [
-    { "name": "Lorah", "bet": "1000" },
-    { "name": "Bekki", "bet": "500" }
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    },
+    {
+      "name": "Bekki",
+      "bet": "500"
+    }
   ],
-  "rolls": [7, 10, 9, 10, 8, 10],
+  "rolls": [
+    7,
+    10,
+    9,
+    10,
+    8,
+    10
+  ],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
@@ -13,7 +26,6 @@
     "Stand:1:0",
     "BeginDealerTurn",
     "DealerHit",
-    "GoToPayout",
-    "NewRound"
+    "GoToPayout"
   ]
 }

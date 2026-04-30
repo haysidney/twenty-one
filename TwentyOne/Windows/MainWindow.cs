@@ -70,6 +70,10 @@ public partial class MainWindow : Window, IDisposable
     public ActiveScenario? ActiveScenario { get; set; }
     // when true, only the button matching the next scenario action is enabled
     public bool ScenarioGateButtons = true;
+#if DEBUG
+    // when true, auto-steps through scenario actions as chatQueue drains each frame
+    public bool ScenarioFastForward = false;
+#endif
 
     // Called by DebugWindow after overwriting GameState so stale bet edits don't index OOB.
     public void ClearBetEdits() => betEdits.Clear();
@@ -836,6 +840,14 @@ private static unsafe void SendChatMessage(string message)
                 lastSentMinWaitMs = minWaitAfterMs;
             }
         }
+
+#if DEBUG
+        // Fast-forward: fire the next scenario step as soon as the chat queue and pending state drain
+        if (ScenarioFastForward && ActiveScenario?.PeekNext() != null
+            && chatQueue.Count == 0 && pendingHit == null && !deferredRoll.HasValue)
+            ExecuteNextScenarioStep();
+        if (ActiveScenario?.PeekNext() == null) ScenarioFastForward = false;
+#endif
 
         // Process deferred roll from OnChatMessage
         if (deferredRoll.HasValue)

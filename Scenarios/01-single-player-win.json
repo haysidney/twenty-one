@@ -1,16 +1,23 @@
 {
-  "name": "Single player — player wins (19 vs dealer 17)",
+  "name": "Single player \u2014 player wins (19 vs dealer 17)",
   "players": [
-    { "name": "Lorah", "bet": "1000" }
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
   ],
-  "rolls": [10, 10, 9, 7],
+  "rolls": [
+    10,
+    10,
+    9,
+    7
+  ],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
     "Stand:0:0",
     "BeginDealerTurn",
     "DealerHit",
-    "GoToPayout",
-    "NewRound"
+    "GoToPayout"
   ]
 }

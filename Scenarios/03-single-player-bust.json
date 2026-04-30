@@ -1,14 +1,21 @@
 {
-  "name": "Single player — player busts (draws to 24)",
+  "name": "Single player \u2014 player busts (draws to 24)",
   "players": [
-    { "name": "Lorah", "bet": "1000" }
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
   ],
-  "rolls": [7, 10, 6, 8],
+  "rolls": [
+    7,
+    10,
+    6,
+    8
+  ],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
     "Hit:0:0",
-    "GoToPayout",
-    "NewRound"
+    "GoToPayout"
   ]
 }

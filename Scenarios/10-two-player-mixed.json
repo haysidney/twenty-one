@@ -1,10 +1,25 @@
 {
-  "name": "Two players — Lorah wins (19), Bekki busts",
+  "name": "Two players \u2014 Lorah wins (19), Bekki busts",
   "players": [
-    { "name": "Lorah", "bet": "1000" },
-    { "name": "Bekki", "bet": "500" }
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    },
+    {
+      "name": "Bekki",
+      "bet": "500"
+    }
   ],
-  "rolls": [7, 10, 9, 10, 4, 10, 9, 2],
+  "rolls": [
+    7,
+    10,
+    9,
+    10,
+    4,
+    10,
+    9,
+    2
+  ],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
@@ -14,7 +29,6 @@
     "BeginDealerTurn",
     "DealerHit",
     "DealerHit",
-    "GoToPayout",
-    "NewRound"
+    "GoToPayout"
   ]
 }
