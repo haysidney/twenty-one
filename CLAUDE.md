@@ -66,7 +66,7 @@ All debug tooling is `#if DEBUG` — absent in Release builds. Enable via the **
 
 **Roll order during deal:** dealer card first, then player 0 card 1, player 0 card 2, player 1 card 1, player 1 card 2, etc. Subsequent hit rolls consumed in action order.
 
-**Button gating:** while a scenario is active, only the button matching the next action is enabled. All others are disabled. Step button in DebugWindow executes the next action programmatically (fallback if you don't want to click the actual button).
+**Button gating:** while a scenario is active, only the button matching the next action is enabled by default. Uncheck "Gate buttons" in DebugWindow to see all buttons enabled (useful for testing button visibility) while still tracking scenario progress. Step button executes the next action programmatically without clicking the actual button.
 
 **Abort:** click Abort in the banner or in DebugWindow. Clears scenario and roll queue; GameState is left wherever it was.
 
