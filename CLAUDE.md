@@ -14,6 +14,68 @@ It's a plugin meant for a dealer to use to run a blackjack game in a venue.
 
 Plugin config is saved to `/home/sidney/.xlcore/pluginConfigs/TwentyOne.json`.
 
+### Debug build (DEBUG-only UI features)
+
+All debug tooling is `#if DEBUG` — absent in Release builds. Enable via the **Debug** button in the MainWindow top bar (appears in Debug builds only).
+
+#### DebugWindow
+
+- **Roll queue** — pre-load card values (1–13) that `QueueHitRoll` consumes instead of sending chat rolls. Manual entry or loaded from scenario file.
+- **Scenario** — loads a JSON scenario file that sets up players/bets, enqueues rolls, and scripts the exact sequence of UI button clicks to execute. An orange banner appears in MainWindow while a scenario is active showing the next required step.
+- **Snapshot save/load** — serialize/restore `GameState` directly for reproducing specific game states.
+
+#### Scenario format
+
+```json
+{
+  "name": "Human-readable name",
+  "players": [
+    { "name": "Lorah", "bet": "1000" },
+    { "name": "Bekki", "bet": "500" }
+  ],
+  "rolls": [1, 10, 7, 6],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Stand:0:0",
+    "Stand:1:0",
+    "BeginDealerTurn",
+    "GoToPayout",
+    "NewRound"
+  ]
+}
+```
+
+**Action strings:**
+
+| Action | Trigger |
+|--------|---------|
+| `StartDeal` | "Start Deal →" button |
+| `BeginPlayerTurns` | "Begin Player Turns →" button |
+| `BeginDealerTurn` | "Begin Dealer Turn →" button |
+| `GoToPayout` | "Go to Payout →" button |
+| `NewRound` | "New Round" button |
+| `DealerHit` | Dealer Hit button |
+| `Hit:pi:hi` | Player pi hand hi Hit button |
+| `Stand:pi:hi` | Player pi hand hi Stand button |
+| `Dbl:pi:hi` | Player pi hand hi Dbl button (sets pendingDouble) |
+| `ConfirmDbl:pi:hi` | "Confirm Dbl" button after Dbl |
+| `Spl:pi:hi` | Player pi hand hi Spl button (sets pendingSplit) |
+| `ConfirmSpl:pi:hi` | "Confirm Spl" button after Spl |
+| `AdvancePlayer` | "Next Player ↓" / "Next Hand ↓" button |
+
+**Roll order during deal:** dealer card first, then player 0 card 1, player 0 card 2, player 1 card 1, player 1 card 2, etc. Subsequent hit rolls consumed in action order.
+
+**Button gating:** while a scenario is active, only the button matching the next action is enabled. All others are disabled. Step button in DebugWindow executes the next action programmatically (fallback if you don't want to click the actual button).
+
+**Abort:** click Abort in the banner or in DebugWindow. Clears scenario and roll queue; GameState is left wherever it was.
+
+**Right-click any row in Round History** → "Save snapshot..." to export a `GameState` for later debugging or to load into a scenario.
+
+#### Scenario files
+
+Scenario JSON files live in `Scenarios/`. Scenario names use test player names: Lorah, Bekki, Nolla (Lorah = winning player per test convention).
+
 ## Build
 
 Dev environment uses Nix. Enter with `nix develop` (requires `flake.nix` to be git-tracked). This installs `dotnet-sdk_10`.

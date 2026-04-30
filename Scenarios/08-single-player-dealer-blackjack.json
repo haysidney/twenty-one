@@ -1,0 +1,15 @@
+{
+  "name": "Single player — dealer blackjack (ace upcard, must check hole card)",
+  "players": [
+    { "name": "Lorah", "bet": "1000" }
+  ],
+  "rolls": [1, 9, 7, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Stand:0:0",
+    "BeginDealerTurn",
+    "GoToPayout",
+    "NewRound"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "Three players — Nolla sitting out (verify sit-out skipping and UI)",
+  "players": [
+    { "name": "Lorah", "bet": "1000" },
+    { "name": "Bekki", "bet": "500" },
+    { "name": "Nolla", "sittingOut": true }
+  ],
+  "rolls": [7, 10, 9, 10, 8, 8],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Stand:0:0",
+    "AdvancePlayer",
+    "Stand:1:0",
+    "BeginDealerTurn",
+    "GoToPayout",
+    "NewRound"
+  ]
+}

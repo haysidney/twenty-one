@@ -63,8 +63,148 @@ public partial class MainWindow : Window, IDisposable
 #if DEBUG
     // debug roll queue: consumed by QueueHitRoll before sending chat, bypasses /random
     public readonly Queue<int> DebugRollQueue = new();
-    private DebugWindow debugWindow = null!;
+    private DebugWindow        debugWindow    = null!;
     public void SetDebugWindow(DebugWindow w) => debugWindow = w;
+
+    // active scenario: non-null while a scripted test scenario is running
+    public ActiveScenario? ActiveScenario { get; set; }
+
+    // Returns true if no scenario is active OR the scenario's next step matches key.
+    private bool IsScenarioStep(string key)
+        => ActiveScenario == null || ActiveScenario.PeekNext() == key;
+
+    // Advances the scenario pointer after a scripted button is clicked.
+    private void ScenarioAdvance() => ActiveScenario?.Advance();
+
+    // Executes the next scripted action programmatically (Step button fallback).
+    public void ExecuteNextScenarioStep()
+    {
+        var step = ActiveScenario?.PeekNext();
+        if (step == null) return;
+        ScenarioAdvance();
+        switch (step)
+        {
+            case "StartDeal":
+                foreach (var (idx, val) in betEdits.ToList())
+                {
+                    betEdits.Remove(idx);
+                    if (val != State.Players[idx].Bet)
+                        Apply(new SetPlayerBet(idx, val));
+                }
+                Apply(new StartDeal());
+                foreach (var p in State.Players)
+                {
+                    if (p.SittingOut) continue;
+                    var betAmt = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
+                    if (betAmt <= 0) continue;
+                    var betKey = PlayerStatKey(p);
+                    if (!config.PlayerStatsStore.TryGetValue(betKey, out var betStat) || betStat.Bank <= 0) continue;
+                    ApplyBank(betStat, new BankBet(betAmt));
+                }
+                for (var i = 0; i < State.Players.Count; i++)
+                {
+                    if (State.Players[i].SittingOut) continue;
+                    autoDealQueue.Enqueue((false, i, 0, true));
+                    autoDealQueue.Enqueue((false, i, 0, false));
+                }
+                Apply(new AnnounceDealerDeal());
+                QueueHitRoll(isDealer: true, -1, -1);
+                break;
+            case "BeginPlayerTurns":
+                Apply(new BeginPlayerTurns());
+                break;
+            case "BeginDealerTurn":
+                Apply(new BeginDealerTurn());
+                break;
+            case "GoToPayout":
+                Apply(new GoToPayout());
+                UpdatePlayerStats();
+                break;
+            case "NewRound":
+                Apply(new NewRound());
+                break;
+            case "DealerHit":
+                Apply(new AnnounceDealerHit());
+                QueueHitRoll(isDealer: true, -1, -1);
+                break;
+            case "AdvancePlayer":
+                Apply(new AdvanceToNextPlayer());
+                break;
+            default:
+            {
+                // Hit:pi:hi / Stand:pi:hi / Dbl:pi:hi / Spl:pi:hi / ConfirmDbl:pi:hi / ConfirmSpl:pi:hi
+                var parts = step.Split(':');
+                if (parts.Length < 3 || !int.TryParse(parts[1], out var pi) || !int.TryParse(parts[2], out var hi))
+                    break;
+                var p    = pi < State.Players.Count ? State.Players[pi] : null;
+                var hand = p != null && hi < p.Hands.Count ? p.Hands[hi] : null;
+                if (p == null || hand == null) break;
+                switch (parts[0])
+                {
+                    case "Hit":
+                        Apply(new AnnouncePlayerHit(pi, hi));
+                        QueueHitRoll(isDealer: false, pi, hi);
+                        break;
+                    case "Stand":
+                        Apply(new StandPlayer(pi, hi));
+                        break;
+                    case "Dbl":
+                    {
+                        var dblBet     = GameEngine.GetEffectiveBet(p, hand);
+                        var dblKey     = PlayerStatKey(p);
+                        var dblBank    = config.PlayerStatsStore.TryGetValue(dblKey, out var dblStat) ? dblStat.Bank : 0;
+                        var dblRounded = (long)Math.Ceiling(dblBet);
+                        var fromBank   = dblBank >= dblRounded;
+                        var bankAfter  = fromBank ? dblBank - dblRounded : dblBank;
+                        pendingDouble  = (pi, hi);
+                        Apply(new AnnounceDouble(pi, hi, fromBank, bankAfter));
+                        break;
+                    }
+                    case "Spl":
+                    {
+                        var splBet     = GameEngine.GetEffectiveBet(p, hand);
+                        var splKey     = PlayerStatKey(p);
+                        var splBank    = config.PlayerStatsStore.TryGetValue(splKey, out var splStat) ? splStat.Bank : 0;
+                        var splRounded = (long)Math.Ceiling(splBet);
+                        var fromBank   = splBank >= splRounded;
+                        var bankAfter  = fromBank ? splBank - splRounded : splBank;
+                        pendingSplit   = (pi, hi);
+                        Apply(new AnnounceSplit(pi, hi, fromBank, bankAfter));
+                        break;
+                    }
+                    case "ConfirmDbl":
+                        Apply(new AnnounceDoubleConfirm(pi, hi));
+                        Apply(new DoubleDown(pi, hi));
+                        var dblKey2 = PlayerStatKey(p);
+                        var dblAmt2 = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
+                        if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0)
+                        {
+                            var before2 = dblStat2.Bank;
+                            ApplyBank(dblStat2, new BankDoubleDown(dblAmt2));
+                            config.NarrationLog.Add($"[Bank] {p.DisplayName}: doubled — {dblAmt2:N0} deducted (was {before2:N0} → {dblStat2.Bank:N0})");
+                            config.Save();
+                        }
+                        pendingDouble = null;
+                        QueueHitRoll(isDealer: false, pi, hi);
+                        break;
+                    case "ConfirmSpl":
+                        var splKey2 = PlayerStatKey(p);
+                        var splAmt2 = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
+                        if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0)
+                        {
+                            var before2 = splStat2.Bank;
+                            ApplyBank(splStat2, new BankSplit(splAmt2));
+                            config.NarrationLog.Add($"[Bank] {p.DisplayName}: split — {splAmt2:N0} deducted (was {before2:N0} → {splStat2.Bank:N0})");
+                            config.Save();
+                        }
+                        Apply(new SplitHand(pi, hi));
+                        pendingSplit = null;
+                        break;
+                }
+                break;
+            }
+        }
+    }
 #endif
     // pending trade confirmation for double/split: set when dealer clicks the button, cleared on confirm/cancel
     private (int PlayerIndex, int HandIndex)? pendingDouble;
@@ -1000,6 +1140,22 @@ private static unsafe void SendChatMessage(string message)
                 ExitHistoryView();
             ImGui.Separator();
         }
+#if DEBUG
+        if (ActiveScenario != null)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.7f, 0.2f, 1f));
+            var nextStep = ActiveScenario.PeekNext() ?? "(done)";
+            ImGui.TextUnformatted($"[SCENARIO] {ActiveScenario.Name}  |  Next: {nextStep}  ({ActiveScenario.Remaining} left)");
+            ImGui.PopStyleColor();
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Abort##scenBannerAbort"))
+            {
+                ActiveScenario = null;
+                DebugRollQueue.Clear();
+            }
+            ImGui.Separator();
+        }
+#endif
 
         if (!venueMemoryDismissed && !isHistoryView && GetVenueMemorySuggestion() is var suggestion && suggestion.HasValue)
         {
@@ -1094,11 +1250,21 @@ private static unsafe void SendChatMessage(string message)
         if (dealerHitActive)
         {
             if (State.DealerHand.Cards.Count > 0) ImGui.SameLine();
+#if DEBUG
+            var _scenDHit = IsScenarioStep("DealerHit");
+            if (!_scenDHit) ImGui.BeginDisabled();
+#endif
             if (ImGui.SmallButton("Hit##dealer"))
             {
+#if DEBUG
+                ScenarioAdvance();
+#endif
                 Apply(new AnnounceDealerHit());
                 QueueHitRoll(isDealer: true, -1, -1);
             }
+#if DEBUG
+            if (!_scenDHit) ImGui.EndDisabled();
+#endif
         }
 
         // ── Player table ──────────────────────────────────────────────────────
@@ -1797,6 +1963,15 @@ private static unsafe void SendChatMessage(string message)
                     var isPendingSplit  = pendingSplit.HasValue  && pendingSplit.Value  == (pi, hi);
                     var asp = ImGui.GetStyle().ItemSpacing.X;
                     float ABW(string s) => ImGui.CalcTextSize(s).X + ImGui.GetStyle().FramePadding.X * 2;
+#if DEBUG
+                    var _scenHit        = IsScenarioStep($"Hit:{pi}:{hi}");
+                    var _scenStand      = IsScenarioStep($"Stand:{pi}:{hi}");
+                    var _scenDbl        = IsScenarioStep($"Dbl:{pi}:{hi}");
+                    var _scenSpl        = IsScenarioStep($"Spl:{pi}:{hi}");
+                    var _scenConfirmDbl = IsScenarioStep($"ConfirmDbl:{pi}:{hi}");
+                    var _scenConfirmSpl = IsScenarioStep($"ConfirmSpl:{pi}:{hi}");
+                    var _scenAdvPlayer  = IsScenarioStep("AdvancePlayer");
+#endif
 
                     if (Phase == GamePhase.PlayerTurns && State.WaitingForNextPlayer
                         && pi == ActivePlayerIndex && hi == ActiveHandIndex)
@@ -1804,13 +1979,31 @@ private static unsafe void SendChatMessage(string message)
                         var moreHands = p.Hands.Skip(hi + 1).Any(h => h.State == HandState.Playing);
                         var advLabel  = moreHands ? "Next Hand ↓" : "Next Player ↓";
                         ImGui.SetCursorPosX(actionsCellRight - ABW(advLabel));
-                        if (ImGui.SmallButton($"{advLabel}##{pi}_{hi}")) Apply(new AdvanceToNextPlayer());
+#if DEBUG
+                        if (!_scenAdvPlayer) ImGui.BeginDisabled();
+#endif
+                        if (ImGui.SmallButton($"{advLabel}##{pi}_{hi}"))
+                        {
+#if DEBUG
+                            ScenarioAdvance();
+#endif
+                            Apply(new AdvanceToNextPlayer());
+                        }
+#if DEBUG
+                        if (!_scenAdvPlayer) ImGui.EndDisabled();
+#endif
                     }
                     else if (isPendingDouble)
                     {
                         ImGui.SetCursorPosX(actionsCellRight - ABW("Confirm Dbl") - asp - ABW("Cancel"));
+#if DEBUG
+                        if (!_scenConfirmDbl) ImGui.BeginDisabled();
+#endif
                         if (ImGui.SmallButton($"Confirm Dbl##{pi}_{hi}"))
                         {
+#if DEBUG
+                            ScenarioAdvance();
+#endif
                             Apply(new AnnounceDoubleConfirm(pi, hi));
                             Apply(new DoubleDown(pi, hi));
                             var dblKey2    = PlayerStatKey(p);
@@ -1825,14 +2018,23 @@ private static unsafe void SendChatMessage(string message)
                             pendingDouble = null;
                             QueueHitRoll(isDealer: false, pi, hi);
                         }
+#if DEBUG
+                        if (!_scenConfirmDbl) ImGui.EndDisabled();
+#endif
                         ImGui.SameLine();
                         if (ImGui.SmallButton($"Cancel##{pi}_{hi}dblcancel")) pendingDouble = null;
                     }
                     else if (isPendingSplit)
                     {
                         ImGui.SetCursorPosX(actionsCellRight - ABW("Confirm Spl") - asp - ABW("Cancel"));
+#if DEBUG
+                        if (!_scenConfirmSpl) ImGui.BeginDisabled();
+#endif
                         if (ImGui.SmallButton($"Confirm Spl##{pi}_{hi}"))
                         {
+#if DEBUG
+                            ScenarioAdvance();
+#endif
                             var splKey2    = PlayerStatKey(p);
                             var splAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
                             if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0)
@@ -1846,6 +2048,9 @@ private static unsafe void SendChatMessage(string message)
                             pendingSplit = null;
                             // The 1-card split hands are auto-hit in Draw()
                         }
+#if DEBUG
+                        if (!_scenConfirmSpl) ImGui.EndDisabled();
+#endif
                         ImGui.SameLine();
                         if (ImGui.SmallButton($"Cancel##{pi}_{hi}splcancel")) pendingSplit = null;
                     }
@@ -1865,25 +2070,52 @@ private static unsafe void SendChatMessage(string message)
                                     && pi == ActivePlayerIndex && hi == ActiveHandIndex
                                     && GameEngine.CanHit(hand);
                         if (!canStand) ImGui.BeginDisabled();
-                        if (ImGui.SmallButton($"Stand##{pi}_{hi}")) Apply(new StandPlayer(pi, hi));
+#if DEBUG
+                        if (!_scenStand) ImGui.BeginDisabled();
+#endif
+                        if (ImGui.SmallButton($"Stand##{pi}_{hi}"))
+                        {
+#if DEBUG
+                            ScenarioAdvance();
+#endif
+                            Apply(new StandPlayer(pi, hi));
+                        }
+#if DEBUG
+                        if (!_scenStand) ImGui.EndDisabled();
+#endif
                         if (!canStand) ImGui.EndDisabled();
 
                         ImGui.SameLine();
                         var hitActive = PlayerHitActive(pi, hi);
                         if (!hitActive) ImGui.BeginDisabled();
+#if DEBUG
+                        if (!_scenHit) ImGui.BeginDisabled();
+#endif
                         if (ImGui.SmallButton($"Hit##{pi}_{hi}"))
                         {
+#if DEBUG
+                            ScenarioAdvance();
+#endif
                             Apply(new AnnouncePlayerHit(pi, hi));
                             QueueHitRoll(isDealer: false, pi, hi);
                         }
+#if DEBUG
+                        if (!_scenHit) ImGui.EndDisabled();
+#endif
                         if (!hitActive) ImGui.EndDisabled();
 
                         ImGui.SameLine();
                         var canDouble = !hasAnyPending && isActiveHand
                                      && GameEngine.CanDouble(hand, p.Bet);
                         if (!canDouble) ImGui.BeginDisabled();
+#if DEBUG
+                        if (!_scenDbl) ImGui.BeginDisabled();
+#endif
                         if (ImGui.SmallButton($"Dbl##{pi}_{hi}"))
                         {
+#if DEBUG
+                            ScenarioAdvance();
+#endif
                             var dblBet     = GameEngine.GetEffectiveBet(p, hand);
                             var dblKey     = PlayerStatKey(p);
                             var dblBank    = config.PlayerStatsStore.TryGetValue(dblKey, out var dblStat) ? dblStat.Bank : 0;
@@ -1895,14 +2127,23 @@ private static unsafe void SendChatMessage(string message)
                             if (!fromBank && hasWorld && config.AutoTradeEnabled)
                                 QueueTrade(p.FullName, p.World);
                         }
+#if DEBUG
+                        if (!_scenDbl) ImGui.EndDisabled();
+#endif
                         if (!canDouble) ImGui.EndDisabled();
 
                         ImGui.SameLine();
                         var canSplit = !hasAnyPending && isActiveHand
                                     && GameEngine.CanSplit(hand);
                         if (!canSplit) ImGui.BeginDisabled();
+#if DEBUG
+                        if (!_scenSpl) ImGui.BeginDisabled();
+#endif
                         if (ImGui.SmallButton($"Spl##{pi}_{hi}"))
                         {
+#if DEBUG
+                            ScenarioAdvance();
+#endif
                             var splBet     = GameEngine.GetEffectiveBet(p, hand);
                             var splKey     = PlayerStatKey(p);
                             var splBank    = config.PlayerStatsStore.TryGetValue(splKey, out var splStat) ? splStat.Bank : 0;
@@ -1914,6 +2155,9 @@ private static unsafe void SendChatMessage(string message)
                             if (!fromBank && hasWorld && config.AutoTradeEnabled)
                                 QueueTrade(p.FullName, p.World);
                         }
+#if DEBUG
+                        if (!_scenSpl) ImGui.EndDisabled();
+#endif
                         if (!canSplit) ImGui.EndDisabled();
 
                         if (isFirstHand && !multiHand)
@@ -2111,8 +2355,15 @@ private static unsafe void SendChatMessage(string message)
                            && State.Players.Select((p, i) => p.SittingOut || !string.IsNullOrWhiteSpace(effectiveBets[i])).All(x => x)
                            && !isReorderMode;
                 if (!canDeal) ImGui.BeginDisabled();
+#if DEBUG
+                var _scenStartDeal = IsScenarioStep("StartDeal");
+                if (!_scenStartDeal) ImGui.BeginDisabled();
+#endif
                 if (ImGui.Button("Start Deal →"))
                 {
+#if DEBUG
+                    ScenarioAdvance();
+#endif
                     // Flush uncommitted bet edits before transitioning
                     foreach (var (idx, val) in betEdits.ToList())
                     {
@@ -2141,6 +2392,9 @@ private static unsafe void SendChatMessage(string message)
                     Apply(new AnnounceDealerDeal());
                     QueueHitRoll(isDealer: true, -1, -1);
                 }
+#if DEBUG
+                if (!_scenStartDeal) ImGui.EndDisabled();
+#endif
                 if (!canDeal) ImGui.EndDisabled();
                 if (!canDeal && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                     ImGui.SetTooltip(State.Players.Count == 0
@@ -2151,7 +2405,20 @@ private static unsafe void SendChatMessage(string message)
             case GamePhase.Deal:
                 var dealDone = GameEngine.IsDealComplete(State);
                 if (!dealDone) ImGui.BeginDisabled();
-                if (ImGui.Button("Begin Player Turns →")) Apply(new BeginPlayerTurns());
+#if DEBUG
+                var _scenBPT = IsScenarioStep("BeginPlayerTurns");
+                if (!_scenBPT) ImGui.BeginDisabled();
+#endif
+                if (ImGui.Button("Begin Player Turns →"))
+                {
+#if DEBUG
+                    ScenarioAdvance();
+#endif
+                    Apply(new BeginPlayerTurns());
+                }
+#if DEBUG
+                if (!_scenBPT) ImGui.EndDisabled();
+#endif
                 if (!dealDone) ImGui.EndDisabled();
                 if (!dealDone && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                     ImGui.SetTooltip("Dealer needs 1 card; each player needs 2 cards."u8);
@@ -2163,13 +2430,40 @@ private static unsafe void SendChatMessage(string message)
             case GamePhase.DealerTurn:
                 if (State.WaitingForDealer)
                 {
-                    if (ImGui.Button("Begin Dealer Turn →")) Apply(new BeginDealerTurn());
+#if DEBUG
+                    var _scenBDT = IsScenarioStep("BeginDealerTurn");
+                    if (!_scenBDT) ImGui.BeginDisabled();
+#endif
+                    if (ImGui.Button("Begin Dealer Turn →"))
+                    {
+#if DEBUG
+                        ScenarioAdvance();
+#endif
+                        Apply(new BeginDealerTurn());
+                    }
+#if DEBUG
+                    if (!_scenBDT) ImGui.EndDisabled();
+#endif
                 }
                 else
                 {
                     var canPayout = GameEngine.CanGoToPayout(State);
                     if (!canPayout) ImGui.BeginDisabled();
-                    if (ImGui.Button("Go to Payout →")) { Apply(new GoToPayout()); UpdatePlayerStats(); }
+#if DEBUG
+                    var _scenGTP = IsScenarioStep("GoToPayout");
+                    if (!_scenGTP) ImGui.BeginDisabled();
+#endif
+                    if (ImGui.Button("Go to Payout →"))
+                    {
+#if DEBUG
+                        ScenarioAdvance();
+#endif
+                        Apply(new GoToPayout());
+                        UpdatePlayerStats();
+                    }
+#if DEBUG
+                    if (!_scenGTP) ImGui.EndDisabled();
+#endif
                     if (!canPayout) ImGui.EndDisabled();
                     if (!canPayout && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                         ImGui.SetTooltip("Dealer must finish their hand first."u8);
@@ -2177,10 +2471,20 @@ private static unsafe void SendChatMessage(string message)
                 break;
 
             case GamePhase.Payout:
+#if DEBUG
+                var _scenNR = IsScenarioStep("NewRound");
+                if (!_scenNR) ImGui.BeginDisabled();
+#endif
                 if (ImGui.Button("New Round"))
                 {
+#if DEBUG
+                    ScenarioAdvance();
+#endif
                     Apply(new NewRound());
                 }
+#if DEBUG
+                if (!_scenNR) ImGui.EndDisabled();
+#endif
                 break;
         }
 

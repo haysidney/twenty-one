@@ -1,0 +1,14 @@
+{
+  "name": "Two players — both blackjack (dealer safe upcard, skip dealer reveal)",
+  "players": [
+    { "name": "Lorah", "bet": "1000" },
+    { "name": "Bekki", "bet": "500" }
+  ],
+  "rolls": [7, 1, 10, 1, 10, 3],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "GoToPayout",
+    "NewRound"
+  ]
+}

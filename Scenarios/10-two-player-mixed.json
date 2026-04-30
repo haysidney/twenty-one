@@ -1,0 +1,18 @@
+{
+  "name": "Two players — mixed result (Lorah wins, Bekki loses)",
+  "players": [
+    { "name": "Lorah", "bet": "1000" },
+    { "name": "Bekki", "bet": "500" }
+  ],
+  "rolls": [7, 10, 9, 6, 8, 4, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Stand:0:0",
+    "Stand:1:0",
+    "BeginDealerTurn",
+    "DealerHit",
+    "GoToPayout",
+    "NewRound"
+  ]
+}

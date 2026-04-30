@@ -12,6 +12,44 @@ using TwentyOne.Game;
 
 namespace TwentyOne.Windows;
 
+// ── Scenario data model ───────────────────────────────────────────────────────
+
+public class DebugScenarioFile
+{
+    public string?                   Name    { get; set; }
+    public List<DebugScenarioPlayer>? Players { get; set; }
+    public List<int>?                Rolls   { get; set; }
+    public List<string>?             Actions { get; set; }
+}
+
+public class DebugScenarioPlayer
+{
+    public string Name      { get; set; } = string.Empty;
+    public string Bet       { get; set; } = "0";
+    public bool   SittingOut { get; set; } = false;
+}
+
+// ── Runtime scenario state ────────────────────────────────────────────────────
+
+public class ActiveScenario
+{
+    public string Name      { get; }
+    public int    Remaining => _actions.Count;
+
+    private readonly Queue<string> _actions;
+
+    public ActiveScenario(string name, IEnumerable<string> actions)
+    {
+        Name     = name;
+        _actions = new Queue<string>(actions);
+    }
+
+    public string? PeekNext() => _actions.TryPeek(out var s) ? s : null;
+    public bool    Advance()  => _actions.TryDequeue(out _);
+}
+
+// ── Debug window ──────────────────────────────────────────────────────────────
+
 public class DebugWindow : Window
 {
     private readonly Configuration    config;
@@ -27,7 +65,7 @@ public class DebugWindow : Window
         this.mainWindow = mainWindow;
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(360, 300),
+            MinimumSize = new Vector2(380, 340),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
         };
     }
@@ -35,6 +73,44 @@ public class DebugWindow : Window
     public override void Draw()
     {
         _fileDialog.Draw();
+
+        // ── Scenario ──────────────────────────────────────────────────────────
+        ImGui.Separator();
+        ImGui.TextUnformatted("Scenario");
+
+        var active = mainWindow.ActiveScenario;
+        if (active != null)
+        {
+            ImGui.TextColored(new Vector4(1f, 0.7f, 0.2f, 1f), $"Active: {active.Name}");
+            ImGui.TextUnformatted($"Next: {active.PeekNext() ?? "(done)"}  ({active.Remaining} remaining)");
+
+            if (ImGui.SmallButton("Step##scenStep"))
+                mainWindow.ExecuteNextScenarioStep();
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Abort##scenAbort"))
+            {
+                mainWindow.ActiveScenario = null;
+                mainWindow.DebugRollQueue.Clear();
+            }
+        }
+        else
+        {
+            ImGui.TextDisabled("No scenario loaded.");
+        }
+
+        if (ImGui.SmallButton("Load scenario##loadScen"))
+        {
+            _fileDialog.OpenFileDialog("Load Scenario", "JSON{.json}", (ok, path) =>
+            {
+                if (!ok) return;
+                try { LoadScenario(path); } catch { }
+            });
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(
+                "JSON: { \"name\": \"...\", \"players\": [{\"name\":\"Lorah\",\"bet\":\"1000\"}],\n" +
+                "        \"rolls\": [1,10,6,9], \"actions\": [\"StartDeal\",\"BeginPlayerTurns\",\n" +
+                "        \"Stand:0:0\",\"BeginDealerTurn\",\"GoToPayout\",\"NewRound\"] }");
 
         // ── Roll queue ────────────────────────────────────────────────────────
         ImGui.Separator();
@@ -47,7 +123,6 @@ public class DebugWindow : Window
             ImGui.SameLine();
             if (ImGui.SmallButton("Clear##clearQueue"))
                 queue.Clear();
-
             var preview = string.Join(", ", queue.Take(20)) + (queue.Count > 20 ? ", ..." : "");
             ImGui.TextUnformatted(preview);
         }
@@ -59,26 +134,6 @@ public class DebugWindow : Window
         ImGui.SameLine();
         if (ImGui.SmallButton("Enqueue##enqRolls"))
             EnqueueRollString(_rollInput);
-
-        if (ImGui.SmallButton("Load scenario##loadScenario"))
-        {
-            _fileDialog.OpenFileDialog("Load Roll Scenario", "JSON{.json}", (ok, path) =>
-            {
-                if (!ok) return;
-                try
-                {
-                    var text = File.ReadAllText(path);
-                    var scenario = JsonSerializer.Deserialize<DebugScenario>(text);
-                    if (scenario?.Rolls != null)
-                        foreach (var r in scenario.Rolls)
-                            if (r >= 1 && r <= 13)
-                                queue.Enqueue(r);
-                }
-                catch { }
-            });
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("JSON: { \"name\": \"...\", \"rolls\": [1, 10, 7, 6] }\nAppends rolls to queue."u8);
 
         // ── Snapshot save/load ────────────────────────────────────────────────
         ImGui.Separator();
@@ -115,6 +170,43 @@ public class DebugWindow : Window
             ImGui.SetTooltip("Overwrites current game state. Clears undo/redo stack."u8);
     }
 
+    private void LoadScenario(string path)
+    {
+        var text = File.ReadAllText(path);
+        var file = JsonSerializer.Deserialize<DebugScenarioFile>(text,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (file == null) return;
+
+        // Build initial GameState: Betting phase with players set
+        var state = new GameState { BjPayout = config.GameState.BjPayout };
+        foreach (var sp in file.Players ?? [])
+        {
+            (state, _) = GameEngine.Apply(state, new AddPlayer(sp.Name));
+            var pi = state.Players.Count - 1;
+            if (sp.SittingOut)
+                (state, _) = GameEngine.Apply(state, new ToggleSittingOut(pi));
+            else
+                (state, _) = GameEngine.Apply(state, new SetPlayerBet(pi, sp.Bet));
+        }
+
+        config.GameState = state;
+        config.UndoStack.Clear();
+        config.RedoStack.Clear();
+        config.Save();
+
+        // Enqueue rolls
+        var queue = mainWindow.DebugRollQueue;
+        queue.Clear();
+        foreach (var r in file.Rolls ?? [])
+            if (r >= 1 && r <= 13)
+                queue.Enqueue(r);
+
+        // Set active scenario
+        mainWindow.ActiveScenario = new ActiveScenario(
+            file.Name ?? Path.GetFileNameWithoutExtension(path),
+            file.Actions ?? []);
+    }
+
     private void EnqueueRollString(string input)
     {
         var queue = mainWindow.DebugRollQueue;
@@ -123,11 +215,5 @@ public class DebugWindow : Window
                 queue.Enqueue(r);
         _rollInput = string.Empty;
     }
-}
-
-public class DebugScenario
-{
-    public string?    Name  { get; set; }
-    public List<int>? Rolls { get; set; }
 }
 #endif

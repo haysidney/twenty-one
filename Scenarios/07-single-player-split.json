@@ -1,0 +1,19 @@
+{
+  "name": "Single player — split 8s (one hand wins, one loses)",
+  "players": [
+    { "name": "Lorah", "bet": "1000" }
+  ],
+  "rolls": [6, 8, 8, 10, 3, 2, 9],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "Stand:0:0",
+    "Stand:0:1",
+    "BeginDealerTurn",
+    "DealerHit",
+    "GoToPayout",
+    "NewRound"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Single player — hits to 21 (not blackjack)",
+  "players": [
+    { "name": "Lorah", "bet": "1000" }
+  ],
+  "rolls": [7, 6, 5, 8, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Hit:0:0",
+    "BeginDealerTurn",
+    "GoToPayout",
+    "NewRound"
+  ]
+}

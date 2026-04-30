@@ -1,0 +1,13 @@
+{
+  "name": "Single player — player blackjack (dealer safe upcard 7)",
+  "players": [
+    { "name": "Lorah", "bet": "1000" }
+  ],
+  "rolls": [7, 1, 10, 3],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "GoToPayout",
+    "NewRound"
+  ]
+}

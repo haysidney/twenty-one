@@ -1,0 +1,16 @@
+{
+  "name": "Two players — all bust (dealer wins without playing)",
+  "players": [
+    { "name": "Lorah", "bet": "1000" },
+    { "name": "Bekki", "bet": "500" }
+  ],
+  "rolls": [6, 10, 9, 7, 6, 5, 9],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Hit:0:0",
+    "Hit:1:0",
+    "GoToPayout",
+    "NewRound"
+  ]
+}
