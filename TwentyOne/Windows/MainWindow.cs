@@ -69,6 +69,9 @@ public partial class MainWindow : Window, IDisposable
     // active scenario: non-null while a scripted test scenario is running
     public ActiveScenario? ActiveScenario { get; set; }
 
+    // Called by DebugWindow after overwriting GameState so stale bet edits don't index OOB.
+    public void ClearBetEdits() => betEdits.Clear();
+
     // Returns true if no scenario is active OR the scenario's next step matches key.
     private bool IsScenarioStep(string key)
         => ActiveScenario == null || ActiveScenario.PeekNext() == key;

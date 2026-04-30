@@ -193,6 +193,7 @@ public class DebugWindow : Window
         config.UndoStack.Clear();
         config.RedoStack.Clear();
         config.Save();
+        mainWindow.ClearBetEdits();
 
         // Enqueue rolls
         var queue = mainWindow.DebugRollQueue;
