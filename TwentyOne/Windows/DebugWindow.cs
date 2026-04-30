@@ -92,6 +92,9 @@ public class DebugWindow : Window
                 mainWindow.ActiveScenario = null;
                 mainWindow.DebugRollQueue.Clear();
             }
+            var gate = mainWindow.ScenarioGateButtons;
+            if (ImGui.Checkbox("Gate buttons##scenGate", ref gate))
+                mainWindow.ScenarioGateButtons = gate;
         }
         else
         {
