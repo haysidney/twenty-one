@@ -1258,6 +1258,45 @@ public class DoubleDownTests
     }
 
     [Fact]
+    public void AnnounceDouble_FromBank_NarratesWithBankTemplate()
+    {
+        var state = ActiveState([5, 6]);
+        var t = new NarrationTemplates { PlayerDoubleRequestBank = [["{name} dbl bank {amount} left {bank}"]] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceDouble(0, 0, FromBank: true, BankAfter: 500), t);
+        Assert.Single(effects);
+        var text = ((SendChat)effects[0]).Text;
+        Assert.Contains("Lorah", text);
+        Assert.Contains("100", text);   // amount
+        Assert.Contains("500", text);   // bank remaining
+    }
+
+    [Fact]
+    public void AnnounceDouble_FromBank_ZeroRemaining_ShowsZeroNotNegative()
+    {
+        // Bank exactly covers the bet — BankAfter must be 0, never negative
+        var state = ActiveState([5, 6]);
+        var t = new NarrationTemplates { PlayerDoubleRequestBank = [["{name} {amount} {bank}"]] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceDouble(0, 0, FromBank: true, BankAfter: 0), t);
+        Assert.Single(effects);
+        Assert.Contains("0", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void AnnounceDouble_BankShort_UsesTradeTemplate()
+    {
+        // Bank insufficient → FromBank=false → regular trade-request template, not bank template
+        var state = ActiveState([5, 6]);
+        var t = new NarrationTemplates
+        {
+            PlayerDoubleRequest     = [["TRADE {name} {amount}"]],
+            PlayerDoubleRequestBank = [["BANK {name} {amount} {bank}"]],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceDouble(0, 0, FromBank: false), t);
+        Assert.Single(effects);
+        Assert.StartsWith("TRADE", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
     public void AnnounceDoubleConfirm_NarratesWithName()
     {
         var state = ActiveState([5, 6]);
@@ -1714,6 +1753,72 @@ public class SplitHandTests
         Assert.Single(effects);
         Assert.Contains("100", ((SendChat)effects[0]).Text);
         Assert.Contains("split", ((SendChat)effects[0]).Text.ToLower());
+    }
+
+    [Fact]
+    public void AnnounceSplit_FromBank_NarratesWithBankTemplate()
+    {
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            Players           =
+            [
+                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [8, 8], State = HandState.Playing }] },
+            ],
+        };
+        var t = new NarrationTemplates { PlayerSplitRequestBank = [["{name} spl bank {amount} left {bank}"]] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceSplit(0, 0, FromBank: true, BankAfter: 250), t);
+        Assert.Single(effects);
+        var text = ((SendChat)effects[0]).Text;
+        Assert.Contains("Lorah", text);
+        Assert.Contains("100", text);   // amount
+        Assert.Contains("250", text);   // bank remaining
+    }
+
+    [Fact]
+    public void AnnounceSplit_FromBank_ZeroRemaining_ShowsZeroNotNegative()
+    {
+        // Bank exactly covers the bet — BankAfter must be 0, never negative
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            Players           =
+            [
+                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [8, 8], State = HandState.Playing }] },
+            ],
+        };
+        var t = new NarrationTemplates { PlayerSplitRequestBank = [["{name} {amount} {bank}"]] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceSplit(0, 0, FromBank: true, BankAfter: 0), t);
+        Assert.Single(effects);
+        Assert.Contains("0", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void AnnounceSplit_BankShort_UsesTradeTemplate()
+    {
+        // Bank insufficient → FromBank=false → regular trade-request template, not bank template
+        var state = new GameState
+        {
+            Phase             = GamePhase.PlayerTurns,
+            ActivePlayerIndex = 0,
+            ActiveHandIndex   = 0,
+            Players           =
+            [
+                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [8, 8], State = HandState.Playing }] },
+            ],
+        };
+        var t = new NarrationTemplates
+        {
+            PlayerSplitRequest     = [["TRADE {name} {amount}"]],
+            PlayerSplitRequestBank = [["BANK {name} {amount} {bank}"]],
+        };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceSplit(0, 0, FromBank: false), t);
+        Assert.Single(effects);
+        Assert.StartsWith("TRADE", ((SendChat)effects[0]).Text);
     }
 
     [Fact]
@@ -2377,5 +2482,158 @@ public class SittingOutTests
         var (_, effects) = GameEngine.Apply(state, new GoToPayout());
         var chat = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.DoesNotContain(chat, line => line.Contains("Bekki"));
+    }
+}
+
+public class BankLedgerTests
+{
+    // ── Credits ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Deposit_IncreasesBalance()
+    {
+        var (bal, entry) = BankLedger.Apply(1000, new BankDeposit(500));
+        Assert.Equal(1500, bal);
+        Assert.Equal(1500, entry.Balance);
+        Assert.Equal(500,  entry.Amount);
+        Assert.Equal(BankTransactionKind.Deposit, entry.Kind);
+    }
+
+    [Fact]
+    public void Win_IncreasesBalance()
+    {
+        var (bal, entry) = BankLedger.Apply(1000, new BankWin(300));
+        Assert.Equal(1300, bal);
+        Assert.Equal(BankTransactionKind.Win, entry.Kind);
+    }
+
+    [Fact]
+    public void Win_ZeroAmount_BalanceUnchanged()
+    {
+        var (bal, _) = BankLedger.Apply(1000, new BankWin(0));
+        Assert.Equal(1000, bal);
+    }
+
+    // ── Debits — normal ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Withdrawal_DecreasesBalance()
+    {
+        var (bal, entry) = BankLedger.Apply(1000, new BankWithdrawal(400));
+        Assert.Equal(600, bal);
+        Assert.Equal(BankTransactionKind.Withdrawal, entry.Kind);
+    }
+
+    [Fact]
+    public void Bet_DecreasesBalance()
+    {
+        var (bal, entry) = BankLedger.Apply(1000, new BankBet(1000));
+        Assert.Equal(0, bal);
+        Assert.Equal(BankTransactionKind.Bet, entry.Kind);
+    }
+
+    [Fact]
+    public void DoubleDown_DecreasesBalance()
+    {
+        var (bal, entry) = BankLedger.Apply(1000, new BankDoubleDown(500));
+        Assert.Equal(500, bal);
+        Assert.Equal(BankTransactionKind.DoubleDown, entry.Kind);
+    }
+
+    [Fact]
+    public void Split_DecreasesBalance()
+    {
+        var (bal, entry) = BankLedger.Apply(1000, new BankSplit(500));
+        Assert.Equal(500, bal);
+        Assert.Equal(BankTransactionKind.Split, entry.Kind);
+    }
+
+    // ── Debits — floor at zero, never negative ─────────────────────────────────
+
+    [Fact]
+    public void Withdrawal_ExceedsBalance_ClampsToZero()
+    {
+        var (bal, _) = BankLedger.Apply(100, new BankWithdrawal(999));
+        Assert.Equal(0, bal);
+    }
+
+    [Fact]
+    public void Bet_ExceedsBalance_ClampsToZero()
+    {
+        var (bal, _) = BankLedger.Apply(0, new BankBet(1000));
+        Assert.Equal(0, bal);
+    }
+
+    [Fact]
+    public void DoubleDown_ExceedsBalance_ClampsToZero()
+    {
+        // Player traded to cover the double — bank may be 0; deduction never goes negative
+        var (bal, _) = BankLedger.Apply(0, new BankDoubleDown(1000));
+        Assert.Equal(0, bal);
+    }
+
+    [Fact]
+    public void Split_ExceedsBalance_ClampsToZero()
+    {
+        var (bal, _) = BankLedger.Apply(0, new BankSplit(1000));
+        Assert.Equal(0, bal);
+    }
+
+    [Fact]
+    public void DoubleDown_BankExactlyCoversBet_BalanceIsZero()
+    {
+        var (bal, entry) = BankLedger.Apply(500, new BankDoubleDown(500));
+        Assert.Equal(0, bal);
+        Assert.Equal(0, entry.Balance);
+    }
+
+    // ── Sequence — bet-all then double via trade ────────────────────────────────
+
+    [Fact]
+    public void BetAll_ThenDepositForDouble_ThenDoubleDown_CorrectSequence()
+    {
+        // Simulates: player banks 1000, bets 1000, deposits 1000 for double, double deducted at confirm
+        long bank = 1000;
+        (bank, _) = BankLedger.Apply(bank, new BankBet(1000));       // StartDeal
+        Assert.Equal(0, bank);
+
+        (bank, _) = BankLedger.Apply(bank, new BankDeposit(1000));   // trade received, deposited
+        Assert.Equal(1000, bank);
+
+        (bank, _) = BankLedger.Apply(bank, new BankDoubleDown(1000)); // Confirm Dbl
+        Assert.Equal(0, bank);
+    }
+
+    [Fact]
+    public void BetAll_ThenDepositExtra_ThenDoubleDown_ExcessStaysInBank()
+    {
+        // Player trades 2000 (only 1000 needed for double) — excess stays in bank
+        long bank = 1000;
+        (bank, _) = BankLedger.Apply(bank, new BankBet(1000));
+        Assert.Equal(0, bank);
+
+        (bank, _) = BankLedger.Apply(bank, new BankDeposit(2000));
+        Assert.Equal(2000, bank);
+
+        (bank, _) = BankLedger.Apply(bank, new BankDoubleDown(1000));
+        Assert.Equal(1000, bank);
+    }
+
+    // ── Log entry fields ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void Entry_BalanceReflectsPostTransactionState()
+    {
+        var (_, entry) = BankLedger.Apply(800, new BankBet(300));
+        Assert.Equal(500, entry.Balance); // post-deduction balance
+        Assert.Equal(300, entry.Amount);
+    }
+
+    [Fact]
+    public void Entry_HasTimestamp()
+    {
+        var before = System.DateTime.Now;
+        var (_, entry) = BankLedger.Apply(0, new BankDeposit(1));
+        Assert.True(entry.Timestamp >= before);
     }
 }

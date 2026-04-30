@@ -273,8 +273,12 @@ public partial class MainWindow : Window, IDisposable
     private static string PlayerStatKey(Player p) =>
         p.FullName.Length > 0 ? $"{p.FullName}@{p.World}" : p.Nickname;
 
-    private static void AddBankLog(PlayerStat stat, BankTransactionKind kind, long amount, long balance) =>
-        stat.BankLog.Add(new BankTransactionEntry { Timestamp = DateTime.Now, Kind = kind, Amount = amount, Balance = balance });
+    private static void ApplyBank(PlayerStat stat, BankTransaction tx)
+    {
+        var (newBalance, entry) = BankLedger.Apply(stat.Bank, tx);
+        stat.Bank = newBalance;
+        stat.BankLog.Add(entry);
+    }
 
     // Called immediately after Apply(new GoToPayout()) to record round results.
     private void UpdatePlayerStats()
@@ -359,11 +363,10 @@ public partial class MainWindow : Window, IDisposable
                 };
                 net2 += delta2;
             }
-            var prevBank2 = stat2.Bank;
-            stat2.Bank += (long)Math.Round(net2);
+            var winAmt2 = (long)Math.Round(net2);
+            if (winAmt2 > 0)
+                ApplyBank(stat2, new BankWin(winAmt2));
             playerBanksSnapshot[key2] = stat2.Bank;
-            if (stat2.Bank != prevBank2)
-                AddBankLog(stat2, BankTransactionKind.Win, stat2.Bank - prevBank2, stat2.Bank);
         }
 
         var roundNum = config.RoundHistory.Count + 1;
@@ -738,8 +741,7 @@ private static unsafe void SendChatMessage(string message)
                 if (!canDep2) ImGui.BeginDisabled();
                 if (ImGui.Button("Confirm##bankdepconfirm"))
                 {
-                    bmpStat.Bank += depAmt2;
-                    AddBankLog(bmpStat, BankTransactionKind.Deposit, depAmt2, bmpStat.Bank);
+                    ApplyBank(bmpStat, new BankDeposit(depAmt2));
                     Apply(new AnnounceBankDeposit(bankManagePlayerIndex, depAmt2, bmpStat.Bank));
                     bankDepositBuf = string.Empty;
                 }
@@ -756,8 +758,7 @@ private static unsafe void SendChatMessage(string message)
                 if (!canWd2) ImGui.BeginDisabled();
                 if (ImGui.Button("Confirm##bankwdconfirm"))
                 {
-                    bmpStat.Bank = Math.Max(0, bmpBank - wdAmt2);
-                    AddBankLog(bmpStat, BankTransactionKind.Withdrawal, wdAmt2, bmpStat.Bank);
+                    ApplyBank(bmpStat, new BankWithdrawal(wdAmt2));
                     Apply(new AnnounceBankWithdraw(bankManagePlayerIndex, wdAmt2, bmpStat.Bank));
                     bankWithdrawBuf = string.Empty;
                 }
@@ -794,6 +795,21 @@ private static unsafe void SendChatMessage(string message)
                     if (ImGui.Button("Announce Shortfall##bankshort"))
                         Apply(new AnnounceBankShortfall(bankManagePlayerIndex, (long)Math.Ceiling(shortfall2)));
                 }
+
+                ImGui.Spacing();
+
+                // Clear all
+                var ctrlDown = ImGui.GetIO().KeyCtrl;
+                if (!ctrlDown) ImGui.BeginDisabled();
+                if (ImGui.Button("Clear All##bankClear"))
+                {
+                    bmpStat.Bank = 0;
+                    bmpStat.BankLog.Clear();
+                    config.Save();
+                }
+                if (!ctrlDown) ImGui.EndDisabled();
+                if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip("Hold Ctrl to clear balance and transaction history");
 
                 ImGui.Spacing();
 
@@ -909,8 +925,7 @@ private static unsafe void SendChatMessage(string message)
                     bobStat = new PlayerStat { DisplayName = bobPlayer.DisplayName };
                     config.PlayerStatsStore[bobKey] = bobStat;
                 }
-                bobStat.Bank += bobgil;
-                AddBankLog(bobStat, BankTransactionKind.Deposit, bobgil, bobStat.Bank);
+                ApplyBank(bobStat, new BankDeposit(bobgil));
                 Apply(new AnnounceBankDeposit(bobpi, bobgil, bobStat.Bank));
                 pendingBetOrBankPrompt = null;
                 ImGui.CloseCurrentPopup();
@@ -945,10 +960,7 @@ private static unsafe void SendChatMessage(string message)
             ImGui.Spacing();
             if (ImGui.Button("Yes##bankTradeYes"))
             {
-                btStat.Bank = btwd
-                    ? Math.Max(0, btStat.Bank - btamt)
-                    : btStat.Bank + btamt;
-                AddBankLog(btStat, btwd ? BankTransactionKind.Withdrawal : BankTransactionKind.Deposit, btamt, btStat.Bank);
+                ApplyBank(btStat, btwd ? new BankWithdrawal(btamt) : new BankDeposit(btamt));
                 Apply(btwd
                     ? new AnnounceBankWithdraw(btpi, btamt, btStat.Bank)
                     : new AnnounceBankDeposit (btpi, btamt, btStat.Bank));
@@ -1782,6 +1794,15 @@ private static unsafe void SendChatMessage(string message)
                         {
                             Apply(new AnnounceDoubleConfirm(pi, hi));
                             Apply(new DoubleDown(pi, hi));
+                            var dblKey2    = PlayerStatKey(p);
+                            var dblAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
+                            if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0)
+                            {
+                                var before2 = dblStat2.Bank;
+                                ApplyBank(dblStat2, new BankDoubleDown(dblAmt2));
+                                config.NarrationLog.Add($"[Bank] {p.DisplayName}: doubled — {dblAmt2:N0} deducted (was {before2:N0} → {dblStat2.Bank:N0})");
+                                config.Save();
+                            }
                             pendingDouble = null;
                             QueueHitRoll(isDealer: false, pi, hi);
                         }
@@ -1793,6 +1814,15 @@ private static unsafe void SendChatMessage(string message)
                         ImGui.SetCursorPosX(actionsCellRight - ABW("Confirm Spl") - asp - ABW("Cancel"));
                         if (ImGui.SmallButton($"Confirm Spl##{pi}_{hi}"))
                         {
+                            var splKey2    = PlayerStatKey(p);
+                            var splAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
+                            if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0)
+                            {
+                                var before2 = splStat2.Bank;
+                                ApplyBank(splStat2, new BankSplit(splAmt2));
+                                config.NarrationLog.Add($"[Bank] {p.DisplayName}: split — {splAmt2:N0} deducted (was {before2:N0} → {splStat2.Bank:N0})");
+                                config.Save();
+                            }
                             Apply(new SplitHand(pi, hi));
                             pendingSplit = null;
                             // The 1-card split hands are auto-hit in Draw()
@@ -1835,18 +1865,15 @@ private static unsafe void SendChatMessage(string message)
                         if (!canDouble) ImGui.BeginDisabled();
                         if (ImGui.SmallButton($"Dbl##{pi}_{hi}"))
                         {
-                            var dblBet  = GameEngine.GetEffectiveBet(p, hand);
-                            var dblKey  = PlayerStatKey(p);
-                            var dblBank = config.PlayerStatsStore.TryGetValue(dblKey, out var dblStat) ? dblStat.Bank : 0;
+                            var dblBet     = GameEngine.GetEffectiveBet(p, hand);
+                            var dblKey     = PlayerStatKey(p);
+                            var dblBank    = config.PlayerStatsStore.TryGetValue(dblKey, out var dblStat) ? dblStat.Bank : 0;
+                            var dblRounded = (long)Math.Ceiling(dblBet);
+                            var fromBank   = dblBank >= dblRounded;
+                            var bankAfter  = fromBank ? dblBank - dblRounded : dblBank;
                             pendingDouble = (pi, hi);
-                            Apply(new AnnounceDouble(pi, hi));
-                            if (dblBank >= (long)Math.Ceiling(dblBet) && dblStat != null)
-                            {
-                                dblStat.Bank -= (long)Math.Ceiling(dblBet);
-                                AddBankLog(dblStat, BankTransactionKind.DoubleDown, (long)Math.Ceiling(dblBet), dblStat.Bank);
-                                config.Save();
-                            }
-                            else if (hasWorld && config.AutoTradeEnabled)
+                            Apply(new AnnounceDouble(pi, hi, fromBank, bankAfter));
+                            if (!fromBank && hasWorld && config.AutoTradeEnabled)
                                 QueueTrade(p.FullName, p.World);
                         }
                         if (!canDouble) ImGui.EndDisabled();
@@ -1857,18 +1884,15 @@ private static unsafe void SendChatMessage(string message)
                         if (!canSplit) ImGui.BeginDisabled();
                         if (ImGui.SmallButton($"Spl##{pi}_{hi}"))
                         {
-                            var splBet  = GameEngine.GetEffectiveBet(p, hand);
-                            var splKey  = PlayerStatKey(p);
-                            var splBank = config.PlayerStatsStore.TryGetValue(splKey, out var splStat) ? splStat.Bank : 0;
+                            var splBet     = GameEngine.GetEffectiveBet(p, hand);
+                            var splKey     = PlayerStatKey(p);
+                            var splBank    = config.PlayerStatsStore.TryGetValue(splKey, out var splStat) ? splStat.Bank : 0;
+                            var splRounded = (long)Math.Ceiling(splBet);
+                            var fromBank   = splBank >= splRounded;
+                            var bankAfter  = fromBank ? splBank - splRounded : splBank;
                             pendingSplit = (pi, hi);
-                            Apply(new AnnounceSplit(pi, hi));
-                            if (splBank >= (long)Math.Ceiling(splBet) && splStat != null)
-                            {
-                                splStat.Bank -= (long)Math.Ceiling(splBet);
-                                AddBankLog(splStat, BankTransactionKind.Split, (long)Math.Ceiling(splBet), splStat.Bank);
-                                config.Save();
-                            }
-                            else if (hasWorld && config.AutoTradeEnabled)
+                            Apply(new AnnounceSplit(pi, hi, fromBank, bankAfter));
+                            if (!fromBank && hasWorld && config.AutoTradeEnabled)
                                 QueueTrade(p.FullName, p.World);
                         }
                         if (!canSplit) ImGui.EndDisabled();
@@ -2086,8 +2110,7 @@ private static unsafe void SendChatMessage(string message)
                         if (betAmt <= 0) continue;
                         var betKey = PlayerStatKey(p);
                         if (!config.PlayerStatsStore.TryGetValue(betKey, out var betStat) || betStat.Bank <= 0) continue;
-                        betStat.Bank = Math.Max(0, betStat.Bank - betAmt);
-                        AddBankLog(betStat, BankTransactionKind.Bet, betAmt, betStat.Bank);
+                        ApplyBank(betStat, new BankBet(betAmt));
                     }
                     // Queue initial cards: dealer first, then each active player gets both cards in a pair
                     for (var i = 0; i < State.Players.Count; i++)

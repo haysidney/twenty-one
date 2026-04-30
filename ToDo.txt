@@ -63,8 +63,6 @@
 
 - Add commands for hit stand etc
 
-- Allow reordering players
-
 - Keep track of paid players during payout
 
 - Add amount bet and amount lost
@@ -84,3 +82,15 @@ Split Aces only hit once
 Print rules
 
 Bank transactions on the undo stack?
+
+------
+
+Bet confirm needs to support {bank}
+
+blackjack we'll just move along shouldn't fire if only 2 player and only 1 playing because of sitting out.
+
+if all players win with five card charles the dealer doesn't need to play if 5CC beats all.
+
+The announce shortfall button is hidden even when their bet is over their bank because the bet hasn't been applied yet.
+
+Private bank as an option.

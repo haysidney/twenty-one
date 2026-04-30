@@ -671,7 +671,10 @@ public static class GameEngine
                 var hand   = player.Hands[a.HandIndex];
                 var bet    = GetEffectiveBet(player, hand);
                 var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
-                Narrate(t.PlayerDoubleRequest, ("name", name), ("amount", FormatGil(bet)));
+                if (a.FromBank)
+                    Narrate(t.PlayerDoubleRequestBank, ("name", name), ("amount", FormatGil(bet)), ("bank", FormatGil(a.BankAfter)));
+                else
+                    Narrate(t.PlayerDoubleRequest, ("name", name), ("amount", FormatGil(bet)));
                 return (state, effects);
             }
 
@@ -689,7 +692,10 @@ public static class GameEngine
                 var hand   = player.Hands[a.HandIndex];
                 var bet    = GetEffectiveBet(player, hand);
                 var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
-                Narrate(t.PlayerSplitRequest, ("name", name), ("amount", FormatGil(bet)));
+                if (a.FromBank)
+                    Narrate(t.PlayerSplitRequestBank, ("name", name), ("amount", FormatGil(bet)), ("bank", FormatGil(a.BankAfter)));
+                else
+                    Narrate(t.PlayerSplitRequest, ("name", name), ("amount", FormatGil(bet)));
                 return (state, effects);
             }
 

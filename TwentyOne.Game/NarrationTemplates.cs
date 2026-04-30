@@ -75,8 +75,10 @@ public class NarrationTemplates
 
     // Trade-request announcements (sent when dealer clicks Double/Split, before confirming trade)
     // {amount} = the extra chips required
-    public List<List<string>> PlayerDoubleRequest { get; set; } = [["{name} would like to double down! Please trade {amount} gil to the dealer."]];
-    public List<List<string>> PlayerSplitRequest  { get; set; } = [["{name} would like to split! Please trade {amount} gil to the dealer."]];
+    public List<List<string>> PlayerDoubleRequest     { get; set; } = [["{name} would like to double down! Please trade {amount} gil to the dealer."]];
+    public List<List<string>> PlayerDoubleRequestBank { get; set; } = [["{name} is doubling down — {amount} deducted from bank. ({bank} remaining.)"]];
+    public List<List<string>> PlayerSplitRequest      { get; set; } = [["{name} would like to split! Please trade {amount} gil to the dealer."]];
+    public List<List<string>> PlayerSplitRequestBank  { get; set; } = [["{name} is splitting — {amount} deducted from bank. ({bank} remaining.)"]];
 
     // Sent when dealer clicks Confirm Dbl (trade received, card about to be drawn)
     // {name} = player display name

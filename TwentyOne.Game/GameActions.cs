@@ -16,9 +16,10 @@ public record AnnounceDealerDeal : GameAction;
 public record AnnouncePlayerDeal(int PlayerIndex) : GameAction;
 
 // Double/Split trade-request announcements (narration only, no state change)
-public record AnnounceDouble(int PlayerIndex, int HandIndex) : GameAction;
+// FromBank=true → deducting from bank (no trade needed); BankAfter = balance after deduction
+public record AnnounceDouble(int PlayerIndex, int HandIndex, bool FromBank = false, long BankAfter = 0) : GameAction;
 public record AnnounceDoubleConfirm(int PlayerIndex, int HandIndex) : GameAction;
-public record AnnounceSplit(int PlayerIndex, int HandIndex) : GameAction;
+public record AnnounceSplit(int PlayerIndex, int HandIndex, bool FromBank = false, long BankAfter = 0) : GameAction;
 
 // Hit announcements (narration only, no state change)
 public record AnnounceDealerHit : GameAction;
