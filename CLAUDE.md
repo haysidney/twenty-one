@@ -16,11 +16,13 @@ Plugin config is saved to `/home/sidney/.xlcore/pluginConfigs/TwentyOne.json`.
 
 ## Build
 
+Dev environment uses Nix. Enter with `nix develop` (requires `flake.nix` to be git-tracked). This installs `dotnet-sdk_10`.
+
 Build commands:
 ```bash
-dotnet build TwentyOne/TwentyOne.csproj -c Debug
-dotnet build TwentyOne/TwentyOne.csproj -c Release
-dotnet test TwentyOne.Tests/TwentyOne.Tests.csproj
+nix develop --command dotnet build TwentyOne/TwentyOne.csproj -c Debug
+nix develop --command dotnet build TwentyOne/TwentyOne.csproj -c Release
+nix develop --command dotnet test TwentyOne.Tests/TwentyOne.Tests.csproj
 ```
 
 ## Architecture

@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.Chat;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
@@ -37,7 +38,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly IClientState   clientState;
 
     // Venue memory suggestion banner state.
-    private ushort lastSeenTerritory;
+    private uint lastSeenTerritory;
     private bool   venueMemoryDismissed;
 
     // Betting-phase UI state
@@ -502,9 +503,11 @@ private static unsafe void SendChatMessage(string message)
     [GeneratedRegex(@"^You hand over ([\d,]+) gil\.$")]
     private static partial Regex GaveGilRegex();
 
-    private void OnChatMessage(XivChatType type, int timestamp,
-        ref SeString sender, ref SeString message, ref bool isHandled)
+    private void OnChatMessage(IHandleableChatMessage msg)
     {
+        var sender  = msg.Sender;
+        var message = msg.Message;
+
         // ── Trade detection (bet auto-fill + bank deposit/withdraw) ──────────
         var isBetPhase    = config.AutoBetFromTrades    && Phase == GamePhase.Betting;
         var isBankMonitor = config.AutoDepositFromTrades;

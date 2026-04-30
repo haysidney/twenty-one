@@ -30,16 +30,16 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandName = "/twentyone";
 
     // Outdoor housing territory IDs.
-    private static readonly HashSet<ushort> OutdoorHousingTerritories = [339, 340, 341, 641, 979];
+    private static readonly HashSet<uint> OutdoorHousingTerritories = [339, 340, 341, 641, 979];
 
     // Last outdoor housing territory seen — used to resolve indoor addresses.
-    internal static ushort LastOutdoorHousingTerritoryId { get; private set; }
+    internal static uint LastOutdoorHousingTerritoryId { get; private set; }
 
     /// <summary>Returns the current housing address key, or null if not in a housing zone.</summary>
     internal static unsafe string? GetCurrentHousingAddressKey()
     {
         var territory = ClientState.TerritoryType;
-        ushort districtTerritory;
+        uint districtTerritory;
         if (OutdoorHousingTerritories.Contains(territory))
         {
             districtTerritory = territory;
@@ -59,7 +59,7 @@ public sealed class Plugin : IDalamudPlugin
         return $"{districtTerritory}:{ward + 1}:{plot + 1}";
     }
 
-    private void OnTerritoryChanged(ushort territory)
+    private void OnTerritoryChanged(uint territory)
     {
         if (OutdoorHousingTerritories.Contains(territory))
             LastOutdoorHousingTerritoryId = territory;
