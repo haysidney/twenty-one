@@ -56,7 +56,10 @@ public class DebugWindow : Window
     private readonly MainWindow       mainWindow;
     private readonly FileDialogManager _fileDialog = new();
 
-    private string _rollInput = string.Empty;
+    private string       _rollInput      = string.Empty;
+    private List<string> _playlist       = [];
+    private int          _playlistIndex  = -1;
+    private string       _playlistFile   = string.Empty;  // filename of loaded scenario
 
     public DebugWindow(Configuration config, MainWindow mainWindow)
         : base("Debug##TwentyOneDebug")
@@ -82,6 +85,8 @@ public class DebugWindow : Window
         if (active != null)
         {
             ImGui.TextColored(new Vector4(1f, 0.7f, 0.2f, 1f), $"Active: {active.Name}");
+            if (_playlistFile.Length > 0)
+                ImGui.TextDisabled(_playlistFile);
             ImGui.TextUnformatted($"Next: {active.PeekNext() ?? "(done)"}  ({active.Remaining} remaining)");
 
             if (ImGui.SmallButton("Step##scenStep"))
@@ -103,6 +108,30 @@ public class DebugWindow : Window
         else
         {
             ImGui.TextDisabled("No scenario loaded.");
+        }
+
+        // Playlist navigation
+        if (_playlist.Count > 0)
+        {
+            var hasPrev = _playlistIndex > 0;
+            var hasNext = _playlistIndex >= 0 && _playlistIndex < _playlist.Count - 1;
+            if (!hasPrev) ImGui.BeginDisabled();
+            if (ImGui.SmallButton("< Prev##scenPrev"))
+                LoadScenario(_playlist[_playlistIndex - 1]);
+            if (!hasPrev) ImGui.EndDisabled();
+            ImGui.SameLine();
+            if (_playlistIndex >= 0)
+            {
+                if (ImGui.SmallButton("Replay##scenReplay"))
+                    LoadScenario(_playlist[_playlistIndex]);
+                ImGui.SameLine();
+                ImGui.TextDisabled($"{_playlistIndex + 1}/{_playlist.Count}");
+                ImGui.SameLine();
+            }
+            if (!hasNext) ImGui.BeginDisabled();
+            if (ImGui.SmallButton("Next >##scenNext"))
+                LoadScenario(_playlist[_playlistIndex + 1]);
+            if (!hasNext) ImGui.EndDisabled();
         }
 
         if (ImGui.SmallButton("Load scenario##loadScen"))
@@ -184,6 +213,15 @@ public class DebugWindow : Window
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         if (file == null) return;
 
+        // Rebuild playlist if directory changed
+        var dir = Path.GetDirectoryName(path) ?? string.Empty;
+        if (_playlist.Count == 0 || Path.GetDirectoryName(_playlist[0]) != dir)
+        {
+            _playlist = Directory.GetFiles(dir, "*.json").OrderBy(f => f).ToList();
+        }
+        _playlistIndex = _playlist.IndexOf(path);
+        _playlistFile  = Path.GetFileName(path);
+
         // Build initial GameState: Betting phase with players set
         var state = new GameState { BjPayout = config.GameState.BjPayout };
         foreach (var sp in file.Players ?? [])
@@ -201,6 +239,7 @@ public class DebugWindow : Window
         config.RedoStack.Clear();
         config.Save();
         mainWindow.ClearBetEdits();
+        mainWindow.ScenarioFastForward = false;
 
         // Enqueue rolls
         var queue = mainWindow.DebugRollQueue;
