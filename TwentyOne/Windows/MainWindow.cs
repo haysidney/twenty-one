@@ -766,10 +766,18 @@ private static unsafe void SendChatMessage(string message)
                 ImGui.Spacing();
 
                 // Remind (betting phase + bank > 0 + bet set)
-                if (Phase == GamePhase.Betting && bmpBank > 0 && !string.IsNullOrWhiteSpace(bmp.Bet))
+                var bmpBetForRemind = betEdits.TryGetValue(bankManagePlayerIndex, out var bmpPending) ? bmpPending : bmp.Bet;
+                if (Phase == GamePhase.Betting && bmpBank > 0 && !string.IsNullOrWhiteSpace(bmpBetForRemind))
                 {
                     if (ImGui.Button("Remind##bankremind"))
+                    {
+                        if (betEdits.TryGetValue(bankManagePlayerIndex, out var pendingBet) && pendingBet != bmp.Bet)
+                        {
+                            betEdits.Remove(bankManagePlayerIndex);
+                            Apply(new SetPlayerBet(bankManagePlayerIndex, pendingBet));
+                        }
                         Apply(new AnnounceBankRemind(bankManagePlayerIndex, bmpBank));
+                    }
                     if (ImGui.IsItemHovered())
                         ImGui.SetTooltip("Remind player of their bet and bank balance");
                 }
