@@ -1,6 +1,9 @@
+using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text.Json;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using TwentyOne.Game;
 
@@ -10,6 +13,9 @@ public class RoundHistoryWindow : Window
 {
     private readonly Configuration config;
     private readonly MainWindow     mainWindow;
+#if DEBUG
+    private readonly FileDialogManager _fileDialog = new();
+#endif
 
     public RoundHistoryWindow(Configuration config, MainWindow mainWindow)
         : base("Round History##TwentyOneHistory")
@@ -26,6 +32,9 @@ public class RoundHistoryWindow : Window
 
     public override void Draw()
     {
+#if DEBUG
+        _fileDialog.Draw();
+#endif
         var history = config.RoundHistory;
 
         var canClear = history.Count > 0 && ImGui.GetIO().KeyCtrl;
@@ -99,6 +108,20 @@ public class RoundHistoryWindow : Window
             }
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Click to view this round");
+#if DEBUG
+            if (ImGui.BeginPopupContextItem($"##histCtx{i}"))
+            {
+                if (ImGui.MenuItem("Save snapshot..."))
+                {
+                    var snapshot = entry.Snapshot;
+                    var json     = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
+                    _fileDialog.SaveFileDialog(
+                        "Save Debug Snapshot", "JSON{.json}", $"round-{entry.RoundNumber}", ".json",
+                        (ok, path) => { if (ok) File.WriteAllText(path, json); });
+                }
+                ImGui.EndPopup();
+            }
+#endif
 
             ImGui.TableSetColumnIndex(1);
             ImGui.AlignTextToFramePadding();

@@ -60,6 +60,12 @@ public partial class MainWindow : Window, IDisposable
     private (bool IsDealer, int PlayerIndex, int HandIndex, bool IsPublic)? pendingHit;
     // deferred roll: set by OnChatMessage, applied at the start of the next Draw()
     private (bool IsDealer, int PlayerIndex, int HandIndex, int Roll)?      deferredRoll;
+#if DEBUG
+    // debug roll queue: consumed by QueueHitRoll before sending chat, bypasses /random
+    public readonly Queue<int> DebugRollQueue = new();
+    private DebugWindow debugWindow = null!;
+    public void SetDebugWindow(DebugWindow w) => debugWindow = w;
+#endif
     // pending trade confirmation for double/split: set when dealer clicks the button, cleared on confirm/cancel
     private (int PlayerIndex, int HandIndex)? pendingDouble;
     private (int PlayerIndex, int HandIndex)? pendingSplit;
@@ -449,6 +455,14 @@ private static unsafe void SendChatMessage(string message)
 
     private void QueueHitRoll(bool isDealer, int playerIndex, int handIndex)
     {
+#if DEBUG
+        if (DebugRollQueue.TryDequeue(out var debugRoll))
+        {
+            LogRoll(isDealer, playerIndex, debugRoll);
+            deferredRoll = (isDealer, playerIndex, handIndex, debugRoll);
+            return;
+        }
+#endif
         if (!config.ChatEnabled)
         {
             var simRoll = Random.Shared.Next(1, 14);
@@ -1017,6 +1031,11 @@ private static unsafe void SendChatMessage(string message)
         ImGui.SameLine();
         if (ImGui.SmallButton("History"))
             roundHistoryWindow.Toggle();
+#if DEBUG
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Debug"))
+            debugWindow.Toggle();
+#endif
 
         var canUndo = config.UndoStack.Count > 0;
         var canRedo = config.RedoStack.Count > 0;

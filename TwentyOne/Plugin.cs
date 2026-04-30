@@ -74,6 +74,9 @@ public sealed class Plugin : IDalamudPlugin
     private PlayerStatsWindow        PlayerStatsWindow        { get; init; }
     private PlayerStatsHistoryWindow PlayerStatsHistoryWindow { get; init; }
     private RoundHistoryWindow       RoundHistoryWindow       { get; init; }
+#if DEBUG
+    private DebugWindow              DebugWindow              { get; init; }
+#endif
 
     public Plugin()
     {
@@ -88,6 +91,10 @@ public sealed class Plugin : IDalamudPlugin
         MainWindow         = new MainWindow(Configuration, ConfigWindow, BankWindow, PlayerStatsWindow, ChatGui, ObjectTable, TargetManager, ClientState);
         RoundHistoryWindow = new RoundHistoryWindow(Configuration, MainWindow);
         MainWindow.SetRoundHistoryWindow(RoundHistoryWindow);
+#if DEBUG
+        DebugWindow = new DebugWindow(Configuration, MainWindow);
+        MainWindow.SetDebugWindow(DebugWindow);
+#endif
         ClientState.TerritoryChanged += OnTerritoryChanged;
         ContextMenu.OnMenuOpened += OnMenuOpened;
         WindowSystem.AddWindow(ConfigWindow);
@@ -95,6 +102,9 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(PlayerStatsWindow);
         WindowSystem.AddWindow(PlayerStatsHistoryWindow);
         WindowSystem.AddWindow(RoundHistoryWindow);
+#if DEBUG
+        WindowSystem.AddWindow(DebugWindow);
+#endif
         WindowSystem.AddWindow(MainWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
