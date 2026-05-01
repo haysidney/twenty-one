@@ -16,10 +16,11 @@ namespace TwentyOne.Windows;
 
 public class DebugScenarioFile
 {
-    public string?                   Name    { get; set; }
-    public List<DebugScenarioPlayer>? Players { get; set; }
-    public List<int>?                Rolls   { get; set; }
-    public List<string>?             Actions { get; set; }
+    public string?                   Name            { get; set; }
+    public List<DebugScenarioPlayer>? Players        { get; set; }
+    public List<int>?                Rolls           { get; set; }
+    public List<string>?             Actions         { get; set; }
+    public FiveCardCharlieRule?      FiveCardCharlie { get; set; }
 }
 
 public class DebugScenarioPlayer
@@ -223,7 +224,11 @@ public class DebugWindow : Window
         _playlistFile  = Path.GetFileName(path);
 
         // Build initial GameState: Betting phase with players set
-        var state = new GameState { BjPayout = config.GameState.BjPayout };
+        var state = new GameState
+        {
+            BjPayout        = config.GameState.BjPayout,
+            FiveCardCharlie = file.FiveCardCharlie ?? FiveCardCharlieRule.Disabled,
+        };
         foreach (var sp in file.Players ?? [])
         {
             (state, _) = GameEngine.Apply(state, new AddPlayer(sp.Name));

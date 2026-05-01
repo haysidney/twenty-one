@@ -1,0 +1,22 @@
+{
+  "name": "Single player — split Js, hand0 gets A for 21 (Stand not BJ), both hands win",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [7, 10, 10, 1, 8, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "Stand:0:0",
+    "AdvancePlayer",
+    "Stand:0:1",
+    "BeginDealerTurn",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

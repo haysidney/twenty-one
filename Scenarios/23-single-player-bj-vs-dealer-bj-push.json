@@ -1,0 +1,17 @@
+{
+  "name": "Single player — player BJ vs dealer BJ (ace upcard + 10 hole) — push",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [1, 10, 1, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "BeginDealerTurn",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "Two players + sitting out — all active BJ, dealer 10-value upcard (must check hole card, no dealer BJ)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    },
+    {
+      "name": "Bekki",
+      "bet": "500"
+    },
+    {
+      "name": "Nolla",
+      "sittingOut": true
+    }
+  ],
+  "rolls": [10, 1, 10, 1, 10, 5],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "AdvancePlayer",
+    "AdvancePlayer",
+    "BeginDealerTurn",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

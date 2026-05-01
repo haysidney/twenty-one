@@ -1,0 +1,18 @@
+{
+  "name": "Single player — dealer BJ with 10-value upcard (must check hole card)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [10, 9, 7, 1],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Stand:0:0",
+    "BeginDealerTurn",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

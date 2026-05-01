@@ -1,0 +1,32 @@
+{
+  "name": "Two players + sitting out — Lorah Five Card Charlie (Nolla sitting out), dealer busts",
+  "fiveCardCharlie": "BeatsAll",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    },
+    {
+      "name": "Bekki",
+      "bet": "500"
+    },
+    {
+      "name": "Nolla",
+      "sittingOut": true
+    }
+  ],
+  "rolls": [6, 2, 2, 9, 8, 2, 2, 3, 10, 7],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Hit:0:0",
+    "Hit:0:0",
+    "Hit:0:0",
+    "AdvancePlayer",
+    "Stand:1:0",
+    "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "Single player — player soft 17 (A+6) hits to 20, wins vs dealer 17",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [7, 1, 6, 3, 8, 2],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Hit:0:0",
+    "Stand:0:0",
+    "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

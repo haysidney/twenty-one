@@ -1,0 +1,25 @@
+{
+  "name": "Two players + sitting out — all active BJ (Nolla sitting out, dealer safe upcard skips reveal)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    },
+    {
+      "name": "Bekki",
+      "bet": "500"
+    },
+    {
+      "name": "Nolla",
+      "sittingOut": true
+    }
+  ],
+  "rolls": [7, 1, 10, 1, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "AdvancePlayer",
+    "AdvancePlayer",
+    "GoToPayout"
+  ]
+}

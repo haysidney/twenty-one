@@ -1,0 +1,20 @@
+{
+  "name": "Single player — split aces (auto-stand each hand, 21 not BJ)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [7, 1, 1, 10, 9, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "AdvancePlayer",
+    "BeginDealerTurn",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

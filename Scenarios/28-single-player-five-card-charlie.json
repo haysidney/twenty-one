@@ -1,0 +1,22 @@
+{
+  "name": "Single player — Five Card Charlie (5 cards, 14 total, beats dealer 21)",
+  "fiveCardCharlie": "BeatsAll",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [5, 2, 3, 4, 2, 3, 10, 6],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Hit:0:0",
+    "Hit:0:0",
+    "Hit:0:0",
+    "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

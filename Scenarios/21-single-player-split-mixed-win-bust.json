@@ -1,0 +1,22 @@
+{
+  "name": "Single player — split 8s, hand0 busts, hand1 wins (19 vs dealer 17)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [7, 8, 8, 6, 9, 1, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "Hit:0:0",
+    "AdvancePlayer",
+    "Stand:0:1",
+    "BeginDealerTurn",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

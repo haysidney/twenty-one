@@ -1,0 +1,30 @@
+{
+  "name": "Three players — Lorah wins (18), Bekki pushes (17), Nolla busts",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    },
+    {
+      "name": "Bekki",
+      "bet": "500"
+    },
+    {
+      "name": "Nolla",
+      "bet": "750"
+    }
+  ],
+  "rolls": [7, 10, 8, 9, 8, 10, 6, 8, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Stand:0:0",
+    "AdvancePlayer",
+    "Stand:1:0",
+    "AdvancePlayer",
+    "Hit:2:0",
+    "BeginDealerTurn",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

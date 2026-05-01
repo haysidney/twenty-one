@@ -1,0 +1,27 @@
+{
+  "name": "Single player — re-split 8s (8+8 splits, hand0 gets 8 again, splits twice), dealer busts",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [6, 8, 8, 8, 2, 3, 5, 10, 7],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "Stand:0:0",
+    "AdvancePlayer",
+    "Stand:0:1",
+    "AdvancePlayer",
+    "Stand:0:2",
+    "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

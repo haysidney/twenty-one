@@ -1,0 +1,26 @@
+{
+  "name": "Two players + sitting out — all active bust (Nolla sitting out, dealer skips to payout)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    },
+    {
+      "name": "Bekki",
+      "bet": "500"
+    },
+    {
+      "name": "Nolla",
+      "sittingOut": true
+    }
+  ],
+  "rolls": [5, 10, 6, 10, 6, 10, 7],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Hit:0:0",
+    "AdvancePlayer",
+    "Hit:1:0",
+    "GoToPayout"
+  ]
+}
