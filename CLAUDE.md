@@ -164,6 +164,11 @@ All cards come from FFXIV chat rolls (`/random 13` or `/dice 13`). There are no 
 
 Use only these player names in test cases: Lorah, Bekki, Nolla. If more than 3 names are needed, invent new ones. When a test requires a winning player, that player must always be Lorah. Write tests for all new features.
 
+**Two distinct test layers — do not conflate them:**
+
+- `TwentyOne.Tests/GameEngineTests.cs` — xUnit unit tests. Test `GameEngine.Apply()` calls in isolation. No Dalamud dependency. Covers individual action transitions, narration, payout math.
+- `Scenarios/*.json` — human-replay integration tests. Loaded via DebugWindow in-game. Test the full stack: `MainWindow` orchestration (autoDealQueue deal sequence, deferred rolls, `AutoHit` side effects, button gating). Cannot be automated without replicating `MainWindow` logic separately, which creates a divergence risk. Run manually by loading and stepping/fast-forwarding in-game.
+
 ## Narration Templates
 
 `NarrationTemplates` properties are `List<List<string>>` — the outer list is random variants (one picked per use via `Random.Shared`), the inner list is the sequence of chat lines sent for that variant. Defaults always have exactly one variant. The three `DealSummary*` properties remain plain `string` (they are concatenated components, not narrated independently).
