@@ -70,39 +70,6 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Save the current session's stats and reset for a new session."u8);
 
-        ImGui.SameLine();
-        if (ImGui.Button("History"))
-        {
-            if (_historyWindow != null)
-                _historyWindow.IsOpen = !_historyWindow.IsOpen;
-        }
-
-        ImGui.SameLine();
-        if (ImGui.Button("Reset Stats"))
-        {
-            config.PlayerStatsStore.Clear();
-            config.Save();
-        }
-        ImGui.SameLine();
-        var shiftHeld = ImGui.GetIO().KeyShift;
-        if (ImGui.Button("Export"))
-        {
-            if (shiftHeld)
-            {
-                _fileDialogManager.SaveFileDialog(
-                    "Export Player Stats", "TSV{.tsv}", "player-stats", ".tsv",
-                    (ok, path) => { if (ok) File.WriteAllText(path, BuildExportText()); });
-            }
-            else
-            {
-                ImGui.SetClipboardText(BuildExportText());
-            }
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip(shiftHeld
-                ? "Save player stats to a TSV file."u8
-                : "Copy player stats to clipboard as TSV. Shift+click to save to file."u8);
-
         ImGui.Spacing();
         ImGui.Separator();
 
@@ -225,6 +192,40 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
         ImGui.Spacing();
         ImGui.Separator();
+        ImGui.Spacing();
+
+        // Player stats controls
+        if (ImGui.Button("History"))
+        {
+            if (_historyWindow != null)
+                _historyWindow.IsOpen = !_historyWindow.IsOpen;
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Reset Stats"))
+        {
+            config.PlayerStatsStore.Clear();
+            config.Save();
+        }
+        ImGui.SameLine();
+        var shiftHeld = ImGui.GetIO().KeyShift;
+        if (ImGui.Button("Export"))
+        {
+            if (shiftHeld)
+            {
+                _fileDialogManager.SaveFileDialog(
+                    "Export Player Stats", "TSV{.tsv}", "player-stats", ".tsv",
+                    (ok, path) => { if (ok) File.WriteAllText(path, BuildExportText()); });
+            }
+            else
+            {
+                ImGui.SetClipboardText(BuildExportText());
+            }
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(shiftHeld
+                ? "Save player stats to a TSV file."u8
+                : "Copy player stats to clipboard as TSV. Shift+click to save to file."u8);
+
         ImGui.Spacing();
 
         // Player stats table
