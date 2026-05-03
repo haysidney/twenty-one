@@ -63,7 +63,7 @@ public unsafe class PlayerStatsWindow : Window, IDisposable
         if (ImGui.Button("History"))
         {
             if (_historyWindow != null)
-                _historyWindow.IsOpen = true;
+                _historyWindow.IsOpen = !_historyWindow.IsOpen;
         }
 
         ImGui.SameLine();
