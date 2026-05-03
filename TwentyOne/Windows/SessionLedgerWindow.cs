@@ -55,7 +55,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         if (ImGui.BeginPopup("NewSessionConfirm##TwentyOne"))
         {
             ImGui.TextUnformatted("Save current stats as a session and start fresh?");
-            ImGui.TextUnformatted("This will also clear tips and reset the bank tracker.");
+            ImGui.TextUnformatted("This will also clear tips, reset the bank tracker, and remove all players from the table.");
             ImGui.Spacing();
             if (ImGui.Button("Confirm"))
             {
@@ -341,6 +341,17 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         SyncBuffers();
         venue.ActiveSessionStartedAt   = null;
         venue.ActiveSessionLocationKey = null;
+
+        var gs = config.GameState;
+        config.GameState = new GameState
+        {
+            BjPayout                 = gs.BjPayout,
+            FiveCardCharlie          = gs.FiveCardCharlie,
+            SkipDealSummaryOnePlayer = gs.SkipDealSummaryOnePlayer,
+        };
+        config.UndoStack.Clear();
+        config.RedoStack.Clear();
+
         config.Save();
     }
 
