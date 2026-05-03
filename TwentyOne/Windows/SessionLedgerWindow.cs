@@ -12,16 +12,20 @@ using TwentyOne.Game;
 
 namespace TwentyOne.Windows;
 
-public unsafe class PlayerStatsWindow : Window, IDisposable
+public unsafe class SessionLedgerWindow : Window, IDisposable
 {
     private readonly Configuration config;
     private readonly FileDialogManager _fileDialogManager = new();
     private HistoryWindow? _historyWindow;
 
+    private string gilStartBuf = string.Empty;
+    private string gilEndBuf   = string.Empty;
+    private string tipBuf      = string.Empty;
+
     public void SetHistoryWindow(HistoryWindow w) => _historyWindow = w;
 
-    public PlayerStatsWindow(Configuration config)
-        : base("Player Stats##TwentyOneStats")
+    public SessionLedgerWindow(Configuration config)
+        : base("Session Ledger##TwentyOneSessionLedger")
     {
         this.config = config;
         SizeConstraints = new WindowSizeConstraints
@@ -30,6 +34,13 @@ public unsafe class PlayerStatsWindow : Window, IDisposable
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
         };
         Flags = ImGuiWindowFlags.NoCollapse;
+        SyncBuffers();
+    }
+
+    public void SyncBuffers()
+    {
+        gilStartBuf = config.GilStart.ToString();
+        gilEndBuf   = config.GilEnd.ToString();
     }
 
     public void Dispose() { }
@@ -38,17 +49,17 @@ public unsafe class PlayerStatsWindow : Window, IDisposable
     {
         _fileDialogManager.Draw();
 
-        if (ImGui.Button("Start Night"))
-            ImGui.OpenPopup("StartNightConfirm##TwentyOne");
+        if (ImGui.Button("Start Session"))
+            ImGui.OpenPopup("StartSessionConfirm##TwentyOne");
 
-        if (ImGui.BeginPopup("StartNightConfirm##TwentyOne"))
+        if (ImGui.BeginPopup("StartSessionConfirm##TwentyOne"))
         {
             ImGui.TextUnformatted("Save current stats as a session and start fresh?");
             ImGui.TextUnformatted("This will also clear tips and reset the bank tracker.");
             ImGui.Spacing();
             if (ImGui.Button("Confirm"))
             {
-                StartNight();
+                StartSession();
                 ImGui.CloseCurrentPopup();
             }
             ImGui.SameLine();
@@ -57,7 +68,7 @@ public unsafe class PlayerStatsWindow : Window, IDisposable
             ImGui.EndPopup();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Save the current night's stats as a session and reset for a new night."u8);
+            ImGui.SetTooltip("Save the current session's stats and reset for a new session."u8);
 
         ImGui.SameLine();
         if (ImGui.Button("History"))
@@ -94,8 +105,125 @@ public unsafe class PlayerStatsWindow : Window, IDisposable
 
         ImGui.Spacing();
         ImGui.Separator();
+
+        // Reconciliation
+        var difference  = config.GilEnd - config.GilStart;
+        var grandTotal  = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
+        var reconciled  = difference == grandTotal;
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text("House Difference:");
+        ImGui.SameLine();
+        ColoredGilText(difference);
+        ImGui.SameLine(0, 20);
+        ImGui.Text("Player Net:");
+        ImGui.SameLine();
+        ColoredGilText(grandTotal);
+        ImGui.SameLine(0, 8);
+        if (reconciled)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.35f, 0.9f, 0.35f, 1f));
+            ImGui.TextUnformatted("OK");
+            ImGui.PopStyleColor();
+        }
+        else
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.35f, 0.35f, 1f));
+            ImGui.TextUnformatted("MISMATCH");
+            ImGui.PopStyleColor();
+        }
+
+        ImGui.Separator();
+
+        // House bank tracker
+        ImGui.Text("Starting Gil"); ImGui.SameLine(110);
+        ImGui.SetNextItemWidth(160);
+        if (ImGui.InputText("##gilstart", ref gilStartBuf, 20))
+        {
+            if (long.TryParse(gilStartBuf, out var v)) { config.GilStart = v; config.Save(); }
+        }
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Current##start"))
+        {
+            var gil = (long)InventoryManager.Instance()->GetGil();
+            config.GilStart = gil;
+            gilStartBuf = gil.ToString();
+            config.Save();
+        }
+
+        ImGui.Text("Ending Gil"); ImGui.SameLine(110);
+        ImGui.SetNextItemWidth(160);
+        if (ImGui.InputText("##gilend", ref gilEndBuf, 20))
+        {
+            if (long.TryParse(gilEndBuf, out var v)) { config.GilEnd = v; config.Save(); }
+        }
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Current##end"))
+        {
+            var gil = (long)InventoryManager.Instance()->GetGil();
+            config.GilEnd = gil;
+            gilEndBuf = gil.ToString();
+            config.Save();
+        }
+
+        ImGui.AlignTextToFramePadding(); ImGui.Text("Venue Cut %"); ImGui.SameLine();
+        ImGui.SetNextItemWidth(100);
+        var cut = config.DealerCutPct;
+        if (ImGui.InputInt("##dealercut", ref cut))
+        {
+            config.DealerCutPct = Math.Clamp(cut, 0, 100);
+            config.Save();
+        }
+
+        ImGui.Separator();
+        ImGui.Text("Tips");
+
+        long tipTotal = 0;
+        for (int i = 0; i < config.Tips.Count; i++)
+        {
+            tipTotal += config.Tips[i];
+            ImGui.Text($"  {config.Tips[i]:N0}");
+            ImGui.SameLine();
+            ImGui.PushID(i);
+            if (ImGui.SmallButton("X"))
+            {
+                config.Tips.RemoveAt(i);
+                config.Save();
+                ImGui.PopID();
+                break;
+            }
+            ImGui.PopID();
+        }
+
+        ImGui.Text($"Tips total: {tipTotal:N0} gil");
+
+        ImGui.SetNextItemWidth(120);
+        var addTip = ImGui.InputText("##tipinput", ref tipBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue);
+        ImGui.SameLine();
+        addTip |= ImGui.Button("Add Tip");
+        if (addTip)
+        {
+            if (long.TryParse(tipBuf, out var tip) && tip != 0)
+            {
+                config.Tips.Add(tip);
+                config.Save();
+                tipBuf = string.Empty;
+            }
+        }
+
+        var profit    = difference - tipTotal;
+        var venueOwes = profit > 0 ? (long)Math.Floor(profit * config.DealerCutPct / 100.0) : 0;
+        var dealerKeeps = profit > 0 ? profit - venueOwes + tipTotal : tipTotal;
+        ImGui.Separator();
+        CopyableGilRow("Profit", profit);
+        ImGui.Separator();
+        CopyableGilRow("Dealer receives", dealerKeeps);
+        CopyableGilRow("Venue receives", venueOwes);
+
+        ImGui.Spacing();
+        ImGui.Separator();
         ImGui.Spacing();
 
+        // Player stats table
         var flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
         if (ImGui.BeginTable("##stats", 8, flags))
         {
@@ -145,44 +273,31 @@ public unsafe class PlayerStatsWindow : Window, IDisposable
 
                 ImGui.TableSetColumnIndex(7);
                 ImGui.AlignTextToFramePadding();
-                var totalColor = stat.TotalWon > 0
+                var netColor = stat.TotalWon > 0
                     ? new Vector4(0.35f, 0.9f, 0.35f, 1f)
                     : stat.TotalWon < 0
                         ? new Vector4(1f, 0.35f, 0.35f, 1f)
                         : new Vector4(0.7f, 0.7f, 0.7f, 1f);
-                var totalStr = stat.TotalWon > 0 ? $"+{GameEngine.FormatGil(stat.TotalWon)}" : GameEngine.FormatGil(stat.TotalWon);
-                ImGui.TextColored(totalColor, totalStr);
+                var netStr = stat.TotalWon > 0 ? $"+{GameEngine.FormatGil(stat.TotalWon)}" : GameEngine.FormatGil(stat.TotalWon);
+                ImGui.TextColored(netColor, netStr);
             }
 
             ImGui.EndTable();
         }
-
-        var grandTotal = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
-        var grandColor = grandTotal > 0
-            ? new Vector4(0.35f, 0.9f, 0.35f, 1f)
-            : grandTotal < 0
-                ? new Vector4(1f, 0.35f, 0.35f, 1f)
-                : new Vector4(0.7f, 0.7f, 0.7f, 1f);
-        var grandStr = grandTotal > 0 ? $"+{GameEngine.FormatGil(grandTotal)}" : GameEngine.FormatGil(grandTotal);
-        ImGui.Spacing();
-        ImGui.Text("Net (all players):");
-        ImGui.SameLine();
-        ImGui.TextColored(grandColor, grandStr);
     }
 
-    public void StartNight()
+    public void StartSession()
     {
         var venue = config.ActiveVenue;
 
-        // Archive current session data.
         var roundSummaries = venue.RoundHistory.Select(r => new RoundSummary
         {
             RoundNumber = r.RoundNumber,
             BankNet     = r.BankNet,
-            PlayerBanks = new System.Collections.Generic.Dictionary<string, long>(r.PlayerBanks),
+            PlayerBanks = new Dictionary<string, long>(r.PlayerBanks),
         });
         var statData = venue.PlayerStatsStore.Select(kv =>
-            System.Collections.Generic.KeyValuePair.Create(kv.Key, new PlayerStatData
+            KeyValuePair.Create(kv.Key, new PlayerStatData
             {
                 DisplayName = kv.Value.DisplayName,
                 GamesPlayed = kv.Value.GamesPlayed,
@@ -203,7 +318,6 @@ public unsafe class PlayerStatsWindow : Window, IDisposable
             Rounds      = archivedRounds,
         });
 
-        // Reset per-session game stats; preserve Bank/BankLog.
         foreach (var s in venue.PlayerStatsStore.Values)
         {
             s.GamesPlayed = 0;
@@ -219,9 +333,28 @@ public unsafe class PlayerStatsWindow : Window, IDisposable
         var currentGil = (long)InventoryManager.Instance()->GetGil();
         venue.GilStart = currentGil;
         venue.GilEnd   = currentGil;
+        SyncBuffers();
         venue.ActiveSessionStartedAt   = null;
         venue.ActiveSessionLocationKey = null;
         config.Save();
+    }
+
+    private static void ColoredGilText(long value)
+    {
+        var color = value > 0
+            ? new Vector4(0.35f, 0.9f, 0.35f, 1f)
+            : value < 0
+                ? new Vector4(1f, 0.35f, 0.35f, 1f)
+                : new Vector4(0.7f, 0.7f, 0.7f, 1f);
+        var text = value > 0 ? $"+{GameEngine.FormatGil(value)}" : GameEngine.FormatGil(value);
+        ImGui.TextColored(color, text);
+    }
+
+    private static void CopyableGilRow(string label, long value)
+    {
+        ImGui.Text($"{label}: {value:N0} gil");
+        if (ImGui.IsItemClicked()) ImGui.SetClipboardText(value.ToString());
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Click to copy"u8);
     }
 
     private string BuildExportText()

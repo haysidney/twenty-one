@@ -23,8 +23,7 @@ public partial class MainWindow : Window, IDisposable
 {
     private readonly Configuration      config;
     private readonly ConfigWindow       configWindow;
-    private readonly BankWindow         bankWindow;
-    private readonly PlayerStatsWindow  playerStatsWindow;
+    private readonly SessionLedgerWindow sessionLedgerWindow;
     private          HistoryWindow historyWindow = null!;
 
     // History viewer mode: non-null when viewing a historical round.
@@ -247,16 +246,14 @@ public partial class MainWindow : Window, IDisposable
 
     // ── Constructor / Dispose ─────────────────────────────────────────────────
 
-    public MainWindow(Configuration config, ConfigWindow configWindow, BankWindow bankWindow,
-                      PlayerStatsWindow playerStatsWindow,
+    public MainWindow(Configuration config, ConfigWindow configWindow, SessionLedgerWindow sessionLedgerWindow,
                       IChatGui chatGui, IObjectTable objectTable, ITargetManager targetManager,
                       IClientState clientState)
         : base("Twenty One##TwentyOneMain")
     {
-        this.config            = config;
-        this.configWindow      = configWindow;
-        this.bankWindow        = bankWindow;
-        this.playerStatsWindow = playerStatsWindow;
+        this.config              = config;
+        this.configWindow        = configWindow;
+        this.sessionLedgerWindow = sessionLedgerWindow;
         this.chatGui           = chatGui;
         this.objectTable       = objectTable;
         this.targetManager     = targetManager;
@@ -1192,7 +1189,7 @@ private static unsafe void SendChatMessage(string message)
             if (ImGui.SmallButton("Yes##venueMemoryYes"))
             {
                 config.ActiveVenueIndex = suggestion.Value.Index;
-                bankWindow.SyncBuffers();
+                sessionLedgerWindow.SyncBuffers();
                 config.Save();
                 venueMemoryDismissed = true;
             }
@@ -1228,14 +1225,14 @@ private static unsafe void SendChatMessage(string message)
                     if (addrKey != null)
                         config.VenueMemory[addrKey] = config.Venues[vIdx].Id.ToString();
                     config.ActiveVenueIndex = vIdx;
-                    bankWindow.SyncBuffers();
+                    sessionLedgerWindow.SyncBuffers();
                     config.Save();
                 }
                 if (roundInProgress) ImGui.EndDisabled();
                 ImGui.SameLine();
-                if (ImGui.SmallButton("Start Night##sessionBannerStart"))
+                if (ImGui.SmallButton("Start Session##sessionBannerStart"))
                 {
-                    playerStatsWindow.StartNight();
+                    sessionLedgerWindow.StartSession();
                     sessionBannerDismissed = true;
                 }
                 ImGui.SameLine();
@@ -1248,11 +1245,8 @@ private static unsafe void SendChatMessage(string message)
         if (ImGui.SmallButton("Config"))
             configWindow.Toggle();
         ImGui.SameLine();
-        if (ImGui.SmallButton("Bank"))
-            bankWindow.Toggle();
-        ImGui.SameLine();
-        if (ImGui.SmallButton("Stats"))
-            playerStatsWindow.Toggle();
+        if (ImGui.SmallButton("Session Ledger"))
+            sessionLedgerWindow.Toggle();
         ImGui.SameLine();
         if (ImGui.SmallButton("History"))
             historyWindow.Toggle();

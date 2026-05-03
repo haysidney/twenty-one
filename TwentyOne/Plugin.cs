@@ -70,8 +70,7 @@ public sealed class Plugin : IDalamudPlugin
     public readonly WindowSystem WindowSystem = new("TwentyOne");
     private MainWindow        MainWindow        { get; init; }
     private ConfigWindow      ConfigWindow      { get; init; }
-    private BankWindow        BankWindow        { get; init; }
-    private PlayerStatsWindow PlayerStatsWindow { get; init; }
+    private SessionLedgerWindow SessionLedgerWindow { get; init; }
     private HistoryWindow     HistoryWindow     { get; init; }
 #if DEBUG
     private DebugWindow       DebugWindow       { get; init; }
@@ -82,13 +81,12 @@ public sealed class Plugin : IDalamudPlugin
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.EnsureVenues();
 
-        BankWindow        = new BankWindow(Configuration);
-        ConfigWindow      = new ConfigWindow(Configuration, BankWindow);
-        PlayerStatsWindow = new PlayerStatsWindow(Configuration);
-        MainWindow        = new MainWindow(Configuration, ConfigWindow, BankWindow, PlayerStatsWindow, ChatGui, ObjectTable, TargetManager, ClientState);
-        HistoryWindow     = new HistoryWindow(Configuration, MainWindow);
+        SessionLedgerWindow = new SessionLedgerWindow(Configuration);
+        ConfigWindow        = new ConfigWindow(Configuration, SessionLedgerWindow);
+        MainWindow          = new MainWindow(Configuration, ConfigWindow, SessionLedgerWindow, ChatGui, ObjectTable, TargetManager, ClientState);
+        HistoryWindow       = new HistoryWindow(Configuration, MainWindow);
         MainWindow.SetHistoryWindow(HistoryWindow);
-        PlayerStatsWindow.SetHistoryWindow(HistoryWindow);
+        SessionLedgerWindow.SetHistoryWindow(HistoryWindow);
 #if DEBUG
         DebugWindow = new DebugWindow(Configuration, MainWindow);
         MainWindow.SetDebugWindow(DebugWindow);
@@ -96,8 +94,7 @@ public sealed class Plugin : IDalamudPlugin
         ClientState.TerritoryChanged += OnTerritoryChanged;
         ContextMenu.OnMenuOpened += OnMenuOpened;
         WindowSystem.AddWindow(ConfigWindow);
-        WindowSystem.AddWindow(BankWindow);
-        WindowSystem.AddWindow(PlayerStatsWindow);
+        WindowSystem.AddWindow(SessionLedgerWindow);
         WindowSystem.AddWindow(HistoryWindow);
 #if DEBUG
         WindowSystem.AddWindow(DebugWindow);
@@ -200,8 +197,7 @@ public sealed class Plugin : IDalamudPlugin
 
         WindowSystem.RemoveAllWindows();
         ConfigWindow.Dispose();
-        BankWindow.Dispose();
-        PlayerStatsWindow.Dispose();
+        SessionLedgerWindow.Dispose();
         MainWindow.Dispose();
         // HistoryWindow has no IDisposable resources.
 

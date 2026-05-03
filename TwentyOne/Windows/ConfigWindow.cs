@@ -14,13 +14,13 @@ namespace TwentyOne.Windows;
 public class ConfigWindow : Window, IDisposable
 {
     private readonly Configuration config;
-    private readonly BankWindow    bankWindow;
+    private readonly SessionLedgerWindow sessionLedgerWindow;
 
-    public ConfigWindow(Configuration config, BankWindow bankWindow)
+    public ConfigWindow(Configuration config, SessionLedgerWindow sessionLedgerWindow)
         : base("Twenty One — Settings##TwentyOneConfig")
     {
-        this.config     = config;
-        this.bankWindow = bankWindow;
+        this.config              = config;
+        this.sessionLedgerWindow = sessionLedgerWindow;
         SizeConstraints = new WindowSizeConstraints { MinimumSize = new Vector2(400, 200), MaximumSize = new Vector2(float.MaxValue, float.MaxValue) };
         Flags = ImGuiWindowFlags.NoCollapse;
     }
@@ -230,7 +230,7 @@ public class ConfigWindow : Window, IDisposable
             if (Plugin.GetCurrentHousingAddressKey() is { } addrKey)
                 config.VenueMemory[addrKey] = config.Venues[idx].Id.ToString();
             config.ActiveVenueIndex = idx;
-            bankWindow.SyncBuffers();
+            sessionLedgerWindow.SyncBuffers();
             config.Save();
         }
         if (roundInProgress) ImGui.EndDisabled();
@@ -244,7 +244,7 @@ public class ConfigWindow : Window, IDisposable
             if (!roundInProgress)
             {
                 config.ActiveVenueIndex = config.Venues.Count - 1;
-                bankWindow.SyncBuffers();
+                sessionLedgerWindow.SyncBuffers();
             }
             config.Save();
         }
@@ -275,7 +275,7 @@ public class ConfigWindow : Window, IDisposable
             config.ActiveVenueIndex = Math.Min(removeIdx, config.Venues.Count - 1);
             foreach (var k in config.VenueMemory.Keys.Where(k => config.VenueMemory[k] == removedGuid).ToList())
                 config.VenueMemory.Remove(k);
-            bankWindow.SyncBuffers();
+            sessionLedgerWindow.SyncBuffers();
             config.Save();
         }
         if (!canDelete) ImGui.EndDisabled();
@@ -340,7 +340,7 @@ public class ConfigWindow : Window, IDisposable
                     if (!roundInProgress)
                     {
                         config.ActiveVenueIndex = config.Venues.Count - 1;
-                        bankWindow.SyncBuffers();
+                        sessionLedgerWindow.SyncBuffers();
                     }
                     config.Save();
                 }
