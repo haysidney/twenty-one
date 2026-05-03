@@ -49,17 +49,17 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     {
         _fileDialogManager.Draw();
 
-        if (ImGui.Button("Start Session"))
-            ImGui.OpenPopup("StartSessionConfirm##TwentyOne");
+        if (ImGui.Button("New Session"))
+            ImGui.OpenPopup("NewSessionConfirm##TwentyOne");
 
-        if (ImGui.BeginPopup("StartSessionConfirm##TwentyOne"))
+        if (ImGui.BeginPopup("NewSessionConfirm##TwentyOne"))
         {
             ImGui.TextUnformatted("Save current stats as a session and start fresh?");
             ImGui.TextUnformatted("This will also clear tips and reset the bank tracker.");
             ImGui.Spacing();
             if (ImGui.Button("Confirm"))
             {
-                StartSession();
+                NewSession();
                 ImGui.CloseCurrentPopup();
             }
             ImGui.SameLine();
@@ -290,7 +290,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         }
     }
 
-    public void StartSession()
+    public void NewSession()
     {
         var venue = config.ActiveVenue;
 

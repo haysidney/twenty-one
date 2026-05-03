@@ -143,9 +143,9 @@ Fields that belong in `Configuration` (persisted, outside undo):
 
 `VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round). Each entry stores the `GameState` at payout, the bank net for that round, and a round number. Appended by `UpdatePlayerStats` after `GoToPayout`.
 
-`VenueSettings.ActiveSessionStartedAt` / `ActiveSessionLocationKey` — set on first `GoToPayout` of a new night via `SessionManager.TryStartSession`. Cleared by `StartSession`. Used to detect when a new session banner should be shown.
+`VenueSettings.ActiveSessionStartedAt` / `ActiveSessionLocationKey` — set on first `GoToPayout` of a new night via `SessionManager.TryStartSession`. Cleared by `NewSession`. Used to detect when a new session banner should be shown.
 
-`VenueSettings.StatsSessions` holds `PlayerStatsSession` archives. Each session stores a snapshot of `PlayerStatData` (no Bank/BankLog), `List<RoundSummary>`, `BankNet`, `LocationKey`, and `Date`. Archived by `StartSession` in `SessionLedgerWindow`.
+`VenueSettings.StatsSessions` holds `PlayerStatsSession` archives. Each session stores a snapshot of `PlayerStatData` (no Bank/BankLog), `List<RoundSummary>`, `BankNet`, `LocationKey`, and `Date`. Archived by `NewSession` in `SessionLedgerWindow`.
 
 ### Sessions
 
@@ -155,9 +155,9 @@ Fields that belong in `Configuration` (persisted, outside undo):
 - `BuildArchive` — converts live stats + round history into snapshot types for archiving.
 - `ResetGameStats` — zeroes perf fields on `PlayerStatData` objects.
 
-`MainWindow` shows a session banner (dismissible, resets on territory change) when `ShouldShowSessionBanner` is true. Banner includes inline venue dropdown and "Start Session" button that delegates to `SessionLedgerWindow.StartSession()`.
+`MainWindow` shows a session banner (dismissible, resets on territory change) when `ShouldShowSessionBanner` is true. Banner includes inline venue dropdown and "New Session" button that delegates to `SessionLedgerWindow.NewSession()`.
 
-`SessionLedgerWindow.StartSession()` (public): archives session, resets live stat fields (preserves Bank/BankLog), clears RoundHistory/Tips, resets GilTracker, clears session tracking fields, saves.
+`SessionLedgerWindow.NewSession()` (public): archives session, resets live stat fields (preserves Bank/BankLog), clears RoundHistory/Tips, resets GilTracker, clears session tracking fields, saves.
 
 `RoundSummary` (in `TwentyOne.Game/GameTypes.cs`) — lightweight per-round archive record. No `GameState` snapshot; stores `RoundNumber`, `BankNet`, and `PlayerBanks` deltas only.
 

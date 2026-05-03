@@ -1230,9 +1230,9 @@ private static unsafe void SendChatMessage(string message)
                 }
                 if (roundInProgress) ImGui.EndDisabled();
                 ImGui.SameLine();
-                if (ImGui.SmallButton("Start Session##sessionBannerStart"))
+                if (ImGui.SmallButton("New Session##sessionBannerStart"))
                 {
-                    sessionLedgerWindow.StartSession();
+                    sessionLedgerWindow.NewSession();
                     sessionBannerDismissed = true;
                 }
                 ImGui.SameLine();
