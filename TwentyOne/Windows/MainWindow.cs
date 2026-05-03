@@ -25,7 +25,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly ConfigWindow       configWindow;
     private readonly BankWindow         bankWindow;
     private readonly PlayerStatsWindow  playerStatsWindow;
-    private          RoundHistoryWindow roundHistoryWindow = null!;
+    private          HistoryWindow historyWindow = null!;
 
     // History viewer mode: non-null when viewing a historical round.
     private GameState?       savedCurrentState;
@@ -39,7 +39,8 @@ public partial class MainWindow : Window, IDisposable
 
     // Venue memory suggestion banner state.
     private uint lastSeenTerritory;
-    private bool   venueMemoryDismissed;
+    private bool venueMemoryDismissed;
+    private bool sessionBannerDismissed;
 
     // Betting-phase UI state
     private string newPlayerName  = string.Empty;
@@ -268,7 +269,7 @@ public partial class MainWindow : Window, IDisposable
         chatGui.ChatMessage += OnChatMessage;
     }
 
-    public void SetRoundHistoryWindow(RoundHistoryWindow w) => roundHistoryWindow = w;
+    public void SetHistoryWindow(HistoryWindow w) => historyWindow = w;
 
     // Returns (venueIndex, venueName) if VenueMemory has a suggestion for the current location.
     private (int Index, string Name)? GetVenueMemorySuggestion()
@@ -532,6 +533,13 @@ public partial class MainWindow : Window, IDisposable
             BankNet      = (long)bankNet,
             PlayerBanks  = playerBanksSnapshot,
         });
+
+        var venue = config.ActiveVenue;
+        var startedAt   = venue.ActiveSessionStartedAt;
+        var locationKey = venue.ActiveSessionLocationKey;
+        SessionManager.TryStartSession(ref startedAt, ref locationKey, Plugin.GetCurrentHousingAddressKey(), DateTime.Now);
+        venue.ActiveSessionStartedAt   = startedAt;
+        venue.ActiveSessionLocationKey = locationKey;
 
         config.Save();
     }
@@ -821,8 +829,9 @@ private static unsafe void SendChatMessage(string message)
         var currentTerritory = clientState.TerritoryType;
         if (currentTerritory != lastSeenTerritory)
         {
-            lastSeenTerritory    = currentTerritory;
-            venueMemoryDismissed = false;
+            lastSeenTerritory       = currentTerritory;
+            venueMemoryDismissed    = false;
+            sessionBannerDismissed  = false;
         }
 
         // Drain outgoing queue — hold a roll entry until the previous roll's response has arrived
@@ -1193,6 +1202,49 @@ private static unsafe void SendChatMessage(string message)
             ImGui.Separator();
         }
 
+        if (!sessionBannerDismissed && !isHistoryView)
+        {
+            var venue = config.ActiveVenue;
+            var addrKey = Plugin.GetCurrentHousingAddressKey();
+            if (SessionManager.ShouldShowSessionBanner(
+                    venue.ActiveSessionStartedAt,
+                    venue.ActiveSessionLocationKey,
+                    addrKey,
+                    venue.RoundHistory.Count,
+                    DateTime.Now))
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.85f, 0.3f, 1f));
+                ImGui.TextUnformatted("You may need to start a new session.");
+                ImGui.PopStyleColor();
+                ImGui.SameLine();
+                var venueNames = config.Venues.ConvertAll(v => v.Name).ToArray();
+                var vIdx = config.ActiveVenueIndex;
+                var roundInProgress = config.GameState.Phase != GamePhase.Betting;
+                ImGui.SetNextItemWidth(140);
+                if (roundInProgress) ImGui.BeginDisabled();
+                if (ImGui.Combo("##sessionVenueCombo", ref vIdx, venueNames, venueNames.Length)
+                    && vIdx != config.ActiveVenueIndex)
+                {
+                    if (addrKey != null)
+                        config.VenueMemory[addrKey] = config.Venues[vIdx].Id.ToString();
+                    config.ActiveVenueIndex = vIdx;
+                    bankWindow.SyncBuffers();
+                    config.Save();
+                }
+                if (roundInProgress) ImGui.EndDisabled();
+                ImGui.SameLine();
+                if (ImGui.SmallButton("Start Night##sessionBannerStart"))
+                {
+                    playerStatsWindow.StartNight();
+                    sessionBannerDismissed = true;
+                }
+                ImGui.SameLine();
+                if (ImGui.SmallButton("X##sessionBannerDismiss"))
+                    sessionBannerDismissed = true;
+                ImGui.Separator();
+            }
+        }
+
         if (ImGui.SmallButton("Config"))
             configWindow.Toggle();
         ImGui.SameLine();
@@ -1203,7 +1255,7 @@ private static unsafe void SendChatMessage(string message)
             playerStatsWindow.Toggle();
         ImGui.SameLine();
         if (ImGui.SmallButton("History"))
-            roundHistoryWindow.Toggle();
+            historyWindow.Toggle();
 #if DEBUG
         ImGui.SameLine();
         if (ImGui.SmallButton("Debug"))

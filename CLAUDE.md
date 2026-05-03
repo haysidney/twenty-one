@@ -139,9 +139,29 @@ Fields that belong in `Configuration` (persisted, outside undo):
 - `Venues` / `ActiveVenueIndex` — all venue-specific settings live in `VenueSettings`; proxy properties on `Configuration` delegate to `ActiveVenue` so call sites need not change
 - `VenueMemory` — global `Dictionary<string, string>` mapping housing address key (`"{territory}:{ward}:{plot}"`) to venue GUID; updated when user manually switches venues in a housing zone
 
-`VenueSettings` holds all per-venue config: chat, narration templates, dealer name, auto-trade/target, gil tracker, player stats, round history. Each venue has a stable `Guid Id` (never changes, survives renames). Venue switching is allowed during `GamePhase.Betting` but blocked once a round is in progress (any other phase).
+`VenueSettings` holds all per-venue config: chat, narration templates, dealer name, auto-trade/target, gil tracker, player stats, round history, and session tracking. Each venue has a stable `Guid Id` (never changes, survives renames). Venue switching is allowed during `GamePhase.Betting` but blocked once a round is in progress (any other phase).
 
 `VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round). Each entry stores the `GameState` at payout, the bank net for that round, and a round number. Appended by `UpdatePlayerStats` after `GoToPayout`.
+
+`VenueSettings.ActiveSessionStartedAt` / `ActiveSessionLocationKey` — set on first `GoToPayout` of a new night via `SessionManager.TryStartSession`. Cleared by `StartNight`. Used to detect when a new session banner should be shown.
+
+`VenueSettings.StatsSessions` holds `PlayerStatsSession` archives. Each session stores a snapshot of `PlayerStatData` (no Bank/BankLog), `List<RoundSummary>`, `BankNet`, `LocationKey`, and `Date`. Archived by `StartNight` in `PlayerStatsWindow`.
+
+### Sessions
+
+`SessionManager` (in `TwentyOne.Game/SessionManager.cs`) is a pure static class with no Dalamud dependency:
+- `TryStartSession` — sets `ActiveSessionStartedAt` / `ActiveSessionLocationKey` if not already set.
+- `ShouldShowSessionBanner` — returns true if session is null+rounds>0, or stale (>8h), or location changed.
+- `BuildArchive` — converts live stats + round history into snapshot types for archiving.
+- `ResetGameStats` — zeroes perf fields on `PlayerStatData` objects.
+
+`MainWindow` shows a session banner (dismissible, resets on territory change) when `ShouldShowSessionBanner` is true. Banner includes inline venue dropdown and "Start Night" button that delegates to `PlayerStatsWindow.StartNight()`.
+
+`PlayerStatsWindow.StartNight()` (public): archives session, resets live stat fields (preserves Bank/BankLog), clears RoundHistory/Tips, resets GilTracker, clears session tracking fields, saves.
+
+`RoundSummary` (in `TwentyOne.Game/GameTypes.cs`) — lightweight per-round archive record. No `GameState` snapshot; stores `RoundNumber`, `BankNet`, and `PlayerBanks` deltas only.
+
+`PlayerStatData` (in `TwentyOne.Game/SessionManager.cs`) — game-layer stat snapshot (no Bank/BankLog). Used in archived `PlayerStatsSession.Stats`.
 
 ### Venue memory
 
@@ -151,7 +171,7 @@ Fields that belong in `Configuration` (persisted, outside undo):
 
 ### History viewer mode
 
-`MainWindow.isHistoryView` is true when the user is viewing a previous round via `RoundHistoryWindow`. While active:
+`MainWindow.isHistoryView` is true when the user is viewing a historical round via `HistoryWindow`. While active:
 - `UpdatePlayerStats` is a no-op (no stats changes, no new history entry).
 - The current `GameState`, `UndoStack`, and `RedoStack` are saved in-memory and restored on `ExitHistoryView`.
 - A banner is shown at the top of `MainWindow`; all other UI renders normally against the historical snapshot.
@@ -167,6 +187,7 @@ Use only these player names in test cases: Lorah, Bekki, Nolla. If more than 3 n
 **Two distinct test layers — do not conflate them:**
 
 - `TwentyOne.Tests/GameEngineTests.cs` — xUnit unit tests. Test `GameEngine.Apply()` calls in isolation. No Dalamud dependency. Covers individual action transitions, narration, payout math.
+- `TwentyOne.Tests/SessionTests.cs` — unit tests for `SessionManager`: banner logic, archive building, stat reset, auto-session tracking.
 - `Scenarios/*.json` — human-replay integration tests. Loaded via DebugWindow in-game. Test the full stack: `MainWindow` orchestration (autoDealQueue deal sequence, deferred rolls, `AutoHit` side effects, button gating). Cannot be automated without replicating `MainWindow` logic separately, which creates a divergence risk. Run manually by loading and stepping/fast-forwarding in-game.
 
 ## Narration Templates

@@ -9,10 +9,11 @@ namespace TwentyOne;
 [Serializable]
 public class PlayerStatsSession
 {
-    public DateTime                      Date     { get; set; } = DateTime.Now;
-    public Dictionary<string, PlayerStat> Stats   { get; set; } = [];
-    // Sum of BankNet across all rounds in the session (from bank's perspective).
-    public long                          BankNet  { get; set; } = 0;
+    public DateTime                            Date        { get; set; } = DateTime.Now;
+    public string                              LocationKey { get; set; } = "";
+    public Dictionary<string, PlayerStatData>  Stats       { get; set; } = [];
+    public long                                BankNet     { get; set; } = 0;
+    public List<RoundSummary>                  Rounds      { get; set; } = [];
 }
 
 [Serializable]
@@ -75,6 +76,11 @@ public class VenueSettings
 
     // ── Stats sessions (one per night) ─────────────────────────────────────────
     public List<PlayerStatsSession> StatsSessions { get; set; } = [];
+
+    // ── Active session tracking ────────────────────────────────────────────────
+    // Set on first GoToPayout; null = no session started yet this night.
+    public DateTime? ActiveSessionStartedAt   { get; set; }
+    public string?   ActiveSessionLocationKey { get; set; }
 }
 
 [Serializable]

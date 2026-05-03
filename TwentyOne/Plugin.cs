@@ -68,14 +68,13 @@ public sealed class Plugin : IDalamudPlugin
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("TwentyOne");
-    private MainWindow               MainWindow               { get; init; }
-    private ConfigWindow             ConfigWindow             { get; init; }
-    private BankWindow               BankWindow               { get; init; }
-    private PlayerStatsWindow        PlayerStatsWindow        { get; init; }
-    private PlayerStatsHistoryWindow PlayerStatsHistoryWindow { get; init; }
-    private RoundHistoryWindow       RoundHistoryWindow       { get; init; }
+    private MainWindow        MainWindow        { get; init; }
+    private ConfigWindow      ConfigWindow      { get; init; }
+    private BankWindow        BankWindow        { get; init; }
+    private PlayerStatsWindow PlayerStatsWindow { get; init; }
+    private HistoryWindow     HistoryWindow     { get; init; }
 #if DEBUG
-    private DebugWindow              DebugWindow              { get; init; }
+    private DebugWindow       DebugWindow       { get; init; }
 #endif
 
     public Plugin()
@@ -83,14 +82,13 @@ public sealed class Plugin : IDalamudPlugin
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.EnsureVenues();
 
-        BankWindow               = new BankWindow(Configuration);
-        ConfigWindow             = new ConfigWindow(Configuration, BankWindow);
-        PlayerStatsWindow        = new PlayerStatsWindow(Configuration);
-        PlayerStatsHistoryWindow = new PlayerStatsHistoryWindow(Configuration);
-        PlayerStatsWindow.SetHistoryWindow(PlayerStatsHistoryWindow);
-        MainWindow         = new MainWindow(Configuration, ConfigWindow, BankWindow, PlayerStatsWindow, ChatGui, ObjectTable, TargetManager, ClientState);
-        RoundHistoryWindow = new RoundHistoryWindow(Configuration, MainWindow);
-        MainWindow.SetRoundHistoryWindow(RoundHistoryWindow);
+        BankWindow        = new BankWindow(Configuration);
+        ConfigWindow      = new ConfigWindow(Configuration, BankWindow);
+        PlayerStatsWindow = new PlayerStatsWindow(Configuration);
+        MainWindow        = new MainWindow(Configuration, ConfigWindow, BankWindow, PlayerStatsWindow, ChatGui, ObjectTable, TargetManager, ClientState);
+        HistoryWindow     = new HistoryWindow(Configuration, MainWindow);
+        MainWindow.SetHistoryWindow(HistoryWindow);
+        PlayerStatsWindow.SetHistoryWindow(HistoryWindow);
 #if DEBUG
         DebugWindow = new DebugWindow(Configuration, MainWindow);
         MainWindow.SetDebugWindow(DebugWindow);
@@ -100,8 +98,7 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(BankWindow);
         WindowSystem.AddWindow(PlayerStatsWindow);
-        WindowSystem.AddWindow(PlayerStatsHistoryWindow);
-        WindowSystem.AddWindow(RoundHistoryWindow);
+        WindowSystem.AddWindow(HistoryWindow);
 #if DEBUG
         WindowSystem.AddWindow(DebugWindow);
 #endif
@@ -206,7 +203,7 @@ public sealed class Plugin : IDalamudPlugin
         BankWindow.Dispose();
         PlayerStatsWindow.Dispose();
         MainWindow.Dispose();
-        // PlayerStatsHistoryWindow and RoundHistoryWindow have no IDisposable resources.
+        // HistoryWindow has no IDisposable resources.
 
         CommandManager.RemoveHandler(CommandName);
     }

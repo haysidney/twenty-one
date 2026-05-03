@@ -16,9 +16,9 @@ public unsafe class PlayerStatsWindow : Window, IDisposable
 {
     private readonly Configuration config;
     private readonly FileDialogManager _fileDialogManager = new();
-    private PlayerStatsHistoryWindow? _historyWindow;
+    private HistoryWindow? _historyWindow;
 
-    public void SetHistoryWindow(PlayerStatsHistoryWindow w) => _historyWindow = w;
+    public void SetHistoryWindow(HistoryWindow w) => _historyWindow = w;
 
     public PlayerStatsWindow(Configuration config)
         : base("Player Stats##TwentyOneStats")
@@ -170,38 +170,57 @@ public unsafe class PlayerStatsWindow : Window, IDisposable
         ImGui.TextColored(grandColor, grandStr);
     }
 
-    private void StartNight()
+    public void StartNight()
     {
-        // Save current stats as a session (even if empty, to mark the boundary)
-        if (config.PlayerStatsStore.Count > 0)
+        var venue = config.ActiveVenue;
+
+        // Archive current session data.
+        var roundSummaries = venue.RoundHistory.Select(r => new RoundSummary
         {
-            var bankNet = config.RoundHistory.Sum(r => r.BankNet);
-            var snapshot = new PlayerStatsSession
+            RoundNumber = r.RoundNumber,
+            BankNet     = r.BankNet,
+            PlayerBanks = new System.Collections.Generic.Dictionary<string, long>(r.PlayerBanks),
+        });
+        var statData = venue.PlayerStatsStore.Select(kv =>
+            System.Collections.Generic.KeyValuePair.Create(kv.Key, new PlayerStatData
             {
-                Date    = DateTime.Now,
-                Stats   = new System.Collections.Generic.Dictionary<string, PlayerStat>(
-                              config.PlayerStatsStore.ToDictionary(kv => kv.Key,
-                                  kv => new PlayerStat
-                                  {
-                                      DisplayName = kv.Value.DisplayName,
-                                      GamesPlayed = kv.Value.GamesPlayed,
-                                      GamesWon    = kv.Value.GamesWon,
-                                      GamesPushed = kv.Value.GamesPushed,
-                                      GamesLost   = kv.Value.GamesLost,
-                                      Blackjacks  = kv.Value.Blackjacks,
-                                      TotalWon    = kv.Value.TotalWon,
-                                  })),
-                BankNet = bankNet,
-            };
-            config.StatsSessions.Add(snapshot);
+                DisplayName = kv.Value.DisplayName,
+                GamesPlayed = kv.Value.GamesPlayed,
+                GamesWon    = kv.Value.GamesWon,
+                GamesPushed = kv.Value.GamesPushed,
+                GamesLost   = kv.Value.GamesLost,
+                Blackjacks  = kv.Value.Blackjacks,
+                TotalWon    = kv.Value.TotalWon,
+            }));
+        var (archivedStats, bankNet, archivedRounds) = SessionManager.BuildArchive(statData, roundSummaries);
+
+        venue.StatsSessions.Add(new PlayerStatsSession
+        {
+            Date        = DateTime.Now,
+            LocationKey = venue.ActiveSessionLocationKey ?? "",
+            Stats       = archivedStats,
+            BankNet     = bankNet,
+            Rounds      = archivedRounds,
+        });
+
+        // Reset per-session game stats; preserve Bank/BankLog.
+        foreach (var s in venue.PlayerStatsStore.Values)
+        {
+            s.GamesPlayed = 0;
+            s.GamesWon    = 0;
+            s.GamesPushed = 0;
+            s.GamesLost   = 0;
+            s.Blackjacks  = 0;
+            s.TotalWon    = 0;
         }
 
-        config.PlayerStatsStore.Clear();
-        config.Tips.Clear();
-        config.RoundHistory.Clear();
+        venue.RoundHistory.Clear();
+        venue.Tips.Clear();
         var currentGil = (long)InventoryManager.Instance()->GetGil();
-        config.GilStart = currentGil;
-        config.GilEnd   = currentGil;
+        venue.GilStart = currentGil;
+        venue.GilEnd   = currentGil;
+        venue.ActiveSessionStartedAt   = null;
+        venue.ActiveSessionLocationKey = null;
         config.Save();
     }
 

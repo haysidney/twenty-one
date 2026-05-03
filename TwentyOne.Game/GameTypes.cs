@@ -4,6 +4,15 @@ using System.Collections.Generic;
 namespace TwentyOne.Game;
 
 [Serializable]
+public class RoundSummary
+{
+    public int RoundNumber { get; set; }
+    public long BankNet { get; set; }
+    // Key: "{FullName}@{World}" or Nickname — same format as RoundHistoryEntry.PlayerBanks
+    public Dictionary<string, long> PlayerBanks { get; set; } = [];
+}
+
+[Serializable]
 public class RoundHistoryEntry
 {
     public int       RoundNumber { get; set; }
