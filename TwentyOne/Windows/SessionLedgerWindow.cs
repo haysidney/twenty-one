@@ -106,38 +106,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         ImGui.Spacing();
         ImGui.Separator();
 
-        // Reconciliation
-        var difference   = config.GilEnd - config.GilStart;
-        var grandTotal   = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
-        var betsHeld     = CalcBetsHeld();
-        var banksHeld    = config.PlayerStatsStore.Values.Sum(s => s.Bank);
-        var adjustedDiff = difference + betsHeld + banksHeld;
-        var reconciled   = adjustedDiff == grandTotal;
-
-        ImGui.Text("House Difference:"); ImGui.SameLine(130); ColoredGilText(difference);
-        ImGui.Text("Bets held:");        ImGui.SameLine(130); ImGui.Text($"{betsHeld:N0} gil");
-        ImGui.Text("Player banks:");     ImGui.SameLine(130); ImGui.Text($"{banksHeld:N0} gil");
-        ImGui.Text("Adjusted:");         ImGui.SameLine(130); ColoredGilText(adjustedDiff);
-        ImGui.SameLine(0, 20);
-        ImGui.Text("Player Net:"); ImGui.SameLine();
-        ColoredGilText(grandTotal);
-        ImGui.SameLine(0, 8);
-        if (reconciled)
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.35f, 0.9f, 0.35f, 1f));
-            ImGui.TextUnformatted("OK");
-            ImGui.PopStyleColor();
-        }
-        else
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.35f, 0.35f, 1f));
-            ImGui.TextUnformatted("MISMATCH");
-            ImGui.PopStyleColor();
-        }
-
-        ImGui.Separator();
-
-        // House bank tracker
+        // Gil inputs
         ImGui.Text("Starting Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);
         if (ImGui.InputText("##gilstart", ref gilStartBuf, 20))
@@ -178,6 +147,37 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         }
 
         ImGui.Separator();
+
+        // Reconciliation
+        var difference   = config.GilEnd - config.GilStart;
+        var grandTotal   = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
+        var betsHeld     = CalcBetsHeld();
+        var banksHeld    = config.PlayerStatsStore.Values.Sum(s => s.Bank);
+        var adjustedDiff = difference + betsHeld + banksHeld;
+        var reconciled   = adjustedDiff == grandTotal;
+
+        ImGui.Text("House Difference:"); ImGui.SameLine(130); ColoredGilText(difference);
+        ImGui.Text("Bets held:");        ImGui.SameLine(130); ImGui.Text($"{betsHeld:N0} gil");
+        ImGui.Text("Player banks:");     ImGui.SameLine(130); ImGui.Text($"{banksHeld:N0} gil");
+        ImGui.Text("Adjusted:");         ImGui.SameLine(130); ColoredGilText(adjustedDiff);
+        ImGui.SameLine(0, 20);
+        ImGui.Text("Player Net:"); ImGui.SameLine();
+        ColoredGilText(grandTotal);
+        ImGui.SameLine(0, 8);
+        if (reconciled)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.35f, 0.9f, 0.35f, 1f));
+            ImGui.TextUnformatted("OK");
+            ImGui.PopStyleColor();
+        }
+        else
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.35f, 0.35f, 1f));
+            ImGui.TextUnformatted("MISMATCH");
+            ImGui.PopStyleColor();
+        }
+
+        ImGui.Separator();
         ImGui.Text("Tips");
 
         long tipTotal = 0;
@@ -213,8 +213,8 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             }
         }
 
-        var profit    = difference - tipTotal;
-        var venueOwes = profit > 0 ? (long)Math.Floor(profit * config.DealerCutPct / 100.0) : 0;
+        var profit      = difference - tipTotal;
+        var venueOwes   = profit > 0 ? (long)Math.Floor(profit * config.DealerCutPct / 100.0) : 0;
         var dealerKeeps = profit > 0 ? profit - venueOwes + tipTotal : tipTotal;
         ImGui.Separator();
         CopyableGilRow("Profit", profit);
