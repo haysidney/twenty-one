@@ -107,16 +107,19 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         ImGui.Separator();
 
         // Reconciliation
-        var difference  = config.GilEnd - config.GilStart;
-        var grandTotal  = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
-        var reconciled  = difference == grandTotal;
-        ImGui.AlignTextToFramePadding();
-        ImGui.Text("House Difference:");
-        ImGui.SameLine();
-        ColoredGilText(difference);
+        var difference   = config.GilEnd - config.GilStart;
+        var grandTotal   = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
+        var betsHeld     = CalcBetsHeld();
+        var banksHeld    = config.PlayerStatsStore.Values.Sum(s => s.Bank);
+        var adjustedDiff = difference + betsHeld + banksHeld;
+        var reconciled   = adjustedDiff == grandTotal;
+
+        ImGui.Text("House Difference:"); ImGui.SameLine(130); ColoredGilText(difference);
+        ImGui.Text("Bets held:");        ImGui.SameLine(130); ImGui.Text($"{betsHeld:N0} gil");
+        ImGui.Text("Player banks:");     ImGui.SameLine(130); ImGui.Text($"{banksHeld:N0} gil");
+        ImGui.Text("Adjusted:");         ImGui.SameLine(130); ColoredGilText(adjustedDiff);
         ImGui.SameLine(0, 20);
-        ImGui.Text("Player Net:");
-        ImGui.SameLine();
+        ImGui.Text("Player Net:"); ImGui.SameLine();
         ColoredGilText(grandTotal);
         ImGui.SameLine(0, 8);
         if (reconciled)
@@ -348,6 +351,17 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
                 : new Vector4(0.7f, 0.7f, 0.7f, 1f);
         var text = value > 0 ? $"+{GameEngine.FormatGil(value)}" : GameEngine.FormatGil(value);
         ImGui.TextColored(color, text);
+    }
+
+    private long CalcBetsHeld()
+    {
+        var gs = config.GameState;
+        if (gs.Phase == GamePhase.Betting) return 0;
+        long total = 0;
+        foreach (var player in gs.Players)
+            foreach (var hand in player.Hands)
+                total += (long)GameEngine.GetEffectiveBet(player, hand);
+        return total;
     }
 
     private static void CopyableGilRow(string label, long value)
