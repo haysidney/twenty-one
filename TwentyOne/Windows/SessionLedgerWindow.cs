@@ -323,15 +323,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             Rounds      = archivedRounds,
         });
 
-        foreach (var s in venue.PlayerStatsStore.Values)
-        {
-            s.GamesPlayed = 0;
-            s.GamesWon    = 0;
-            s.GamesPushed = 0;
-            s.GamesLost   = 0;
-            s.Blackjacks  = 0;
-            s.TotalWon    = 0;
-        }
+        venue.PlayerStatsStore.Clear();
 
         venue.RoundHistory.Clear();
         venue.Tips.Clear();
