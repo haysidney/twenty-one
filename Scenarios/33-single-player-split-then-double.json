@@ -1,0 +1,25 @@
+{
+  "name": "Single player — split 8s, double on first hand (both win, dealer busts)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [5, 8, 8, 3, 7, 9, 4, 6, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "Dbl:0:0",
+    "ConfirmDbl:0:0",
+    "AdvancePlayer",
+    "Stand:0:1",
+    "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

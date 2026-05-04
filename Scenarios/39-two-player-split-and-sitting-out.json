@@ -1,0 +1,34 @@
+{
+  "name": "Two players + sitting out — Lorah splits, Nolla sits out, Bekki plays (all win, dealer busts)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    },
+    {
+      "name": "Nolla",
+      "sittingOut": true
+    },
+    {
+      "name": "Bekki",
+      "bet": "500"
+    }
+  ],
+  "rolls": [6, 8, 8, 10, 4, 5, 9, 6, 7, 9],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "Stand:0:0",
+    "AdvancePlayer",
+    "Stand:0:1",
+    "AdvancePlayer",
+    "Hit:2:0",
+    "Stand:2:0",
+    "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

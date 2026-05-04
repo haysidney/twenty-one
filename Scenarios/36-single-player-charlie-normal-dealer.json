@@ -1,0 +1,21 @@
+{
+  "name": "Single player — Five Card Charlie (LosesToDealerBJ), dealer has normal 17 (charlie wins)",
+  "fiveCardCharlie": "LosesToDealerBJ",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [7, 2, 3, 2, 3, 2, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Hit:0:0",
+    "Hit:0:0",
+    "Hit:0:0",
+    "BeginDealerTurn",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

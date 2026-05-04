@@ -1,0 +1,25 @@
+{
+  "name": "Two players — Lorah BJ, Bekki plays normally (hit to 20, dealer 21 beats both)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    },
+    {
+      "name": "Bekki",
+      "bet": "500"
+    }
+  ],
+  "rolls": [5, 1, 10, 9, 7, 4, 10, 6],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "AdvancePlayer",
+    "Hit:1:0",
+    "Stand:1:0",
+    "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

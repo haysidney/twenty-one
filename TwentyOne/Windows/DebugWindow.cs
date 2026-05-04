@@ -21,6 +21,7 @@ public class DebugScenarioFile
     public List<int>?                Rolls           { get; set; }
     public List<string>?             Actions         { get; set; }
     public FiveCardCharlieRule?      FiveCardCharlie { get; set; }
+    public BlackjackPayout?          BjPayout        { get; set; }
 }
 
 public class DebugScenarioPlayer
@@ -226,7 +227,7 @@ public class DebugWindow : Window
         // Build initial GameState: Betting phase with players set
         var state = new GameState
         {
-            BjPayout        = config.GameState.BjPayout,
+            BjPayout        = file.BjPayout ?? config.GameState.BjPayout,
             FiveCardCharlie = file.FiveCardCharlie ?? FiveCardCharlieRule.Disabled,
         };
         foreach (var sp in file.Players ?? [])

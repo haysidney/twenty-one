@@ -1,0 +1,28 @@
+{
+  "name": "Single player — re-split 8s into 3 hands: hand0 busts, hand1 wins (19), hand2 pushes (18)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [6, 8, 8, 8, 6, 10, 3, 8, 10, 12, 2],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "Hit:0:0",
+    "AdvancePlayer",
+    "Hit:0:1",
+    "Stand:0:1",
+    "AdvancePlayer",
+    "Stand:0:2",
+    "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Single player — double down (12 vs dealer 10) draws face card to bust",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    }
+  ],
+  "rolls": [10, 7, 5, 10],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Dbl:0:0",
+    "ConfirmDbl:0:0",
+    "GoToPayout"
+  ]
+}

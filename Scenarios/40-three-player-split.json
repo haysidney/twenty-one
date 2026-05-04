@@ -1,0 +1,35 @@
+{
+  "name": "Three players — Lorah splits 8s, then Bekki and Nolla play (all win, dealer busts)",
+  "players": [
+    {
+      "name": "Lorah",
+      "bet": "1000"
+    },
+    {
+      "name": "Bekki",
+      "bet": "500"
+    },
+    {
+      "name": "Nolla",
+      "bet": "750"
+    }
+  ],
+  "rolls": [6, 8, 8, 7, 4, 10, 8, 5, 9, 10, 6],
+  "actions": [
+    "StartDeal",
+    "BeginPlayerTurns",
+    "Spl:0:0",
+    "ConfirmSpl:0:0",
+    "Stand:0:0",
+    "AdvancePlayer",
+    "Stand:0:1",
+    "AdvancePlayer",
+    "Stand:1:0",
+    "AdvancePlayer",
+    "Stand:2:0",
+    "BeginDealerTurn",
+    "DealerHit",
+    "DealerHit",
+    "GoToPayout"
+  ]
+}
