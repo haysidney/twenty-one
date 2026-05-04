@@ -156,8 +156,8 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         var grandTotal   = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
         var betsHeld     = CalcBetsHeld();
         var banksHeld    = config.PlayerStatsStore.Values.Sum(s => s.Bank);
-        var adjustedDiff = difference + betsHeld + banksHeld - tipTotal;
-        var reconciled   = adjustedDiff == grandTotal;
+        var adjustedDiff = difference - betsHeld - banksHeld - tipTotal;
+        var reconciled   = adjustedDiff + grandTotal == 0;
 
         ImGui.Text("House Difference:"); ImGui.SameLine(130); ColoredGilText(difference);
         ImGui.Text("Bets held:");        ImGui.SameLine(130); ImGui.Text($"{betsHeld:N0} gil");

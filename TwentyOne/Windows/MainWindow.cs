@@ -493,7 +493,7 @@ public partial class MainWindow : Window, IDisposable
             if (p2.SittingOut) continue;
             var key2 = PlayerStatKey(p2);
             if (!config.PlayerStatsStore.TryGetValue(key2, out var stat2)) continue;
-            if (stat2.Bank <= 0) continue;
+            if (stat2.Bank <= 0 && stat2.BankLog.Count == 0) continue;
 
             var net2 = 0m;
             for (var hi2 = 0; hi2 < p2.Hands.Count; hi2++)
@@ -1026,12 +1026,6 @@ private static unsafe void SendChatMessage(string message)
                         if (isCredit) ImGui.TextColored(new Vector4(0.4f, 1f, 0.4f, 1f), $"+{entry.Amount:N0}");
                         else          ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), $"-{entry.Amount:N0}");
                         ImGui.TableSetColumnIndex(3); ImGui.TextUnformatted($"{entry.Balance:N0}");
-                    }
-                    if (log.Count == 0)
-                    {
-                        ImGui.TableNextRow();
-                        ImGui.TableSetColumnIndex(0);
-                        ImGui.TextDisabled("No transactions");
                     }
                     ImGui.EndTable();
                 }
