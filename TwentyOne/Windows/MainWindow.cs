@@ -878,6 +878,20 @@ private static unsafe void SendChatMessage(string message)
             }
         }
 
+        void DrawBankManageButton(int playerIndex, float cellRight, ReadOnlySpan<char> idSuffix)
+        {
+            var mw = ImGui.CalcTextSize("Manage").X + ImGui.GetStyle().FramePadding.X * 2;
+            ImGui.SameLine();
+            if (ImGui.GetCursorPosX() < cellRight - mw)
+                ImGui.SetCursorPosX(cellRight - mw);
+            if (ImGui.SmallButton($"Manage##{playerIndex}{idSuffix}"))
+            {
+                bankManagePlayerIndex = playerIndex;
+                bankDepositBuf        = string.Empty;
+                bankWithdrawBuf       = string.Empty;
+            }
+        }
+
         // ── Bank manage window ─────────────────────────────────────────────────
         if (bankManagePlayerIndex >= 0 && bankManagePlayerIndex < State.Players.Count)
         {
@@ -1500,8 +1514,6 @@ private static unsafe void SendChatMessage(string message)
                         var bankVal       = bankStat.Bank;
                         var parsedBet     = GameEngine.ParseBet(p.Bet);
                         var bankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                        var sfp           = ImGui.GetStyle().FramePadding.X;
-                        float BKW(string s) => ImGui.CalcTextSize(s).X + sfp * 2;
 
                         var bankDelta = 0m;
                         if (Phase == GamePhase.Payout && bankVal > 0)
@@ -1556,16 +1568,7 @@ private static unsafe void SendChatMessage(string message)
                             ImGui.TextDisabled("—");
                         }
 
-                        var manageW = BKW("Manage");
-                        ImGui.SameLine();
-                        if (ImGui.GetCursorPosX() < bankCellRight - manageW)
-                            ImGui.SetCursorPosX(bankCellRight - manageW);
-                        if (ImGui.SmallButton($"Manage##{pi}bank"))
-                        {
-                            bankManagePlayerIndex = pi;
-                            bankDepositBuf        = string.Empty;
-                            bankWithdrawBuf       = string.Empty;
-                        }
+                        DrawBankManageButton(pi, bankCellRight, "bank");
                     }
 
                     // Status (net payout summary or blank)
@@ -1843,8 +1846,6 @@ private static unsafe void SendChatMessage(string message)
                         var bankVal   = bankStat.Bank;
                         var parsedBet = GameEngine.ParseBet(p.Bet);
                         var bankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                        var fp  = ImGui.GetStyle().FramePadding.X;
-                        float BKW(string s) => ImGui.CalcTextSize(s).X + fp * 2;
 
                         // Compute payout delta for this player (shown during Payout phase)
                         var bankDelta = 0m;
@@ -1901,17 +1902,7 @@ private static unsafe void SendChatMessage(string message)
                             ImGui.TextDisabled("—");
                         }
 
-                        // Manage button
-                        var manageW = BKW("Manage");
-                        ImGui.SameLine();
-                        if (ImGui.GetCursorPosX() < bankCellRight - manageW)
-                            ImGui.SetCursorPosX(bankCellRight - manageW);
-                        if (ImGui.SmallButton($"Manage##{pi}bank"))
-                        {
-                            bankManagePlayerIndex = pi;
-                            bankDepositBuf        = string.Empty;
-                            bankWithdrawBuf       = string.Empty;
-                        }
+                        DrawBankManageButton(pi, bankCellRight, "bank");
                     }
 
                     // ── Cards column ──────────────────────────────────────────
@@ -2287,16 +2278,7 @@ private static unsafe void SendChatMessage(string message)
                         {
                             ImGui.TextDisabled("—");
                         }
-                        var sitManageW = ImGui.CalcTextSize("Manage").X + ImGui.GetStyle().FramePadding.X * 2;
-                        ImGui.SameLine();
-                        if (ImGui.GetCursorPosX() < sitBankCellRight - sitManageW)
-                            ImGui.SetCursorPosX(sitBankCellRight - sitManageW);
-                        if (ImGui.SmallButton($"Manage##{spi}sitbank"))
-                        {
-                            bankManagePlayerIndex = spi;
-                            bankDepositBuf        = string.Empty;
-                            bankWithdrawBuf       = string.Empty;
-                        }
+                        DrawBankManageButton(spi, sitBankCellRight, "sitbank");
                     }
 
                     // Status: Resume button
