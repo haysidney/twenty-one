@@ -878,8 +878,11 @@ private static unsafe void SendChatMessage(string message)
             }
         }
 
+        var uiBusy = chatQueue.Count > 0 || pendingHit != null || deferredRoll.HasValue;
+
         void DrawBankManageButton(int playerIndex, float cellRight, ReadOnlySpan<char> idSuffix)
         {
+            if (uiBusy) ImGui.EndDisabled();
             var mw = ImGui.CalcTextSize("Manage").X + ImGui.GetStyle().FramePadding.X * 2;
             ImGui.SameLine();
             if (ImGui.GetCursorPosX() < cellRight - mw)
@@ -890,6 +893,7 @@ private static unsafe void SendChatMessage(string message)
                 bankDepositBuf        = string.Empty;
                 bankWithdrawBuf       = string.Empty;
             }
+            if (uiBusy) ImGui.BeginDisabled();
         }
 
         // ── Bank manage window ─────────────────────────────────────────────────
@@ -917,8 +921,10 @@ private static unsafe void SendChatMessage(string message)
                 if (bmp.World.Length > 0)
                 {
                     ImGui.SameLine();
+                    if (uiBusy) ImGui.BeginDisabled();
                     if (ImGui.Button("Trade##bankmantradetop"))
                         Plugin.TradePlayer(bmp.FullName, bmp.World);
+                    if (uiBusy) ImGui.EndDisabled();
                 }
                 ImGui.Separator();
                 ImGui.Spacing();
@@ -961,6 +967,7 @@ private static unsafe void SendChatMessage(string message)
                 var bmpBetForRemind = betEdits.TryGetValue(bankManagePlayerIndex, out var bmpPending) ? bmpPending : bmp.Bet;
                 if (bmpBank > 0 && !string.IsNullOrWhiteSpace(bmpBetForRemind))
                 {
+                    if (uiBusy) ImGui.BeginDisabled();
                     if (ImGui.Button("Remind##bankremind"))
                     {
                         if (betEdits.TryGetValue(bankManagePlayerIndex, out var pendingBet) && pendingBet != bmp.Bet)
@@ -970,6 +977,7 @@ private static unsafe void SendChatMessage(string message)
                         }
                         Apply(new AnnounceBankRemind(bankManagePlayerIndex, bmpBank));
                     }
+                    if (uiBusy) ImGui.EndDisabled();
                     if (ImGui.IsItemHovered())
                         ImGui.SetTooltip("Remind player of their bet and bank balance");
                 }
@@ -983,8 +991,10 @@ private static unsafe void SendChatMessage(string message)
                     ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f),
                         $"Short by {GameEngine.FormatGil(shortfall2)}");
                     ImGui.SameLine();
+                    if (uiBusy) ImGui.BeginDisabled();
                     if (ImGui.Button("Announce Shortfall##bankshort"))
                         Apply(new AnnounceBankShortfall(bankManagePlayerIndex, (long)Math.Ceiling(shortfall2)));
+                    if (uiBusy) ImGui.EndDisabled();
                 }
 
                 ImGui.Spacing();
@@ -1279,7 +1289,6 @@ private static unsafe void SendChatMessage(string message)
         if (ImGui.SmallButton("Redo")) Redo();
         if (!canRedo) ImGui.EndDisabled();
 
-        var uiBusy = chatQueue.Count > 0 || pendingHit != null || deferredRoll.HasValue;
         if (uiBusy) ImGui.BeginDisabled();
 
         ImGui.Separator();
