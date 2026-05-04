@@ -1,5 +1,5 @@
 {
-  "name": "Two players — Lorah BJ, Bekki plays normally (hit to 20, dealer 21 beats both)",
+  "name": "Two players — Lorah BJ, Bekki hits to 20 (dealer 21 beats Bekki, Lorah BJ wins)",
   "players": [
     {
       "name": "Lorah",
