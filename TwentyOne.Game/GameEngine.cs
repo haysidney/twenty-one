@@ -802,22 +802,40 @@ public static class GameEngine
             case BeginPlayerTurns:
             {
                 var (nextPi, nextHi, nextPhase) = AdvanceFrom(-1, -1, state.Players);
+
+                if (nextPhase == GamePhase.PlayerTurns
+                    && state.Players[nextPi].Hands[nextHi].State == HandState.Blackjack)
+                {
+                    var (scanPi, scanHi, scanPhase) = AdvanceFrom(nextPi, nextHi, state.Players);
+                    while (scanPhase == GamePhase.PlayerTurns
+                           && state.Players[scanPi].Hands[scanHi].State == HandState.Blackjack)
+                    {
+                        (scanPi, scanHi, scanPhase) = AdvanceFrom(scanPi, scanHi, state.Players);
+                    }
+
+                    if (scanPhase == GamePhase.DealerTurn || scanPhase == GamePhase.Payout)
+                    {
+                        var provDealer = With(state, phase: GamePhase.DealerTurn);
+                        var nwWait = scanPhase == GamePhase.DealerTurn && !CanGoToPayout(provDealer);
+                        return (With(state, phase: scanPhase, activePlayerIndex: scanPi, activeHandIndex: scanHi,
+                            waitingForDealer: nwWait, waitingForNextPlayer: false), effects);
+                    }
+
+                    var hand = state.Players[nextPi].Hands[nextHi];
+                    var name = state.Players[nextPi].Hands.Count > 1
+                        ? $"{state.Players[nextPi].DisplayName} (Hand {nextHi + 1})"
+                        : state.Players[nextPi].DisplayName;
+                    if (state.Players.Count > 1)
+                        Narrate(t.PlayerBJMovingAlong, ("name", name), ("cards", HandString(hand.Cards)));
+                    return (With(state, phase: GamePhase.PlayerTurns, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+                        waitingForDealer: false, waitingForNextPlayer: true), effects);
+                }
+
                 var provisionalDealer = With(state, phase: GamePhase.DealerTurn);
                 var waitDealer = nextPhase == GamePhase.DealerTurn && !CanGoToPayout(provisionalDealer);
                 var waitNext   = false;
                 if (nextPhase == GamePhase.PlayerTurns)
-                {
-                    var nextHand = state.Players[nextPi].Hands[nextHi];
-                    if (nextHand.State == HandState.Blackjack)
-                    {
-                        var name = state.Players[nextPi].DisplayName;
-                        if (state.Players.Count > 1)
-                            Narrate(t.PlayerBJMovingAlong, ("name", name), ("cards", HandString(nextHand.Cards)));
-                        waitNext = true;
-                    }
-                    else
-                        NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
-                }
+                    NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
                 if (waitDealer) nextPhase = GamePhase.DealerTurn;
                 return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
                     waitingForDealer: waitDealer, waitingForNextPlayer: waitNext), effects);
@@ -841,12 +859,28 @@ public static class GameEngine
                     }
                     else if (nextHand.State == HandState.Blackjack)
                     {
+                        var (scanPi, scanHi, scanPhase) = AdvanceFrom(nextPi, nextHi, state.Players);
+                        while (scanPhase == GamePhase.PlayerTurns
+                               && state.Players[scanPi].Hands[scanHi].State == HandState.Blackjack)
+                        {
+                            (scanPi, scanHi, scanPhase) = AdvanceFrom(scanPi, scanHi, state.Players);
+                        }
+
+                        if (scanPhase == GamePhase.DealerTurn || scanPhase == GamePhase.Payout)
+                        {
+                            var provisional = With(state, phase: GamePhase.DealerTurn);
+                            var needWait    = scanPhase == GamePhase.DealerTurn && !CanGoToPayout(provisional);
+                            return (With(state, phase: scanPhase, activePlayerIndex: scanPi, activeHandIndex: scanHi,
+                                waitingForNextPlayer: false, waitingForDealer: needWait), effects);
+                        }
+
+                        var hand = state.Players[nextPi].Hands[nextHi];
                         var name = state.Players[nextPi].Hands.Count > 1
                             ? $"{state.Players[nextPi].DisplayName} (Hand {nextHi + 1})"
                             : state.Players[nextPi].DisplayName;
                         if (state.Players.Count > 1)
-                            Narrate(t.PlayerBJMovingAlong, ("name", name), ("cards", HandString(nextHand.Cards)));
-                        return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+                            Narrate(t.PlayerBJMovingAlong, ("name", name), ("cards", HandString(hand.Cards)));
+                        return (With(state, phase: GamePhase.PlayerTurns, activePlayerIndex: nextPi, activeHandIndex: nextHi,
                             waitingForNextPlayer: true), effects);
                     }
                     else

@@ -418,9 +418,10 @@ public class ApplyPhaseTransitionTests
             ],
         };
         var (newState, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
-        Assert.Equal(GamePhase.PlayerTurns, newState.Phase);
-        Assert.True(newState.WaitingForNextPlayer);
-        // Single player: no moving-along message; BJ was already announced after deal summary.
+        // All hands are BJ → skip directly to DealerTurn (dealer has 10 upcard, need hole card)
+        Assert.Equal(GamePhase.DealerTurn, newState.Phase);
+        Assert.False(newState.WaitingForNextPlayer);
+        Assert.True(newState.WaitingForDealer);
         Assert.Empty(effects);
     }
 
