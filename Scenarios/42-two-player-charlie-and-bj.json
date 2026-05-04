@@ -11,7 +11,7 @@
       "bet": "500"
     }
   ],
-  "rolls": [7, 2, 2, 1, 10, 3, 3, 4, 10],
+  "rolls": [7, 2, 2, 1, 10, 3, 3, 4],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
@@ -19,8 +19,6 @@
     "Hit:0:0",
     "Hit:0:0",
     "AdvancePlayer",
-    "BeginDealerTurn",
-    "DealerHit",
     "GoToPayout"
   ]
 }

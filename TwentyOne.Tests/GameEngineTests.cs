@@ -1265,6 +1265,74 @@ public class CanGoToPayoutTests
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
+    [Fact]
+    public void MixedBJAndCharlie_BeatsAll_SafeUpcard_CanPayout()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
+            Players         =
+            [
+                BjPlayer("Lorah"),
+                CharliePlayer("Bekki"),
+            ],
+            DealerHand = new Hand { Cards = [7] },
+        };
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void MixedBJAndCharlie_BeatsAll_AceUpcard_NeedsHoleCard()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
+            Players         =
+            [
+                BjPlayer("Lorah"),
+                CharliePlayer("Bekki"),
+            ],
+            DealerHand = new Hand { Cards = [1] },
+        };
+        Assert.False(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void MixedBJAndCharlie_LosesToDealerBJ_SafeUpcard_CanPayout()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
+            Players         =
+            [
+                BjPlayer("Lorah"),
+                CharliePlayer("Bekki"),
+            ],
+            DealerHand = new Hand { Cards = [7] },
+        };
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void MixedBJAndCharlie_LosesToDealerBJ_AceUpcard_NeedsHoleCard()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
+            Players         =
+            [
+                BjPlayer("Lorah"),
+                CharliePlayer("Bekki"),
+            ],
+            DealerHand = new Hand { Cards = [1] },
+        };
+        Assert.False(GameEngine.CanGoToPayout(state));
+    }
+
     private static Player CharliePlayer(string name) =>
         new() { Nickname = name, Hands = [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] };
 }

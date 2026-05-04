@@ -103,6 +103,18 @@ public static class GameEngine
         // All-Charlie (BeatsAll): skip dealer turn unconditionally.
         if (allCharlie) return true;
 
+        // Mixed terminal-winning hands (BJ + Charlie): check dealer upcard for possible BJ.
+        var allTerminalWin = activePlayers.Count > 0
+                          && activePlayers.All(p => p.Hands.All(h =>
+                              h.State == HandState.Blackjack || h.State == HandState.Charlie));
+        if (allTerminalWin)
+        {
+            var dc     = state.DealerHand.Cards;
+            var upCard = dc.Count > 0 ? dc[0] : 0;
+            var couldHaveBJ = upCard == 1 || upCard >= 10;
+            return dc.Count >= 2 || !couldHaveBJ;
+        }
+
         var allBust = activePlayers.Count > 0
                    && activePlayers.All(p => p.Hands.All(h => h.State == HandState.Bust));
         if (allBust) return true;
