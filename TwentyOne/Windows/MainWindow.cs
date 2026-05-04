@@ -1827,7 +1827,9 @@ private static unsafe void SendChatMessage(string message)
                                 }
                                 if (config.RemindTargetEnabled && hasWorld)
                                     QueueTarget(p.FullName, p.World);
-                                Apply(new AnnounceBetConfirm(pi));
+                                var remindBankKey = PlayerStatKey(p);
+                                var remindBank = config.PlayerStatsStore.TryGetValue(remindBankKey, out var remindBankStat) ? remindBankStat.Bank : 0L;
+                                Apply(new AnnounceBetConfirm(pi, remindBank));
                             }
                             if (!canConfirm) ImGui.EndDisabled();
                             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))

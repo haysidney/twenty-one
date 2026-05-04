@@ -1916,7 +1916,7 @@ public class SplitHandTests
     }
 
     [Fact]
-    public void AnnounceBetConfirm_NarratesNameAndAmount()
+    public void AnnounceBetConfirm_NarratesNameAndAmount_NoBank()
     {
         var state = new GameState
         {
@@ -1924,9 +1924,23 @@ public class SplitHandTests
             Players = [new Player { Nickname = "Lorah", Bet = "50000" }],
         };
         var t = new NarrationTemplates { PlayerBetConfirm = [["{name} bet={amount}"]] };
-        var (_, effects) = GameEngine.Apply(state, new AnnounceBetConfirm(0), t);
+        var (_, effects) = GameEngine.Apply(state, new AnnounceBetConfirm(0, 0L), t);
         Assert.Single(effects);
         Assert.Equal("Lorah bet=50K", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void AnnounceBetConfirmBank_NarratesNameAmountAndBank()
+    {
+        var state = new GameState
+        {
+            Phase   = GamePhase.Betting,
+            Players = [new Player { Nickname = "Lorah", Bet = "50000" }],
+        };
+        var t = new NarrationTemplates { PlayerBetConfirmBank = [["{name} bet={amount} bank={bank} after={bank-after-bet}"]] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceBetConfirm(0, 100000L), t);
+        Assert.Single(effects);
+        Assert.Equal("Lorah bet=50K bank=100K after=50K", ((SendChat)effects[0]).Text);
     }
 
     [Fact]

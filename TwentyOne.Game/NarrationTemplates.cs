@@ -61,6 +61,10 @@ public class NarrationTemplates
     // {name} = player display name, {amount} = bet amount
     public List<List<string>> PlayerBetConfirm { get; set; } = [["{name}, your current bet is {amount}. If you want to change it let me know."]];
 
+    // Bet-confirm with bank (sent when player has a bank balance)
+    // {name} = player display name, {amount} = bet amount, {bank} = current bank balance, {bank-after-bet} = bank after bet deduction
+    public List<List<string>> PlayerBetConfirmBank { get; set; } = [["{name}, your current bet is {amount} and your bank is {bank}. Afterwards your bank would be {bank-after-bet}."]];
+
     // Bank remind — sent from Bank column Remind button
     // {name} = player display name, {amount} = bet amount, {bank} = bank balance
     public List<List<string>> PlayerBankRemind { get; set; } = [["{name}, your bet is {amount} and your bank balance is {bank}."]];

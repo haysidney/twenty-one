@@ -726,7 +726,20 @@ public static class GameEngine
             case AnnounceBetConfirm a:
             {
                 var player = state.Players[a.PlayerIndex];
-                Narrate(t.PlayerBetConfirm, ("name", player.DisplayName), ("amount", FormatGil(ParseBet(player.Bet))));
+                var betAmt = ParseBet(player.Bet);
+                if (a.Bank > 0)
+                {
+                    var bankAfterBet = Math.Max(0, a.Bank - (long)Math.Ceiling(betAmt));
+                    Narrate(t.PlayerBetConfirmBank,
+                        ("name", player.DisplayName),
+                        ("amount", FormatGil(betAmt)),
+                        ("bank", FormatGil(a.Bank)),
+                        ("bank-after-bet", FormatGil(bankAfterBet)));
+                }
+                else
+                {
+                    Narrate(t.PlayerBetConfirm, ("name", player.DisplayName), ("amount", FormatGil(betAmt)));
+                }
                 return (state, effects);
             }
 

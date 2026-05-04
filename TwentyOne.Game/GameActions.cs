@@ -35,7 +35,8 @@ public record AnnounceBettingOpen : GameAction;
 public record AnnounceBetRequest(int PlayerIndex) : GameAction;
 
 // Bet-confirm announcement — sent when dealer clicks Confirm in the Bet cell during Betting phase
-public record AnnounceBetConfirm(int PlayerIndex) : GameAction;
+// Bank is carried here since it lives outside GameState
+public record AnnounceBetConfirm(int PlayerIndex, long Bank) : GameAction;
 
 // Bank remind — sent when dealer clicks Remind in the Bank cell; carries bank balance since it lives outside GameState
 public record AnnounceBankRemind(int PlayerIndex, long Bank) : GameAction;
