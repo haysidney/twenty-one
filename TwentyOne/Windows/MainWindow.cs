@@ -1348,7 +1348,7 @@ private static unsafe void SendChatMessage(string message)
             }
             else
             {
-                if (ImGui.SmallButton("Reorder") && State.Players.Count > 1)
+                if (State.Players.Count(p => !p.SittingOut) > 1 && ImGui.SmallButton("Reorder"))
                 {
                     foreach (var (idx, val) in betEdits.ToList())
                     {
