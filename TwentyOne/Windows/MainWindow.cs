@@ -1331,7 +1331,6 @@ private static unsafe void SendChatMessage(string message)
         }
 
         // ── Player table ──────────────────────────────────────────────────────
-        ImGui.Spacing();
         ImGui.AlignTextToFramePadding();
         ImGui.Text("-- Players --");
         if (Phase == GamePhase.Betting)
