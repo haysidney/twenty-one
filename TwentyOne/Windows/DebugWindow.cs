@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
@@ -212,7 +213,7 @@ public class DebugWindow : Window
     {
         var text = File.ReadAllText(path);
         var file = JsonSerializer.Deserialize<DebugScenarioFile>(text,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } });
         if (file == null) return;
 
         // Rebuild playlist if directory changed
