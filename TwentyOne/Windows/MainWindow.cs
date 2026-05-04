@@ -889,7 +889,7 @@ private static unsafe void SendChatMessage(string message)
                 ImGui.SetCursorPosX(cellRight - mw);
             if (ImGui.SmallButton($"Manage##{playerIndex}{idSuffix}"))
             {
-                bankManagePlayerIndex = playerIndex;
+                bankManagePlayerIndex = bankManagePlayerIndex == playerIndex ? -1 : playerIndex;
                 bankDepositBuf        = string.Empty;
                 bankWithdrawBuf       = string.Empty;
             }
