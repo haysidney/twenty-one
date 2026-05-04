@@ -181,7 +181,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             ImGui.PopStyleColor();
         }
 
-        var profit      = difference - tipTotal;
+        var profit      = difference - betsHeld - banksHeld - tipTotal;
         var venueOwes   = profit > 0 ? (long)Math.Floor(profit * config.DealerCutPct / 100.0) : 0;
         var dealerKeeps = profit > 0 ? profit - venueOwes + tipTotal : tipTotal;
         ImGui.Separator();
