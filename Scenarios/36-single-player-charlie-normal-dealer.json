@@ -1,5 +1,5 @@
 {
-  "name": "Single player — Five Card Charlie (LosesToDealerBJ), dealer has normal 17 (charlie wins)",
+  "name": "Single player — Five Card Charlie (LosesToDealerBJ, safe upcard 7, dealer turn skipped)",
   "fiveCardCharlie": "LosesToDealerBJ",
   "players": [
     {
@@ -7,15 +7,13 @@
       "bet": "1000"
     }
   ],
-  "rolls": [7, 2, 3, 2, 3, 2, 10],
+  "rolls": [7, 2, 3, 2, 3, 2],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
     "Hit:0:0",
     "Hit:0:0",
     "Hit:0:0",
-    "BeginDealerTurn",
-    "DealerHit",
     "GoToPayout"
   ]
 }
