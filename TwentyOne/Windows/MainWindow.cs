@@ -1336,9 +1336,9 @@ private static unsafe void SendChatMessage(string message)
         ImGui.Text("-- Players --");
         if (Phase == GamePhase.Betting)
         {
-            ImGui.SameLine();
             if (isReorderMode)
             {
+                ImGui.SameLine();
                 if (ImGui.SmallButton("Confirm"))
                 {
                     Apply(new ReorderPlayers(reorderIndices));
@@ -1346,9 +1346,10 @@ private static unsafe void SendChatMessage(string message)
                     reorderIndices = [];
                 }
             }
-            else
+            else if (State.Players.Count(p => !p.SittingOut) > 1)
             {
-                if (State.Players.Count(p => !p.SittingOut) > 1 && ImGui.SmallButton("Reorder"))
+                ImGui.SameLine();
+                if (ImGui.SmallButton("Reorder"))
                 {
                     foreach (var (idx, val) in betEdits.ToList())
                     {
