@@ -295,11 +295,36 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     {
         var venue = config.ActiveVenue;
 
-        var roundSummaries = venue.RoundHistory.Select(r => new RoundSummary
+        var roundSummaries = venue.RoundHistory.Select(r =>
         {
-            RoundNumber = r.RoundNumber,
-            BankNet     = r.BankNet,
-            PlayerBanks = new Dictionary<string, long>(r.PlayerBanks),
+            var state   = r.Snapshot;
+            var winners = new List<string>();
+            var losers  = new List<string>();
+            var pushes  = new List<string>();
+            for (var pi = 0; pi < state.Players.Count; pi++)
+            {
+                var p       = state.Players[pi];
+                var results = Enumerable.Range(0, p.Hands.Count)
+                    .Select(hi => GameEngine.GetPayoutResult(state, pi, hi))
+                    .ToList();
+                var anyWin  = results.Any(r2 => r2 is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin);
+                var anyLose = results.Any(r2 => r2 == PayoutResult.Lose);
+                var allPush = results.All(r2 => r2 == PayoutResult.Push);
+                if      (anyWin && !anyLose) winners.Add(p.DisplayName);
+                else if (anyLose && !anyWin) losers.Add(p.DisplayName);
+                else if (allPush)            pushes.Add(p.DisplayName);
+                else if (anyWin)             winners.Add(p.DisplayName);
+                else                         losers.Add(p.DisplayName);
+            }
+            return new RoundSummary
+            {
+                RoundNumber = r.RoundNumber,
+                BankNet     = r.BankNet,
+                PlayerBanks = new Dictionary<string, long>(r.PlayerBanks),
+                Winners     = winners,
+                Losers      = losers,
+                Pushes      = pushes,
+            };
         });
         var statData = venue.PlayerStatsStore.Select(kv =>
             KeyValuePair.Create(kv.Key, new PlayerStatData

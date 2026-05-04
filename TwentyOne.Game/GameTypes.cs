@@ -10,6 +10,9 @@ public class RoundSummary
     public long BankNet { get; set; }
     // Key: "{FullName}@{World}" or Nickname — same format as RoundHistoryEntry.PlayerBanks
     public Dictionary<string, long> PlayerBanks { get; set; } = [];
+    public List<string> Winners { get; set; } = [];
+    public List<string> Losers  { get; set; } = [];
+    public List<string> Pushes  { get; set; } = [];
 }
 
 [Serializable]

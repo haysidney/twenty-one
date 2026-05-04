@@ -339,10 +339,17 @@ public class HistoryWindow : Window
 
         ImGui.Spacing();
         ImGui.TextUnformatted("Rounds:");
-        if (!ImGui.BeginTable("##sessRounds", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit)) return;
+        var roundTableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
+                            | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable
+                            | ImGuiTableFlags.ScrollY;
+        if (!ImGui.BeginTable("##sessRounds", 5, roundTableFlags)) return;
 
-        ImGui.TableSetupColumn("Round"u8, ImGuiTableColumnFlags.WidthFixed, 50);
-        ImGui.TableSetupColumn("Net"u8,   ImGuiTableColumnFlags.WidthFixed, 80);
+        ImGui.TableSetupScrollFreeze(0, 1);
+        ImGui.TableSetupColumn("Round"u8,   ImGuiTableColumnFlags.WidthFixed,   50);
+        ImGui.TableSetupColumn("Winners"u8, ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Losers"u8,  ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Pushes"u8,  ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Net"u8,     ImGuiTableColumnFlags.WidthFixed,   80);
         ImGui.TableHeadersRow();
 
         for (var i = s.Rounds.Count - 1; i >= 0; i--)
@@ -352,7 +359,23 @@ public class HistoryWindow : Window
             ImGui.TableSetColumnIndex(0);
             ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted(r.RoundNumber.ToString());
+
             ImGui.TableSetColumnIndex(1);
+            ImGui.AlignTextToFramePadding();
+            if (r.Winners.Count > 0)
+                ImGui.TextColored(new Vector4(0.35f, 0.9f, 0.35f, 1f), string.Join(", ", r.Winners));
+
+            ImGui.TableSetColumnIndex(2);
+            ImGui.AlignTextToFramePadding();
+            if (r.Losers.Count > 0)
+                ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f), string.Join(", ", r.Losers));
+
+            ImGui.TableSetColumnIndex(3);
+            ImGui.AlignTextToFramePadding();
+            if (r.Pushes.Count > 0)
+                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), string.Join(", ", r.Pushes));
+
+            ImGui.TableSetColumnIndex(4);
             ImGui.AlignTextToFramePadding();
             DrawNetCell(r.BankNet);
             if (r.PlayerBanks.Count > 0 && ImGui.IsItemHovered())
