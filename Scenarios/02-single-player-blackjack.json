@@ -14,7 +14,6 @@
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
-    "AdvancePlayer",
     "GoToPayout"
   ]
 }

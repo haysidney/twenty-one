@@ -1,5 +1,6 @@
 {
-  "name": "Two players + sitting out — all active BJ, dealer 10-value upcard (must check hole card, no dealer BJ)",
+  "name": "Two players — Lorah Five Card Charlie (BeatsAll), Bekki has BJ, dealer stands on 17",
+  "fiveCardCharlie": "BeatsAll",
   "players": [
     {
       "name": "Lorah",
@@ -8,16 +9,16 @@
     {
       "name": "Bekki",
       "bet": "500"
-    },
-    {
-      "name": "Nolla",
-      "sittingOut": true
     }
   ],
-  "rolls": [10, 1, 10, 1, 10, 5],
+  "rolls": [7, 2, 2, 1, 10, 3, 3, 4, 10],
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
+    "Hit:0:0",
+    "Hit:0:0",
+    "Hit:0:0",
+    "AdvancePlayer",
     "BeginDealerTurn",
     "DealerHit",
     "GoToPayout"
