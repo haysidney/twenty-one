@@ -214,10 +214,10 @@ public class HistoryWindow : Window
         var flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit;
         if (!ImGui.BeginTable("##sessionlist", 4, flags)) return;
 
-        ImGui.TableSetupColumn("Date"u8,     ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("Location"u8, ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("Rounds"u8,   ImGuiTableColumnFlags.WidthFixed, 55);
-        ImGui.TableSetupColumn("Net"u8,      ImGuiTableColumnFlags.WidthFixed, 80);
+        ImGui.TableSetupColumn("Date"u8,    ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Players"u8, ImGuiTableColumnFlags.WidthFixed, 55);
+        ImGui.TableSetupColumn("Rounds"u8,  ImGuiTableColumnFlags.WidthFixed, 55);
+        ImGui.TableSetupColumn("Net"u8,     ImGuiTableColumnFlags.WidthFixed, 80);
         ImGui.TableHeadersRow();
 
         for (var i = sessions.Count - 1; i >= 0; i--)
@@ -232,7 +232,7 @@ public class HistoryWindow : Window
 
             ImGui.TableSetColumnIndex(1);
             ImGui.AlignTextToFramePadding();
-            ImGui.TextUnformatted(string.IsNullOrEmpty(s.LocationKey) ? "-" : s.LocationKey);
+            ImGui.TextUnformatted(s.Stats.Count.ToString());
 
             ImGui.TableSetColumnIndex(2);
             ImGui.AlignTextToFramePadding();
