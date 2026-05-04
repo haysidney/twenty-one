@@ -1205,7 +1205,7 @@ private static unsafe void SendChatMessage(string message)
                     DateTime.Now))
             {
                 ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.85f, 0.3f, 1f));
-                ImGui.TextUnformatted("You may need to start a new session.");
+                ImGui.TextUnformatted("It's been a while (or you're at a new location), want to mark a new session in the ledger?");
                 ImGui.PopStyleColor();
                 ImGui.SameLine();
                 var venueNames = config.Venues.ConvertAll(v => v.Name).ToArray();
