@@ -88,13 +88,20 @@ public static class GameEngine
         var activePlayers = state.Players.Where(p => !p.SittingOut).ToList();
         var allBJ = activePlayers.Count > 0
                  && activePlayers.All(p => p.Hands.All(h => h.State == HandState.Blackjack));
-        if (allBJ)
+        var allCharlie = activePlayers.Count > 0
+                      && activePlayers.All(p => p.Hands.All(h => h.State == HandState.Charlie));
+
+        // All-BJ, or all-Charlie when dealer BJ would beat it: need to check dealer's hole card.
+        if (allBJ || (allCharlie && state.FiveCardCharlie == FiveCardCharlieRule.LosesToDealerBJ))
         {
             var dc     = state.DealerHand.Cards;
             var upCard = dc.Count > 0 ? dc[0] : 0;
             var couldHaveBJ = upCard == 1 || upCard >= 10;
             return dc.Count >= 2 || !couldHaveBJ;
         }
+
+        // All-Charlie (BeatsAll): skip dealer turn unconditionally.
+        if (allCharlie) return true;
 
         var allBust = activePlayers.Count > 0
                    && activePlayers.All(p => p.Hands.All(h => h.State == HandState.Bust));
@@ -646,7 +653,10 @@ public static class GameEngine
             {
                 var allBJ = state.Players.Count > 0
                          && state.Players.All(p => p.Hands.All(h => h.State == HandState.Blackjack));
-                Narrate(allBJ ? t.DealerBJCheck : t.DealerHitAnnounce, ("dealer", dealerName));
+                var allCharlie = state.Players.Count > 0
+                              && state.Players.All(p => p.Hands.All(h => h.State == HandState.Charlie));
+                var checkBJ = allBJ || (allCharlie && state.FiveCardCharlie == FiveCardCharlieRule.LosesToDealerBJ);
+                Narrate(checkBJ ? t.DealerBJCheck : t.DealerHitAnnounce, ("dealer", dealerName));
                 return (state, effects);
             }
 

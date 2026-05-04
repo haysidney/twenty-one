@@ -1185,6 +1185,87 @@ public class CanGoToPayoutTests
         };
         Assert.True(GameEngine.CanGoToPayout(state));
     }
+
+    [Fact]
+    public void AllCharlie_BeatsAll_CanPayout()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
+            Players    = [CharliePlayer("Lorah")],
+            DealerHand = new Hand { Cards = [13] },
+        };
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void AllCharlie_BeatsAll_AceUpCard_CanPayout()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
+            Players    = [CharliePlayer("Lorah")],
+            DealerHand = new Hand { Cards = [1] },
+        };
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void AllCharlie_LosesToDealerBJ_DealerUpCardNotTenValue_CanPayout()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
+            Players    = [CharliePlayer("Lorah")],
+            DealerHand = new Hand { Cards = [7] },
+        };
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void AllCharlie_LosesToDealerBJ_DealerUpCardAce_NeedHoleCard()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
+            Players    = [CharliePlayer("Lorah")],
+            DealerHand = new Hand { Cards = [1] },
+        };
+        Assert.False(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void AllCharlie_LosesToDealerBJ_DealerUpCardTenValue_NeedHoleCard()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
+            Players    = [CharliePlayer("Lorah")],
+            DealerHand = new Hand { Cards = [13] },
+        };
+        Assert.False(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void AllCharlie_LosesToDealerBJ_DealerHasTwoCards_CanPayout()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
+            Players    = [CharliePlayer("Lorah")],
+            DealerHand = new Hand { Cards = [1, 10] },
+        };
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
+
+    private static Player CharliePlayer(string name) =>
+        new() { Nickname = name, Hands = [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] };
 }
 
 public class DoubleDownTests
@@ -2234,6 +2315,36 @@ public class DealerBJCheckTests
         var t = new NarrationTemplates { DealerHitAnnounce = [["HIT: {dealer}"]], DealerBJCheck = [["LUCKY CHECK"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t, dealerName: "Vera");
         Assert.Equal("HIT: Vera", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void AnnounceDealerHit_AllCharlie_LosesToDealerBJ_UsesBJCheckTemplate()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
+            DealerHand      = new Hand { Cards = [1], State = HandState.Playing },
+            Players = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] }],
+        };
+        var t = new NarrationTemplates { DealerBJCheck = [["LUCKY CHECK"]] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t);
+        Assert.Equal("LUCKY CHECK", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void AnnounceDealerHit_AllCharlie_BeatsAll_UsesHitAnnounceTemplate()
+    {
+        var state = new GameState
+        {
+            Phase           = GamePhase.DealerTurn,
+            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
+            DealerHand      = new Hand { Cards = [1], State = HandState.Playing },
+            Players = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] }],
+        };
+        var t = new NarrationTemplates { DealerHitAnnounce = [["ANNOUNCE_HIT"]], DealerBJCheck = [["LUCKY CHECK"]] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t);
+        Assert.Equal("ANNOUNCE_HIT", ((SendChat)effects[0]).Text);
     }
 }
 
