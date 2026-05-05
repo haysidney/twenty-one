@@ -107,7 +107,7 @@ public partial class MainWindow : Window, IDisposable
                     var betAmt = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
                     if (betAmt <= 0) continue;
                     var betKey = PlayerStatKey(p);
-                    if (!config.PlayerStatsStore.TryGetValue(betKey, out var betStat) || betStat.Bank <= 0) continue;
+                    if (!config.PlayerStatsStore.TryGetValue(betKey, out var betStat) || !IsBanking(betStat)) continue;
                     ApplyBank(betStat, new BankBet(betAmt));
                 }
                 for (var i = 0; i < State.Players.Count; i++)
@@ -164,7 +164,8 @@ public partial class MainWindow : Window, IDisposable
                         var dblBank    = config.PlayerStatsStore.TryGetValue(dblKey, out var dblStat) ? dblStat.Bank : 0;
                         var dblRounded = (long)Math.Ceiling(dblBet);
                         var fromBank   = dblBank >= dblRounded;
-                        var bankAfter  = fromBank ? dblBank - dblRounded : dblBank;
+                        // fromBank=true: BankAfter = balance after deduction; fromBank=false: BankAfter = shortfall (trade amount needed)
+                        var bankAfter  = fromBank ? dblBank - dblRounded : dblRounded - dblBank;
                         pendingDouble  = (pi, hi);
                         Apply(new AnnounceDouble(pi, hi, fromBank, bankAfter));
                         break;
@@ -176,7 +177,8 @@ public partial class MainWindow : Window, IDisposable
                         var splBank    = config.PlayerStatsStore.TryGetValue(splKey, out var splStat) ? splStat.Bank : 0;
                         var splRounded = (long)Math.Ceiling(splBet);
                         var fromBank   = splBank >= splRounded;
-                        var bankAfter  = fromBank ? splBank - splRounded : splBank;
+                        // fromBank=true: BankAfter = balance after deduction; fromBank=false: BankAfter = shortfall (trade amount needed)
+                        var bankAfter  = fromBank ? splBank - splRounded : splRounded - splBank;
                         pendingSplit   = (pi, hi);
                         Apply(new AnnounceSplit(pi, hi, fromBank, bankAfter));
                         break;
@@ -428,6 +430,8 @@ public partial class MainWindow : Window, IDisposable
 
     private static string PlayerStatKey(Player p) =>
         p.FullName.Length > 0 ? $"{p.FullName}@{p.World}" : p.Nickname;
+
+    private static bool IsBanking(PlayerStat stat) => stat.Bank > 0 || stat.BankLog.Count > 0;
 
     private static void ApplyBank(PlayerStat stat, BankTransaction tx)
     {
@@ -986,21 +990,6 @@ private static unsafe void SendChatMessage(string message)
                         ImGui.SetTooltip("Remind player of their bet and bank balance");
                 }
 
-                // Shortfall announce
-                var parsedBet2 = GameEngine.ParseBet(bmp.Bet);
-                var shortfall2 = parsedBet2 > 0 ? parsedBet2 - bmpBank : 0m;
-                if (shortfall2 > 0)
-                {
-                    ImGui.SameLine();
-                    ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f),
-                        $"Short by {GameEngine.FormatGil(shortfall2)}");
-                    ImGui.SameLine();
-                    if (uiBusy) ImGui.BeginDisabled();
-                    if (ImGui.Button("Announce Shortfall##bankshort"))
-                        Apply(new AnnounceBankShortfall(bankManagePlayerIndex, (long)Math.Ceiling(shortfall2)));
-                    if (uiBusy) ImGui.EndDisabled();
-                }
-
                 ImGui.Spacing();
 
                 // Clear all
@@ -1525,7 +1514,8 @@ private static unsafe void SendChatMessage(string message)
                             config.PlayerStatsStore[bankKey] = bankStat;
                         }
                         var bankVal       = bankStat.Bank;
-                        var parsedBet     = GameEngine.ParseBet(p.Bet);
+                        var effectiveBetStr = betEdits.TryGetValue(pi, out var bpEdit) ? bpEdit : p.Bet;
+                        var parsedBet     = GameEngine.ParseBet(effectiveBetStr);
                         var bankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
 
                         var bankDelta = 0m;
@@ -1551,10 +1541,11 @@ private static unsafe void SendChatMessage(string message)
                         }
 
                         ImGui.AlignTextToFramePadding();
-                        if (bankVal > 0)
+                        var isBankingPlayer = IsBanking(bankStat);
+                        if (isBankingPlayer)
                         {
                             var bankLabel = GameEngine.FormatGil(bankVal);
-                            var shortfall = parsedBet > 0 ? parsedBet - bankVal : 0m;
+                            var shortfall = parsedBet > 0 ? Math.Max(0m, parsedBet - bankVal) : 0m;
                             if (shortfall > 0)
                                 ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f), bankLabel);
                             else
@@ -1562,8 +1553,6 @@ private static unsafe void SendChatMessage(string message)
                             if (ImGui.IsItemHovered())
                             {
                                 var tipLines = new System.Text.StringBuilder();
-                                if (shortfall > 0)
-                                    tipLines.AppendLine($"Short by {GameEngine.FormatGil(shortfall)}");
                                 if (Phase == GamePhase.Payout && bankDelta != 0)
                                 {
                                     var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
@@ -1574,6 +1563,28 @@ private static unsafe void SendChatMessage(string message)
                                 ImGui.SetTooltip(tipLines.ToString());
                                 if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
                                     ImGui.SetClipboardText(bankVal.ToString());
+                            }
+
+                            if (Phase == GamePhase.Betting && shortfall > 0)
+                            {
+                                ImGui.SameLine();
+                                var amber    = new Vector4(1f, 0.75f, 0.1f, 1f);
+                                var amberHov = new Vector4(1f, 0.88f, 0.3f, 1f);
+                                ImGui.PushStyleColor(ImGuiCol.Button, amber with { W = 0.25f });
+                                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, amberHov with { W = 0.4f });
+                                ImGui.PushStyleColor(ImGuiCol.Text, amber);
+                                if (ImGui.SmallButton($"Short##{pi}short"))
+                                {
+                                    if (betEdits.TryGetValue(pi, out var pendingBetVal) && pendingBetVal != p.Bet)
+                                    {
+                                        betEdits.Remove(pi);
+                                        Apply(new SetPlayerBet(pi, pendingBetVal));
+                                    }
+                                    Apply(new AnnounceBankShortfall(pi, (long)Math.Ceiling(shortfall)));
+                                }
+                                ImGui.PopStyleColor(3);
+                                if (ImGui.IsItemHovered())
+                                    ImGui.SetTooltip($"Short by {GameEngine.FormatGil(shortfall)}\nClick to announce shortfall");
                             }
                         }
                         else
@@ -1887,19 +1898,13 @@ private static unsafe void SendChatMessage(string message)
 
                         // Bank balance (clickable to copy)
                         ImGui.AlignTextToFramePadding();
-                        if (bankVal > 0)
+                        if (IsBanking(bankStat))
                         {
                             var bankLabel = GameEngine.FormatGil(bankVal);
-                            var shortfall = parsedBet > 0 ? parsedBet - bankVal : 0m;
-                            if (shortfall > 0)
-                                ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f), bankLabel);
-                            else
-                                ImGui.TextUnformatted(bankLabel);
+                            ImGui.TextUnformatted(bankLabel);
                             if (ImGui.IsItemHovered())
                             {
                                 var tipLines = new System.Text.StringBuilder();
-                                if (shortfall > 0)
-                                    tipLines.AppendLine($"Short by {GameEngine.FormatGil(shortfall)}");
                                 if (Phase == GamePhase.Payout && bankDelta != 0)
                                 {
                                     var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
@@ -2404,9 +2409,22 @@ private static unsafe void SendChatMessage(string message)
                 ImGui.SameLine();
                 var effectiveBets = State.Players.Select((p, i) =>
                     betEdits.TryGetValue(i, out var e) ? e : p.Bet).ToList();
+                var shortfallPlayers = State.Players
+                    .Select((p, i) => (p, i))
+                    .Where(x => !x.p.SittingOut)
+                    .Where(x => {
+                        var key = PlayerStatKey(x.p);
+                        if (!config.PlayerStatsStore.TryGetValue(key, out var st)) return false;
+                        if (!IsBanking(st)) return false;
+                        var eb = GameEngine.ParseBet(effectiveBets[x.i]);
+                        return eb > 0 && st.Bank < eb;
+                    })
+                    .Select(x => x.p.DisplayName)
+                    .ToList();
                 var canDeal = State.Players.Count > 0
                            && State.Players.Any(p => !p.SittingOut)
                            && State.Players.Select((p, i) => p.SittingOut || !string.IsNullOrWhiteSpace(effectiveBets[i])).All(x => x)
+                           && shortfallPlayers.Count == 0
                            && !isReorderMode;
                 if (!canDeal) ImGui.BeginDisabled();
 #if DEBUG
@@ -2433,7 +2451,7 @@ private static unsafe void SendChatMessage(string message)
                         var betAmt = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
                         if (betAmt <= 0) continue;
                         var betKey = PlayerStatKey(p);
-                        if (!config.PlayerStatsStore.TryGetValue(betKey, out var betStat) || betStat.Bank <= 0) continue;
+                        if (!config.PlayerStatsStore.TryGetValue(betKey, out var betStat) || !IsBanking(betStat)) continue;
                         ApplyBank(betStat, new BankBet(betAmt));
                     }
                     // Queue initial cards: dealer first, then each active player gets both cards in a pair
@@ -2453,7 +2471,9 @@ private static unsafe void SendChatMessage(string message)
                 if (!canDeal && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                     ImGui.SetTooltip(State.Players.Count == 0
                         ? "Add at least one player first."
-                        : "All players need a bet before dealing.");
+                        : shortfallPlayers.Count > 0
+                            ? $"Bank shortfall — resolve before dealing:\n{string.Join("\n", shortfallPlayers)}"
+                            : "All players need a bet before dealing.");
                 break;
 
             case GamePhase.Deal:

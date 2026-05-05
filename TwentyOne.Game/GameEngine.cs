@@ -696,7 +696,8 @@ public static class GameEngine
                 if (a.FromBank)
                     Narrate(t.PlayerDoubleRequestBank, ("name", name), ("amount", FormatGil(bet)), ("bank", FormatGil(a.BankAfter)));
                 else
-                    Narrate(t.PlayerDoubleRequest, ("name", name), ("amount", FormatGil(bet)));
+                    // BankAfter holds the shortfall (amount player needs to trade) when !FromBank
+                    Narrate(t.PlayerDoubleRequest, ("name", name), ("amount", FormatGil(a.BankAfter)));
                 return (state, effects);
             }
 
@@ -717,7 +718,8 @@ public static class GameEngine
                 if (a.FromBank)
                     Narrate(t.PlayerSplitRequestBank, ("name", name), ("amount", FormatGil(bet)), ("bank", FormatGil(a.BankAfter)));
                 else
-                    Narrate(t.PlayerSplitRequest, ("name", name), ("amount", FormatGil(bet)));
+                    // BankAfter holds the shortfall (amount player needs to trade) when !FromBank
+                    Narrate(t.PlayerSplitRequest, ("name", name), ("amount", FormatGil(a.BankAfter)));
                 return (state, effects);
             }
 

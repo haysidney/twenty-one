@@ -1401,7 +1401,8 @@ public class DoubleDownTests
     public void AnnounceDouble_NarratesWithAmount()
     {
         var state = ActiveState([5, 6]);
-        var (_, effects) = GameEngine.Apply(state, new AnnounceDouble(0, 0));
+        // !FromBank: BankAfter = shortfall = full bet (100) when no bank
+        var (_, effects) = GameEngine.Apply(state, new AnnounceDouble(0, 0, FromBank: false, BankAfter: 100));
         Assert.Single(effects);
         Assert.Contains("100", ((SendChat)effects[0]).Text);
         Assert.Contains("double", ((SendChat)effects[0]).Text.ToLower());
@@ -1899,7 +1900,8 @@ public class SplitHandTests
                 new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [8, 8], State = HandState.Playing }] },
             ],
         };
-        var (_, effects) = GameEngine.Apply(state, new AnnounceSplit(0, 0));
+        // !FromBank: BankAfter = shortfall = full bet (100) when no bank
+        var (_, effects) = GameEngine.Apply(state, new AnnounceSplit(0, 0, FromBank: false, BankAfter: 100));
         Assert.Single(effects);
         Assert.Contains("100", ((SendChat)effects[0]).Text);
         Assert.Contains("split", ((SendChat)effects[0]).Text.ToLower());
