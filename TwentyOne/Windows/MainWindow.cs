@@ -2189,7 +2189,7 @@ private static unsafe void SendChatMessage(string message)
                             var dblBank    = config.PlayerStatsStore.TryGetValue(dblKey, out var dblStat) ? dblStat.Bank : 0;
                             var dblRounded = (long)Math.Ceiling(dblBet);
                             var fromBank   = dblBank >= dblRounded;
-                            var bankAfter  = fromBank ? dblBank - dblRounded : dblBank;
+                            var bankAfter  = fromBank ? dblBank - dblRounded : dblRounded - dblBank;
                             pendingDouble = (pi, hi);
                             Apply(new AnnounceDouble(pi, hi, fromBank, bankAfter));
                             if (!fromBank && hasWorld && config.AutoTradeEnabled)
@@ -2217,7 +2217,7 @@ private static unsafe void SendChatMessage(string message)
                             var splBank    = config.PlayerStatsStore.TryGetValue(splKey, out var splStat) ? splStat.Bank : 0;
                             var splRounded = (long)Math.Ceiling(splBet);
                             var fromBank   = splBank >= splRounded;
-                            var bankAfter  = fromBank ? splBank - splRounded : splBank;
+                            var bankAfter  = fromBank ? splBank - splRounded : splRounded - splBank;
                             pendingSplit = (pi, hi);
                             Apply(new AnnounceSplit(pi, hi, fromBank, bankAfter));
                             if (!fromBank && hasWorld && config.AutoTradeEnabled)
