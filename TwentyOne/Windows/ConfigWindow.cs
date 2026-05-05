@@ -204,6 +204,16 @@ public class ConfigWindow : Window, IDisposable
                     config.Save();
                 }
             }
+
+            var slash = config.SlashCommandCooldownMs;
+            ImGui.SetNextItemWidth(100);
+            if (ImGui.InputInt("Slash command delay (ms)##slashCooldown", ref slash, 100))
+            {
+                config.SlashCommandCooldownMs = Math.Clamp(slash, 100, 10000);
+                config.Save();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("/random and /dice are rate-limited separately.\nThis delay applies when longer than the channel delay above.");
         }
 
         ImGui.Spacing();

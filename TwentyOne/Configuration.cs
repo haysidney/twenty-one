@@ -54,6 +54,7 @@ public class VenueSettings
     public bool   AllowCrossChannelCommands { get; set; } = false;
     public int    PublicChatCooldownMs      { get; set; } = 2000;
     public int    PrivateChatCooldownMs     { get; set; } = 1200;
+    public int    SlashCommandCooldownMs    { get; set; } = 1200;
 
     // ── Narration templates ────────────────────────────────────────────────────
     public NarrationTemplates NarrationTemplates { get; set; } = new();
@@ -131,6 +132,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public bool   AllowCrossChannelCommands  { get => ActiveVenue.AllowCrossChannelCommands;   set => ActiveVenue.AllowCrossChannelCommands = value; }
     [JsonIgnore] public int    PublicChatCooldownMs       { get => ActiveVenue.PublicChatCooldownMs;        set => ActiveVenue.PublicChatCooldownMs = value; }
     [JsonIgnore] public int    PrivateChatCooldownMs      { get => ActiveVenue.PrivateChatCooldownMs;       set => ActiveVenue.PrivateChatCooldownMs = value; }
+    [JsonIgnore] public int    SlashCommandCooldownMs     { get => ActiveVenue.SlashCommandCooldownMs;      set => ActiveVenue.SlashCommandCooldownMs = value; }
     [JsonIgnore] public NarrationTemplates NarrationTemplates { get => ActiveVenue.NarrationTemplates;     set => ActiveVenue.NarrationTemplates = value; }
     [JsonIgnore] public string DealerName                 { get => ActiveVenue.DealerName;                 set => ActiveVenue.DealerName = value; }
     [JsonIgnore] public long   GilStart                   { get => ActiveVenue.GilStart;                   set => ActiveVenue.GilStart = value; }

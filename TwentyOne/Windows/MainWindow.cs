@@ -233,7 +233,9 @@ public partial class MainWindow : Window, IDisposable
     // rate-limited outgoing queue — narration strings and roll commands share a single FIFO and lastChatSent
     // each entry: (IsRoll, Invoke, MinWaitMs) — narration passes through freely; rolls block until pendingHit is clear
     // MinWaitMs: minimum ms to wait after the *previous* entry before sending this one (0 = use cooldownMs)
-    private readonly Queue<(bool IsRoll, Action Invoke, int MinWaitAfterMs, int MinWaitBeforeMs)> chatQueue = new();
+    // IsSlashRateLimited: true for /random and /dice — enforces SlashCommandCooldownMs if longer than channel cooldown
+    private static readonly HashSet<string> RateLimitedSlashCommands = ["/random", "/dice"];
+    private readonly Queue<(bool IsRoll, Action Invoke, int MinWaitAfterMs, int MinWaitBeforeMs, bool IsSlashRateLimited)> chatQueue = new();
     private          DateTime                                                                       lastChatSent      = DateTime.UtcNow;
     private          int                                                                            lastSentMinWaitMs = 0;
 
@@ -393,7 +395,8 @@ public partial class MainWindow : Window, IDisposable
                     {
                         msg = config.ChatChannel + " " + raw;
                     }
-                    chatQueue.Enqueue((false, () => SendChatMessage(msg), minWait, 0));
+                    var slashRateLimited = RateLimitedSlashCommands.Contains(raw.Split(' ')[0]);
+                    chatQueue.Enqueue((false, () => SendChatMessage(msg), minWait, 0, slashRateLimited));
                 }
             }
             else if (effect is AutoHit ah)
@@ -602,10 +605,10 @@ private static unsafe void SendChatMessage(string message)
     }
 
     private void QueueTrade(string fullName, string world, int minWaitBeforeMs = 0) =>
-        chatQueue.Enqueue((false, () => Plugin.TradePlayer(fullName, world), 0, minWaitBeforeMs));
+        chatQueue.Enqueue((false, () => Plugin.TradePlayer(fullName, world), 0, minWaitBeforeMs, false));
 
     private void QueueTarget(string fullName, string world, int minWaitBeforeMs = 0) =>
-        chatQueue.Enqueue((false, () => Plugin.TargetPlayer(fullName, world), 0, minWaitBeforeMs));
+        chatQueue.Enqueue((false, () => Plugin.TargetPlayer(fullName, world), 0, minWaitBeforeMs, false));
 
     private void QueueHitRoll(bool isDealer, int playerIndex, int handIndex)
     {
@@ -624,7 +627,7 @@ private static unsafe void SendChatMessage(string message)
             deferredRoll = (isDealer, playerIndex, handIndex, simRoll);
             return;
         }
-        chatQueue.Enqueue((true, () => SendHitRoll(isDealer, playerIndex, handIndex), 0, 0));
+        chatQueue.Enqueue((true, () => SendHitRoll(isDealer, playerIndex, handIndex), 0, 0, true));
     }
 
     private unsafe void SendHitRoll(bool isDealer, int playerIndex, int handIndex)
@@ -836,8 +839,9 @@ private static unsafe void SendChatMessage(string message)
         var cooldownMs = isPublicChannel ? config.PublicChatCooldownMs : config.PrivateChatCooldownMs;
         if (chatQueue.Count > 0)
         {
-            var (isRoll, invoke, minWaitAfterMs, minWaitBeforeMs) = chatQueue.Peek();
-            var requiredMs = Math.Max(cooldownMs, lastSentMinWaitMs) + minWaitBeforeMs;
+            var (isRoll, invoke, minWaitAfterMs, minWaitBeforeMs, isSlashRateLimited) = chatQueue.Peek();
+            var effectiveCooldown = isSlashRateLimited ? Math.Max(cooldownMs, config.SlashCommandCooldownMs) : cooldownMs;
+            var requiredMs = Math.Max(effectiveCooldown, lastSentMinWaitMs) + minWaitBeforeMs;
             if ((DateTime.UtcNow - lastChatSent).TotalMilliseconds >= requiredMs && (!isRoll || pendingHit == null))
             {
                 chatQueue.Dequeue();
