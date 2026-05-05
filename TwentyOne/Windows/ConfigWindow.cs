@@ -33,6 +33,7 @@ public class ConfigWindow : Window, IDisposable
     private (string Id, int Index)? _pendingVariantSelect;
     private (string Id, int Index, List<List<string>> Value)? _pendingVariantDelete;
     private double _narrationDirtyAt;
+    private Action? _pendingImport;
 
     private string _renameBuffer     = string.Empty;
     private bool   _renamePending    = false;
@@ -416,30 +417,59 @@ public class ConfigWindow : Window, IDisposable
                     (ok, path) =>
                     {
                         if (!ok) return;
-                        try
+                        _pendingImport = () =>
                         {
-                            var text = File.ReadAllText(path);
-                            var imported = JsonSerializer.Deserialize<NarrationTemplates>(text);
-                            if (imported != null) { config.NarrationTemplates = imported; _narrationDirty = false; config.Save(); }
-                        }
-                        catch { }
+                            try
+                            {
+                                var text = File.ReadAllText(path);
+                                var imported = JsonSerializer.Deserialize<NarrationTemplates>(text);
+                                if (imported != null) { config.NarrationTemplates = imported; _narrationDirty = false; config.Save(); }
+                            }
+                            catch { }
+                        };
                     });
             }
             else
             {
-                try
+                _pendingImport = () =>
                 {
-                    var json = ImGui.GetClipboardText();
-                    var imported = JsonSerializer.Deserialize<NarrationTemplates>(json);
-                    if (imported != null) { config.NarrationTemplates = imported; _narrationDirty = false; config.Save(); }
-                }
-                catch { }
+                    try
+                    {
+                        var json = ImGui.GetClipboardText();
+                        var imported = JsonSerializer.Deserialize<NarrationTemplates>(json);
+                        if (imported != null) { config.NarrationTemplates = imported; _narrationDirty = false; config.Save(); }
+                    }
+                    catch { }
+                };
+                ImGui.OpenPopup("Confirm Import##ntImportConfirm");
             }
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip(shiftHeld
                 ? "Load narration templates from a file."u8
                 : "Load narration templates from clipboard JSON. Shift+click to load from file."u8);
+
+        if (_pendingImport != null && !ImGui.IsPopupOpen("Confirm Import##ntImportConfirm"))
+            ImGui.OpenPopup("Confirm Import##ntImportConfirm");
+
+        if (ImGui.BeginPopupModal("Confirm Import##ntImportConfirm", ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            ImGui.TextUnformatted("Overwrite all narration templates? This cannot be undone.");
+            ImGui.Spacing();
+            if (ImGui.Button("Overwrite"))
+            {
+                _pendingImport?.Invoke();
+                _pendingImport = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel"))
+            {
+                _pendingImport = null;
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.EndPopup();
+        }
 
         ImGui.Spacing();
         var t = config.NarrationTemplates;
