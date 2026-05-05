@@ -378,13 +378,20 @@ public partial class MainWindow : Window, IDisposable
                 config.NarrationLog.Add(chat.Text);
                 if (config.ChatEnabled)
                 {
-                    var raw      = chat.Text;
-                    int minWait  = 0;
-                    var m = System.Text.RegularExpressions.Regex.Match(raw, @"<wait\.(\d+)>");
-                    if (m.Success)
+                    var raw            = chat.Text;
+                    int minWaitAfter   = 0;
+                    int minWaitBefore  = 0;
+                    var mAfter = System.Text.RegularExpressions.Regex.Match(raw, @"<wait\.(\d+)>\s*$");
+                    if (mAfter.Success)
                     {
-                        minWait = int.Parse(m.Groups[1].Value) * 1000;
-                        raw     = raw.Replace(m.Value, "").Trim();
+                        minWaitAfter = int.Parse(mAfter.Groups[1].Value) * 1000;
+                        raw          = raw[..mAfter.Index].Trim();
+                    }
+                    var mBefore = System.Text.RegularExpressions.Regex.Match(raw, @"^\s*<wait\.(\d+)>");
+                    if (mBefore.Success)
+                    {
+                        minWaitBefore = int.Parse(mBefore.Groups[1].Value) * 1000;
+                        raw           = raw[(mBefore.Index + mBefore.Length)..].Trim();
                     }
                     string msg;
                     if (raw.StartsWith('/'))
@@ -398,7 +405,7 @@ public partial class MainWindow : Window, IDisposable
                         msg = config.ChatChannel + " " + raw;
                     }
                     var slashRateLimited = RateLimitedSlashCommands.Contains(raw.Split(' ')[0]);
-                    chatQueue.Enqueue((false, () => SendChatMessage(msg), minWait, 0, slashRateLimited));
+                    chatQueue.Enqueue((false, () => SendChatMessage(msg), minWaitAfter, minWaitBefore, slashRateLimited));
                 }
             }
             else if (effect is AutoHit ah)
