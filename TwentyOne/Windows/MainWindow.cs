@@ -1385,6 +1385,96 @@ private static unsafe void SendChatMessage(string message)
         }
         ImGui.Separator();
 
+        void DrawBankCell(int loopIdx, int actualIdx, Player player, float bankCellRight)
+        {
+            var bankKey = PlayerStatKey(player);
+            if (!config.PlayerStatsStore.TryGetValue(bankKey, out var bankStat))
+            {
+                bankStat = new PlayerStat { DisplayName = player.DisplayName };
+                config.PlayerStatsStore[bankKey] = bankStat;
+            }
+            var bankVal         = bankStat.Bank;
+            var effectiveBetStr = betEdits.TryGetValue(loopIdx, out var bEdit) ? bEdit : player.Bet;
+            var parsedBet       = GameEngine.ParseBet(effectiveBetStr);
+            var shortfall       = parsedBet > 0 ? Math.Max(0m, parsedBet - bankVal) : 0m;
+
+            var bankDelta = 0m;
+            if (Phase == GamePhase.Payout && bankVal > 0)
+            {
+                for (var bhi = 0; bhi < player.Hands.Count; bhi++)
+                {
+                    var br = GameEngine.GetPayoutResult(State, actualIdx, bhi);
+                    bankDelta += br switch
+                    {
+                        PayoutResult.Win        => GameEngine.GetEffectiveBet(player, player.Hands[bhi]),
+                        PayoutResult.BjWin      => Math.Round(GameEngine.GetEffectiveBet(player, player.Hands[bhi])
+                                                    * (State.BjPayout switch
+                                                    {
+                                                        BlackjackPayout.SixToFive => 1.2m,
+                                                        BlackjackPayout.EvenMoney => 1.0m,
+                                                        _                         => 1.5m,
+                                                    }), 2),
+                        PayoutResult.CharlieWin => GameEngine.GetEffectiveBet(player, player.Hands[bhi]),
+                        _                       => 0m,
+                    };
+                }
+            }
+
+            ImGui.AlignTextToFramePadding();
+            if (IsBanking(bankStat))
+            {
+                var bankLabel = GameEngine.FormatGil(bankVal);
+                if (shortfall > 0)
+                    ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f), bankLabel);
+                else
+                    ImGui.TextUnformatted(bankLabel);
+                if (ImGui.IsItemHovered())
+                {
+                    var tip = new System.Text.StringBuilder();
+                    if (shortfall > 0)
+                        tip.AppendLine($"Short by {GameEngine.FormatGil(shortfall)} — needs trade before deal");
+                    if (Phase == GamePhase.Payout && bankDelta != 0)
+                    {
+                        var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
+                        tip.AppendLine($"This round: {deltaStr}");
+                        tip.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankDelta))}");
+                    }
+                    tip.Append("Click to copy");
+                    ImGui.SetTooltip(tip.ToString());
+                    if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                        ImGui.SetClipboardText(bankVal.ToString());
+                }
+
+                if (Phase == GamePhase.Betting && shortfall > 0)
+                {
+                    ImGui.SameLine();
+                    var amber    = new Vector4(1f, 0.75f, 0.1f, 1f);
+                    var amberHov = new Vector4(1f, 0.88f, 0.3f, 1f);
+                    ImGui.PushStyleColor(ImGuiCol.Button,        amber    with { W = 0.25f });
+                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, amberHov with { W = 0.4f  });
+                    ImGui.PushStyleColor(ImGuiCol.Text,          amber);
+                    if (ImGui.SmallButton($"Short##{actualIdx}short"))
+                    {
+                        if (betEdits.TryGetValue(loopIdx, out var pendingBet) && pendingBet != player.Bet)
+                        {
+                            betEdits.Remove(loopIdx);
+                            Apply(new SetPlayerBet(actualIdx, pendingBet));
+                        }
+                        Apply(new AnnounceBankShortfall(actualIdx, (long)Math.Ceiling(shortfall)));
+                    }
+                    ImGui.PopStyleColor(3);
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip($"Short by {GameEngine.FormatGil(shortfall)}\nClick to announce shortfall");
+                }
+            }
+            else
+            {
+                ImGui.TextDisabled("—");
+            }
+
+            DrawBankManageButton(actualIdx, bankCellRight, "bank");
+        }
+
         var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
                          ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
         var tableAvailWidth = ImGui.GetContentRegionAvail().X;
@@ -1513,94 +1603,7 @@ private static unsafe void SendChatMessage(string message)
 
                     // Bank
                     ImGui.TableSetColumnIndex(2);
-                    {
-                        var bankKey  = PlayerStatKey(p);
-                        if (!config.PlayerStatsStore.TryGetValue(bankKey, out var bankStat))
-                        {
-                            bankStat = new PlayerStat { DisplayName = p.DisplayName };
-                            config.PlayerStatsStore[bankKey] = bankStat;
-                        }
-                        var bankVal       = bankStat.Bank;
-                        var effectiveBetStr = betEdits.TryGetValue(pi, out var bpEdit) ? bpEdit : p.Bet;
-                        var parsedBet     = GameEngine.ParseBet(effectiveBetStr);
-                        var bankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-
-                        var bankDelta = 0m;
-                        if (Phase == GamePhase.Payout && bankVal > 0)
-                        {
-                            for (var bhi = 0; bhi < p.Hands.Count; bhi++)
-                            {
-                                var br = GameEngine.GetPayoutResult(State, pi, bhi);
-                                bankDelta += br switch
-                                {
-                                    PayoutResult.Win        => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
-                                    PayoutResult.BjWin      => Math.Round(GameEngine.GetEffectiveBet(p, p.Hands[bhi])
-                                                                * (State.BjPayout switch
-                                                                {
-                                                                    BlackjackPayout.SixToFive => 1.2m,
-                                                                    BlackjackPayout.EvenMoney => 1.0m,
-                                                                    _                         => 1.5m,
-                                                                }), 2),
-                                    PayoutResult.CharlieWin => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
-                                    _                       => 0m,
-                                };
-                            }
-                        }
-
-                        ImGui.AlignTextToFramePadding();
-                        var isBankingPlayer = IsBanking(bankStat);
-                        if (isBankingPlayer)
-                        {
-                            var bankLabel = GameEngine.FormatGil(bankVal);
-                            var shortfall = parsedBet > 0 ? Math.Max(0m, parsedBet - bankVal) : 0m;
-                            if (shortfall > 0)
-                                ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f), bankLabel);
-                            else
-                                ImGui.TextUnformatted(bankLabel);
-                            if (ImGui.IsItemHovered())
-                            {
-                                var tipLines = new System.Text.StringBuilder();
-                                if (Phase == GamePhase.Payout && bankDelta != 0)
-                                {
-                                    var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
-                                    tipLines.AppendLine($"This round: {deltaStr}");
-                                    tipLines.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankDelta))}");
-                                }
-                                tipLines.Append("Click to copy");
-                                ImGui.SetTooltip(tipLines.ToString());
-                                if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                                    ImGui.SetClipboardText(bankVal.ToString());
-                            }
-
-                            if (Phase == GamePhase.Betting && shortfall > 0)
-                            {
-                                ImGui.SameLine();
-                                var amber    = new Vector4(1f, 0.75f, 0.1f, 1f);
-                                var amberHov = new Vector4(1f, 0.88f, 0.3f, 1f);
-                                ImGui.PushStyleColor(ImGuiCol.Button, amber with { W = 0.25f });
-                                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, amberHov with { W = 0.4f });
-                                ImGui.PushStyleColor(ImGuiCol.Text, amber);
-                                if (ImGui.SmallButton($"Short##{pi}short"))
-                                {
-                                    if (betEdits.TryGetValue(pi, out var pendingBetVal) && pendingBetVal != p.Bet)
-                                    {
-                                        betEdits.Remove(pi);
-                                        Apply(new SetPlayerBet(pi, pendingBetVal));
-                                    }
-                                    Apply(new AnnounceBankShortfall(pi, (long)Math.Ceiling(shortfall)));
-                                }
-                                ImGui.PopStyleColor(3);
-                                if (ImGui.IsItemHovered())
-                                    ImGui.SetTooltip($"Short by {GameEngine.FormatGil(shortfall)}\nClick to announce shortfall");
-                            }
-                        }
-                        else
-                        {
-                            ImGui.TextDisabled("—");
-                        }
-
-                        DrawBankManageButton(pi, bankCellRight, "bank");
-                    }
+                    DrawBankCell(pi, displayPi, p, ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X);
 
                     // Status (net payout summary or blank)
                     ImGui.TableSetColumnIndex(5);
@@ -1869,68 +1872,7 @@ private static unsafe void SendChatMessage(string message)
                     // ── Bank column ───────────────────────────────────────────
                     ImGui.TableSetColumnIndex(2);
                     if (isFirstHand && !multiHand)
-                    {
-                        var bankKey  = PlayerStatKey(p);
-                        if (!config.PlayerStatsStore.TryGetValue(bankKey, out var bankStat))
-                        {
-                            bankStat = new PlayerStat { DisplayName = p.DisplayName };
-                            config.PlayerStatsStore[bankKey] = bankStat;
-                        }
-                        var bankVal   = bankStat.Bank;
-                        var parsedBet = GameEngine.ParseBet(p.Bet);
-                        var bankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-
-                        // Compute payout delta for this player (shown during Payout phase)
-                        var bankDelta = 0m;
-                        if (Phase == GamePhase.Payout && bankVal > 0)
-                        {
-                            for (var bhi = 0; bhi < p.Hands.Count; bhi++)
-                            {
-                                var br = GameEngine.GetPayoutResult(State, pi, bhi);
-                                bankDelta += br switch
-                                {
-                                    PayoutResult.Win        => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
-                                    PayoutResult.BjWin      => Math.Round(GameEngine.GetEffectiveBet(p, p.Hands[bhi])
-                                                                * (State.BjPayout switch
-                                                                {
-                                                                    BlackjackPayout.SixToFive => 1.2m,
-                                                                    BlackjackPayout.EvenMoney => 1.0m,
-                                                                    _                         => 1.5m,
-                                                                }), 2),
-                                    PayoutResult.CharlieWin => GameEngine.GetEffectiveBet(p, p.Hands[bhi]),
-                                    _                       => 0m,
-                                };
-                            }
-                        }
-
-                        // Bank balance (clickable to copy)
-                        ImGui.AlignTextToFramePadding();
-                        if (IsBanking(bankStat))
-                        {
-                            var bankLabel = GameEngine.FormatGil(bankVal);
-                            ImGui.TextUnformatted(bankLabel);
-                            if (ImGui.IsItemHovered())
-                            {
-                                var tipLines = new System.Text.StringBuilder();
-                                if (Phase == GamePhase.Payout && bankDelta != 0)
-                                {
-                                    var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
-                                    tipLines.AppendLine($"This round: {deltaStr}");
-                                    tipLines.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankDelta))}");
-                                }
-                                tipLines.Append("Click to copy");
-                                ImGui.SetTooltip(tipLines.ToString());
-                                if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                                    ImGui.SetClipboardText(bankVal.ToString());
-                            }
-                        }
-                        else
-                        {
-                            ImGui.TextDisabled("—");
-                        }
-
-                        DrawBankManageButton(pi, bankCellRight, "bank");
-                    }
+                        DrawBankCell(pi, displayPi, p, ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X);
 
                     // ── Cards column ──────────────────────────────────────────
                     ImGui.TableSetColumnIndex(3);

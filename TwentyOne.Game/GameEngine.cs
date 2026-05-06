@@ -774,7 +774,7 @@ public static class GameEngine
                 var player = state.Players[a.PlayerIndex];
                 Narrate(t.PlayerBankShortfall,
                     ("name",   player.DisplayName),
-                    ("amount", FormatGil(a.ShortfallAmount)));
+                    ("amount", $"{a.ShortfallAmount}"));
                 return (state, effects);
             }
 
