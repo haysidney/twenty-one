@@ -1447,8 +1447,14 @@ private static unsafe void SendChatMessage(string message)
 
                 if (Phase == GamePhase.Betting && shortfall > 0)
                 {
-                    ImGui.SameLine();
                     var amber    = new Vector4(1f, 0.75f, 0.1f, 1f);
+                    var fp       = ImGui.GetStyle().FramePadding.X;
+                    var sp       = ImGui.GetStyle().ItemSpacing.X;
+                    var manageW  = ImGui.CalcTextSize("Manage").X + fp * 2;
+                    var shortW   = ImGui.CalcTextSize("Short").X  + fp * 2;
+                    ImGui.SameLine();
+                    if (ImGui.GetCursorPosX() < bankCellRight - manageW - sp - shortW)
+                        ImGui.SetCursorPosX(bankCellRight - manageW - sp - shortW);
                     var amberHov = new Vector4(1f, 0.88f, 0.3f, 1f);
                     ImGui.PushStyleColor(ImGuiCol.Button,        amber    with { W = 0.25f });
                     ImGui.PushStyleColor(ImGuiCol.ButtonHovered, amberHov with { W = 0.4f  });
