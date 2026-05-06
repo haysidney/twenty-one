@@ -728,7 +728,12 @@ private static unsafe void SendChatMessage(string message)
                 if (pi >= 0)
                 {
                     if (pendingGaveGil > 0 && isBankMonitor)
-                        pendingBankTradePrompt = (pi, pendingGaveGil, true);
+                    {
+                        var wdKey = PlayerStatKey(State.Players[pi]);
+                        var wdBank = config.PlayerStatsStore.TryGetValue(wdKey, out var wdStat) ? wdStat.Bank : 0;
+                        if (wdBank > 0)
+                            pendingBankTradePrompt = (pi, pendingGaveGil, true);
+                    }
                     else if (pendingTradeGil > 0)
                     {
                         if (isBetPhase && isBankMonitor)
