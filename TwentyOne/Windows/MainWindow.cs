@@ -1602,6 +1602,7 @@ private static unsafe void SendChatMessage(string message)
 
                     // Bet (total of all hands)
                     ImGui.TableSetColumnIndex(1);
+                    var sumBetCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     var totalHandBets = p.Hands.Sum(h => GameEngine.GetEffectiveBet(p, h));
                     ImGui.AlignTextToFramePadding();
                     ImGui.TextDisabled(totalHandBets > 0 ? GameEngine.FormatGil(totalHandBets) : p.Bet);
@@ -1610,6 +1611,17 @@ private static unsafe void SendChatMessage(string message)
                         ImGui.SetTooltip("Click to copy total bet");
                         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
                             ImGui.SetClipboardText(totalHandBets > 0 ? $"{totalHandBets:0.##}" : p.Bet);
+                    }
+                    if (hasWorld)
+                    {
+                        var sumTradeW = ImGui.CalcTextSize("Trade").X + ImGui.GetStyle().FramePadding.X * 2;
+                        ImGui.SameLine();
+                        if (ImGui.GetCursorPosX() < sumBetCellRight - sumTradeW)
+                            ImGui.SetCursorPosX(sumBetCellRight - sumTradeW);
+                        if (ImGui.SmallButton($"Trade##{pi}sumtrade"))
+                            Plugin.TradePlayer(p.FullName, p.World);
+                        if (ImGui.IsItemHovered())
+                            ImGui.SetTooltip($"Trade {p.FullName}@{p.World}");
                     }
 
                     // Bank
