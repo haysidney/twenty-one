@@ -232,7 +232,7 @@ public class ConfigWindow : Window, IDisposable
 
     private void DrawVenueSelector()
     {
-        var roundInProgress = config.GameState.Phase != TwentyOne.Game.GamePhase.Betting;
+        var roundInProgress = config.GameState.IsRoundActive();
 
         ImGui.AlignTextToFramePadding();
         ImGui.Text("Venue");

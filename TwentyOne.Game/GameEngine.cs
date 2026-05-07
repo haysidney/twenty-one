@@ -85,7 +85,7 @@ public static class GameEngine
     {
         if (state.Phase != GamePhase.DealerTurn) return false;
 
-        var activePlayers = state.Players.Where(p => !p.SittingOut).ToList();
+        var activePlayers = state.ActivePlayers().ToList();
         var allBJ = activePlayers.Count > 0
                  && activePlayers.All(p => p.Hands.All(h => h.State == HandState.Blackjack));
         var allCharlie = activePlayers.Count > 0
@@ -157,9 +157,7 @@ public static class GameEngine
     {
         if (state.Phase == GamePhase.Deal) return state.DealerHand.Cards.Count < 1;
         if (state.Phase != GamePhase.DealerTurn || state.WaitingForDealer) return false;
-        var allBust = state.Players.Count > 0
-                   && state.Players.All(p => p.SittingOut || p.Hands.All(h => h.State == HandState.Bust));
-        return !allBust
+        return !state.IsAllBust()
             && !CanGoToPayout(state)
             && DealerRecommendation(state.DealerHand) == "HIT"
             && HandValue(state.DealerHand.Cards) <= 21;
@@ -409,7 +407,7 @@ public static class GameEngine
 
         void NarrateDealSummary(GameState s)
         {
-            var activePlayers = s.Players.Where(p => !p.SittingOut).ToList();
+            var activePlayers = s.ActivePlayers().ToList();
             if (!(s.SkipDealSummaryOnePlayer && activePlayers.Count == 1))
             {
                 var sb = new StringBuilder(t.DealSummaryPrefix);

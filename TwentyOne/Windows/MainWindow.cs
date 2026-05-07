@@ -1191,7 +1191,7 @@ private static unsafe void SendChatMessage(string message)
                 ImGui.SameLine();
                 var venueNames = config.Venues.ConvertAll(v => v.Name).ToArray();
                 var vIdx = config.ActiveVenueIndex;
-                var roundInProgress = config.GameState.Phase != GamePhase.Betting;
+                var roundInProgress = config.GameState.IsRoundActive();
                 ImGui.SetNextItemWidth(140);
                 if (roundInProgress) ImGui.BeginDisabled();
                 if (ImGui.Combo("##sessionVenueCombo", ref vIdx, venueNames, venueNames.Length)
@@ -1272,7 +1272,7 @@ private static unsafe void SendChatMessage(string message)
             {
                 ImGui.Text($"= {scoreStr}");
                 var rec = GameEngine.DealerRecommendation(State.DealerHand);
-                var allBust = State.Players.Count > 0 && State.Players.All(p => p.SittingOut || p.Hands.All(h => h.State == HandState.Bust));
+                var allBust = State.IsAllBust();
                 if (rec.Length > 0 && Phase == GamePhase.DealerTurn && !allBust)
                 {
                     ImGui.SameLine();
@@ -1319,7 +1319,7 @@ private static unsafe void SendChatMessage(string message)
                     reorderIndices = [];
                 }
             }
-            else if (State.Players.Count(p => !p.SittingOut) > 1)
+            else if (State.ActivePlayerCount() > 1)
             {
                 ImGui.SameLine();
                 if (ImGui.SmallButton("Reorder"))
