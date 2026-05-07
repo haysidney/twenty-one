@@ -106,8 +106,7 @@ public partial class MainWindow : Window, IDisposable
                     if (p.SittingOut) continue;
                     var betAmt = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
                     if (betAmt <= 0) continue;
-                    var betKey = PlayerStatKey(p);
-                    if (!config.PlayerStatsStore.TryGetValue(betKey, out var betStat) || !IsBanking(betStat)) continue;
+                    if (!p.TryGetBankingStat(config, out var betStat)) continue;
                     ApplyBank(betStat, new BankBet(betAmt));
                 }
                 for (var i = 0; i < State.Players.Count; i++)
@@ -160,8 +159,7 @@ public partial class MainWindow : Window, IDisposable
                     case "Dbl":
                     {
                         var dblBet     = GameEngine.GetEffectiveBet(p, hand);
-                        var dblKey     = PlayerStatKey(p);
-                        var dblBank    = config.PlayerStatsStore.TryGetValue(dblKey, out var dblStat) ? dblStat.Bank : 0;
+                        var dblBank    = p.BankBalance(config);
                         var dblRounded = (long)Math.Ceiling(dblBet);
                         var fromBank   = dblBank >= dblRounded;
                         // fromBank=true: BankAfter = balance after deduction; fromBank=false: BankAfter = shortfall (trade amount needed)
@@ -173,8 +171,7 @@ public partial class MainWindow : Window, IDisposable
                     case "Spl":
                     {
                         var splBet     = GameEngine.GetEffectiveBet(p, hand);
-                        var splKey     = PlayerStatKey(p);
-                        var splBank    = config.PlayerStatsStore.TryGetValue(splKey, out var splStat) ? splStat.Bank : 0;
+                        var splBank    = p.BankBalance(config);
                         var splRounded = (long)Math.Ceiling(splBet);
                         var fromBank   = splBank >= splRounded;
                         // fromBank=true: BankAfter = balance after deduction; fromBank=false: BankAfter = shortfall (trade amount needed)
@@ -186,7 +183,7 @@ public partial class MainWindow : Window, IDisposable
                     case "ConfirmDbl":
                         Apply(new AnnounceDoubleConfirm(pi, hi));
                         Apply(new DoubleDown(pi, hi));
-                        var dblKey2 = PlayerStatKey(p);
+                        var dblKey2 = p.StatsKey();
                         var dblAmt2 = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
                         if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0)
                         {
@@ -199,7 +196,7 @@ public partial class MainWindow : Window, IDisposable
                         QueueHitRoll(isDealer: false, pi, hi);
                         break;
                     case "ConfirmSpl":
-                        var splKey2 = PlayerStatKey(p);
+                        var splKey2 = p.StatsKey();
                         var splAmt2 = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
                         if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0)
                         {
@@ -420,11 +417,6 @@ public partial class MainWindow : Window, IDisposable
         config.Save();
     }
 
-    private static string PlayerStatKey(Player p) =>
-        p.FullName.Length > 0 ? $"{p.FullName}@{p.World}" : p.Nickname;
-
-    private static bool IsBanking(PlayerStat stat) => stat.Bank > 0 || stat.BankLog.Count > 0;
-
     private static void ApplyBank(PlayerStat stat, BankTransaction tx)
     {
         var (newBalance, entry) = BankLedger.Apply(stat.Bank, tx, DateTime.Now);
@@ -444,7 +436,7 @@ public partial class MainWindow : Window, IDisposable
         {
             var p   = state.Players[pi];
             if (p.SittingOut) continue;
-            var key = PlayerStatKey(p);
+            var key = p.StatsKey();
             if (!config.PlayerStatsStore.TryGetValue(key, out var stat))
             {
                 stat = new PlayerStat { DisplayName = p.DisplayName };
@@ -476,7 +468,7 @@ public partial class MainWindow : Window, IDisposable
         {
             var p2  = state.Players[pi2];
             if (p2.SittingOut) continue;
-            var key2 = PlayerStatKey(p2);
+            var key2 = p2.StatsKey();
             if (!config.PlayerStatsStore.TryGetValue(key2, out var stat2)) continue;
             if (stat2.Bank <= 0 && stat2.BankLog.Count == 0) continue;
 
@@ -682,8 +674,7 @@ private static unsafe void SendChatMessage(string message)
                 {
                     if (pendingGaveGil > 0 && isBankMonitor)
                     {
-                        var wdKey = PlayerStatKey(State.Players[pi]);
-                        var wdBank = config.PlayerStatsStore.TryGetValue(wdKey, out var wdStat) ? wdStat.Bank : 0;
+                        var wdBank = State.Players[pi].BankBalance(config);
                         if (wdBank > 0)
                             pendingBankTradePrompt = (pi, pendingGaveGil, true);
                     }
@@ -867,7 +858,7 @@ private static unsafe void SendChatMessage(string message)
         {
             var bankWinOpen = true;
             var bmp     = State.Players[bankManagePlayerIndex];
-            var bmpKey  = PlayerStatKey(bmp);
+            var bmpKey  = bmp.StatsKey();
             ImGui.SetNextWindowSize(new Vector2(380, 480), ImGuiCond.FirstUseEver);
             if (ImGui.Begin("Bank##bankManage", ref bankWinOpen, ImGuiWindowFlags.NoCollapse))
             {
@@ -1065,7 +1056,7 @@ private static unsafe void SendChatMessage(string message)
             ImGui.SameLine();
             if (ImGui.Button("Bank deposit##bobBank"))
             {
-                var bobKey = PlayerStatKey(bobPlayer);
+                var bobKey = bobPlayer.StatsKey();
                 if (!config.PlayerStatsStore.TryGetValue(bobKey, out var bobStat))
                 {
                     bobStat = new PlayerStat { DisplayName = bobPlayer.DisplayName };
@@ -1095,7 +1086,7 @@ private static unsafe void SendChatMessage(string message)
         {
             var (btpi, btamt, btwd) = pendingBankTradePrompt!.Value;
             var btplayer = State.Players[btpi];
-            var btKey    = PlayerStatKey(btplayer);
+            var btKey    = btplayer.StatsKey();
             if (!config.PlayerStatsStore.TryGetValue(btKey, out var btStat))
             {
                 btStat = new PlayerStat { DisplayName = btplayer.DisplayName };
@@ -1338,7 +1329,7 @@ private static unsafe void SendChatMessage(string message)
 
         void DrawBankCell(int loopIdx, int actualIdx, Player player, float bankCellRight)
         {
-            var bankKey = PlayerStatKey(player);
+            var bankKey = player.StatsKey();
             if (!config.PlayerStatsStore.TryGetValue(bankKey, out var bankStat))
             {
                 bankStat = new PlayerStat { DisplayName = player.DisplayName };
@@ -1358,7 +1349,7 @@ private static unsafe void SendChatMessage(string message)
                 }
 
             ImGui.AlignTextToFramePadding();
-            if (IsBanking(bankStat))
+            if (bankStat.IsBanking())
             {
                 var bankLabel = GameEngine.FormatGil(bankVal);
                 if (shortfall > 0)
@@ -1807,9 +1798,7 @@ private static unsafe void SendChatMessage(string message)
                                 }
                                 if (config.RemindTargetEnabled && hasWorld)
                                     QueueTarget(p.FullName, p.World);
-                                var remindBankKey = PlayerStatKey(p);
-                                var remindBank = config.PlayerStatsStore.TryGetValue(remindBankKey, out var remindBankStat) ? remindBankStat.Bank : 0L;
-                                Apply(new AnnounceBetConfirm(pi, remindBank));
+                                Apply(new AnnounceBetConfirm(pi, p.BankBalance(config)));
                             }
                             if (!canConfirm) ImGui.EndDisabled();
                             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
@@ -1978,9 +1967,9 @@ private static unsafe void SendChatMessage(string message)
 #endif
                             Apply(new AnnounceDoubleConfirm(pi, hi));
                             Apply(new DoubleDown(pi, hi));
-                            var dblKey2    = PlayerStatKey(p);
+                            var dblKey2    = p.StatsKey();
                             var dblAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-                            if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0 && IsBanking(dblStat2))
+                            if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0 && dblStat2.IsBanking())
                             {
                                 var before2 = dblStat2.Bank;
                                 ApplyBank(dblStat2, new BankDoubleDown(dblAmt2));
@@ -2007,9 +1996,9 @@ private static unsafe void SendChatMessage(string message)
 #if DEBUG
                             ScenarioAdvance();
 #endif
-                            var splKey2    = PlayerStatKey(p);
+                            var splKey2    = p.StatsKey();
                             var splAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-                            if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0 && IsBanking(splStat2))
+                            if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0 && splStat2.IsBanking())
                             {
                                 var before2 = splStat2.Bank;
                                 ApplyBank(splStat2, new BankSplit(splAmt2));
@@ -2089,8 +2078,7 @@ private static unsafe void SendChatMessage(string message)
                             ScenarioAdvance();
 #endif
                             var dblBet     = GameEngine.GetEffectiveBet(p, hand);
-                            var dblKey     = PlayerStatKey(p);
-                            var dblBank    = config.PlayerStatsStore.TryGetValue(dblKey, out var dblStat) ? dblStat.Bank : 0;
+                            var dblBank    = p.BankBalance(config);
                             var dblRounded = (long)Math.Ceiling(dblBet);
                             var fromBank   = dblBank >= dblRounded;
                             var bankAfter  = fromBank ? dblBank - dblRounded : dblRounded - dblBank;
@@ -2117,8 +2105,7 @@ private static unsafe void SendChatMessage(string message)
                             ScenarioAdvance();
 #endif
                             var splBet     = GameEngine.GetEffectiveBet(p, hand);
-                            var splKey     = PlayerStatKey(p);
-                            var splBank    = config.PlayerStatsStore.TryGetValue(splKey, out var splStat) ? splStat.Bank : 0;
+                            var splBank    = p.BankBalance(config);
                             var splRounded = (long)Math.Ceiling(splBet);
                             var fromBank   = splBank >= splRounded;
                             var bankAfter  = fromBank ? splBank - splRounded : splRounded - splBank;
@@ -2184,8 +2171,7 @@ private static unsafe void SendChatMessage(string message)
                     // Bank
                     ImGui.TableSetColumnIndex(2);
                     {
-                        var sitBankKey = PlayerStatKey(sp);
-                        var sitBankVal = config.PlayerStatsStore.TryGetValue(sitBankKey, out var sitStat) ? sitStat.Bank : 0;
+                        var sitBankVal = sp.BankBalance(config);
                         var sitBankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                         ImGui.AlignTextToFramePadding();
                         if (sitBankVal > 0)
@@ -2317,9 +2303,9 @@ private static unsafe void SendChatMessage(string message)
                     .Select((p, i) => (p, i))
                     .Where(x => !x.p.SittingOut)
                     .Where(x => {
-                        var key = PlayerStatKey(x.p);
+                        var key = x.p.StatsKey();
                         if (!config.PlayerStatsStore.TryGetValue(key, out var st)) return false;
-                        if (!IsBanking(st)) return false;
+                        if (!st.IsBanking()) return false;
                         var eb = GameEngine.ParseBet(effectiveBets[x.i]);
                         return eb > 0 && st.Bank < eb;
                     })
@@ -2354,8 +2340,7 @@ private static unsafe void SendChatMessage(string message)
                         if (p.SittingOut) continue;
                         var betAmt = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
                         if (betAmt <= 0) continue;
-                        var betKey = PlayerStatKey(p);
-                        if (!config.PlayerStatsStore.TryGetValue(betKey, out var betStat) || !IsBanking(betStat)) continue;
+                        if (!p.TryGetBankingStat(config, out var betStat)) continue;
                         ApplyBank(betStat, new BankBet(betAmt));
                     }
                     // Queue initial cards: dealer first, then each active player gets both cards in a pair
