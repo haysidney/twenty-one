@@ -237,6 +237,27 @@ public static class GameEngine
         return delta == 0 ? null : delta;
     }
 
+    /// <summary>
+    /// Total gil owed back to the player at settlement: bet returned + profit
+    /// for wins, bet returned for push, zero for loss/no-bet. Used by the bank
+    /// settlement path which deposits the gross amount.
+    /// </summary>
+    public static decimal PayoutTotalOwed(GameState state, int playerIndex, int handIndex = 0)
+    {
+        var player = state.Players[playerIndex];
+        var hand   = player.Hands[handIndex];
+        var bet    = GetEffectiveBet(player, hand);
+        if (bet <= 0) return 0m;
+        return GetPayoutResult(state, playerIndex, handIndex) switch
+        {
+            PayoutResult.Win        => bet * 2m,
+            PayoutResult.BjWin      => bet + Math.Ceiling(bet * BjMultiplier(state.BjPayout)),
+            PayoutResult.CharlieWin => bet + Math.Ceiling(bet * CharlieMultiplier(state.CharliePayout)),
+            PayoutResult.Push       => bet,
+            _                       => 0m,
+        };
+    }
+
     public static string PayoutAmountString(GameState state, int playerIndex, int handIndex = 0)
     {
         var delta = PayoutDelta(state, playerIndex, handIndex);
