@@ -2039,7 +2039,7 @@ public class SplitHandTests
         var t = new NarrationTemplates { PlayerBankShortfall = [["{name} needs {amount}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBankShortfall(0, 60000), t);
         Assert.Single(effects);
-        Assert.Equal("Lorah needs 60K", ((SendChat)effects[0]).Text);
+        Assert.Equal("Lorah needs 60000", ((SendChat)effects[0]).Text);
     }
 
     [Fact]
