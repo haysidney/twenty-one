@@ -230,7 +230,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
         // Player stats table
         var flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
-        if (ImGui.BeginTable("##stats", 8, flags))
+        if (ImGui.BeginTable("##stats", 9, flags))
         {
             ImGui.TableSetupColumn("Player"u8,    ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Played"u8,    ImGuiTableColumnFlags.WidthFixed, 55);
@@ -238,6 +238,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             ImGui.TableSetupColumn("Pushes"u8,    ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Lost"u8,      ImGuiTableColumnFlags.WidthFixed, 45);
             ImGui.TableSetupColumn("BJs"u8,       ImGuiTableColumnFlags.WidthFixed, 40);
+            ImGui.TableSetupColumn("5CCs"u8,      ImGuiTableColumnFlags.WidthFixed, 40);
             ImGui.TableSetupColumn("Win %"u8,     ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Net"u8,       ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableHeadersRow();
@@ -271,12 +272,16 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
                 ImGui.TableSetColumnIndex(6);
                 ImGui.AlignTextToFramePadding();
+                ImGui.TextUnformatted(stat.Charlies.ToString());
+
+                ImGui.TableSetColumnIndex(7);
+                ImGui.AlignTextToFramePadding();
                 var winPct = stat.GamesPlayed > 0
                     ? $"{stat.GamesWon * 100.0 / stat.GamesPlayed:0.#}%"
                     : "-";
                 ImGui.TextUnformatted(winPct);
 
-                ImGui.TableSetColumnIndex(7);
+                ImGui.TableSetColumnIndex(8);
                 ImGui.AlignTextToFramePadding();
                 var netColor = stat.TotalWon > 0
                     ? new Vector4(0.35f, 0.9f, 0.35f, 1f)
@@ -335,6 +340,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
                 GamesPushed = kv.Value.GamesPushed,
                 GamesLost   = kv.Value.GamesLost,
                 Blackjacks  = kv.Value.Blackjacks,
+                Charlies    = kv.Value.Charlies,
                 TotalWon    = kv.Value.TotalWon,
             }));
         var (archivedStats, bankNet, archivedRounds) = SessionManager.BuildArchive(statData, roundSummaries);
@@ -404,14 +410,14 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     private string BuildExportText()
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Player\tPlayed\tWon\tPushes\tLost\tBJs\tWin%\tNet");
+        sb.AppendLine("Player\tPlayed\tWon\tPushes\tLost\tBJs\t5CCs\tWin%\tNet");
         foreach (var stat in config.PlayerStatsStore.Values.OrderBy(s => s.DisplayName))
         {
             var winPct = stat.GamesPlayed > 0
                 ? $"{stat.GamesWon * 100.0 / stat.GamesPlayed:0.#}%"
                 : "-";
             var totalStr = stat.TotalWon > 0 ? $"+{GameEngine.FormatGil(stat.TotalWon)}" : GameEngine.FormatGil(stat.TotalWon);
-            sb.AppendLine($"{stat.DisplayName}\t{stat.GamesPlayed}\t{stat.GamesWon}\t{stat.GamesPushed}\t{stat.GamesLost}\t{stat.Blackjacks}\t{winPct}\t{totalStr}");
+            sb.AppendLine($"{stat.DisplayName}\t{stat.GamesPlayed}\t{stat.GamesWon}\t{stat.GamesPushed}\t{stat.GamesLost}\t{stat.Blackjacks}\t{stat.Charlies}\t{winPct}\t{totalStr}");
         }
         return sb.ToString().TrimEnd();
     }

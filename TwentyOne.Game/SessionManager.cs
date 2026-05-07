@@ -14,6 +14,7 @@ public class PlayerStatData
     public int    GamesPushed { get; set; }
     public int    GamesLost   { get; set; }
     public int    Blackjacks  { get; set; }
+    public int    Charlies    { get; set; }
     public long   TotalWon    { get; set; }
 }
 
@@ -79,6 +80,7 @@ public static class SessionManager
                 GamesPushed = kv.Value.GamesPushed,
                 GamesLost   = kv.Value.GamesLost,
                 Blackjacks  = kv.Value.Blackjacks,
+                Charlies    = kv.Value.Charlies,
                 TotalWon    = kv.Value.TotalWon,
             });
 
@@ -95,6 +97,7 @@ public static class SessionManager
             s.GamesPushed = 0;
             s.GamesLost   = 0;
             s.Blackjacks  = 0;
+            s.Charlies    = 0;
             s.TotalWon    = 0;
         }
     }

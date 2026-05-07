@@ -495,6 +495,9 @@ public partial class MainWindow : Window, IDisposable
             stat.TotalWon += (long)net;
             if (p.Hands.Any(h => h.State == HandState.Blackjack))
                 stat.Blackjacks++;
+            for (var chi = 0; chi < p.Hands.Count; chi++)
+                if (GameEngine.GetPayoutResult(state, pi, chi) == PayoutResult.CharlieWin)
+                    stat.Charlies++;
 
             bankNet -= net; // bank gains when player loses
         }
