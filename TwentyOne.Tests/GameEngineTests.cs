@@ -2547,6 +2547,17 @@ public class FiveCardCharlieTests
         Assert.Equal("+100", GameEngine.PayoutAmountString(state, 0));
     }
 
+    [Theory]
+    [InlineData(PayoutRatio.ThreeToTwo, "+150")]   // 100 * 1.5 = 150
+    [InlineData(PayoutRatio.SixToFive,  "+120")]   // 100 * 1.2 = 120
+    [InlineData(PayoutRatio.EvenMoney,  "+100")]   // 100 * 1.0 = 100
+    public void CharliePayoutAmounts(PayoutRatio payout, string expected)
+    {
+        var state = CharlieState(FiveCardCharlieRule.BeatsAll, [2, 3, 4, 5, 6], [10, 7]);
+        state.CharliePayout = payout;
+        Assert.Equal(expected, GameEngine.PayoutAmountString(state, 0));
+    }
+
     [Fact]
     public void AddPlayerCard_FifthCard_Enabled_NarratesCharlie()
     {

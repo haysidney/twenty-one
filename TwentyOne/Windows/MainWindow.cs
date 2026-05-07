@@ -1433,7 +1433,13 @@ private static unsafe void SendChatMessage(string message)
                                                         PayoutRatio.EvenMoney => 1.0m,
                                                         _                         => 1.5m,
                                                     }), 2),
-                        PayoutResult.CharlieWin => GameEngine.GetEffectiveBet(player, player.Hands[bhi]),
+                        PayoutResult.CharlieWin => Math.Round(GameEngine.GetEffectiveBet(player, player.Hands[bhi])
+                                                    * (State.CharliePayout switch
+                                                    {
+                                                        PayoutRatio.SixToFive => 1.2m,
+                                                        PayoutRatio.EvenMoney => 1.0m,
+                                                        _                         => 1.5m,
+                                                    }), 2),
                         _                       => 0m,
                     };
                 }
