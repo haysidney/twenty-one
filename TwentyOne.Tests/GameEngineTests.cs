@@ -2694,12 +2694,15 @@ public class SittingOutTests
 
 public class BankLedgerTests
 {
+    private static (long NewBalance, BankTransactionEntry Entry) Apply(long balance, BankTransaction tx)
+        => BankLedger.Apply(balance, tx, default);
+
     // ── Credits ───────────────────────────────────────────────────────────────
 
     [Fact]
     public void Deposit_IncreasesBalance()
     {
-        var (bal, entry) = BankLedger.Apply(1000, new BankDeposit(500));
+        var (bal, entry) = Apply(1000, new BankDeposit(500));
         Assert.Equal(1500, bal);
         Assert.Equal(1500, entry.Balance);
         Assert.Equal(500,  entry.Amount);
@@ -2709,7 +2712,7 @@ public class BankLedgerTests
     [Fact]
     public void Win_IncreasesBalance()
     {
-        var (bal, entry) = BankLedger.Apply(1000, new BankWin(300));
+        var (bal, entry) = Apply(1000, new BankWin(300));
         Assert.Equal(1300, bal);
         Assert.Equal(BankTransactionKind.Win, entry.Kind);
     }
@@ -2717,7 +2720,7 @@ public class BankLedgerTests
     [Fact]
     public void Win_ZeroAmount_BalanceUnchanged()
     {
-        var (bal, _) = BankLedger.Apply(1000, new BankWin(0));
+        var (bal, _) = Apply(1000, new BankWin(0));
         Assert.Equal(1000, bal);
     }
 
@@ -2726,7 +2729,7 @@ public class BankLedgerTests
     [Fact]
     public void Withdrawal_DecreasesBalance()
     {
-        var (bal, entry) = BankLedger.Apply(1000, new BankWithdrawal(400));
+        var (bal, entry) = Apply(1000, new BankWithdrawal(400));
         Assert.Equal(600, bal);
         Assert.Equal(BankTransactionKind.Withdrawal, entry.Kind);
     }
@@ -2734,7 +2737,7 @@ public class BankLedgerTests
     [Fact]
     public void Bet_DecreasesBalance()
     {
-        var (bal, entry) = BankLedger.Apply(1000, new BankBet(1000));
+        var (bal, entry) = Apply(1000, new BankBet(1000));
         Assert.Equal(0, bal);
         Assert.Equal(BankTransactionKind.Bet, entry.Kind);
     }
@@ -2742,7 +2745,7 @@ public class BankLedgerTests
     [Fact]
     public void DoubleDown_DecreasesBalance()
     {
-        var (bal, entry) = BankLedger.Apply(1000, new BankDoubleDown(500));
+        var (bal, entry) = Apply(1000, new BankDoubleDown(500));
         Assert.Equal(500, bal);
         Assert.Equal(BankTransactionKind.DoubleDown, entry.Kind);
     }
@@ -2750,7 +2753,7 @@ public class BankLedgerTests
     [Fact]
     public void Split_DecreasesBalance()
     {
-        var (bal, entry) = BankLedger.Apply(1000, new BankSplit(500));
+        var (bal, entry) = Apply(1000, new BankSplit(500));
         Assert.Equal(500, bal);
         Assert.Equal(BankTransactionKind.Split, entry.Kind);
     }
@@ -2760,14 +2763,14 @@ public class BankLedgerTests
     [Fact]
     public void Withdrawal_ExceedsBalance_ClampsToZero()
     {
-        var (bal, _) = BankLedger.Apply(100, new BankWithdrawal(999));
+        var (bal, _) = Apply(100, new BankWithdrawal(999));
         Assert.Equal(0, bal);
     }
 
     [Fact]
     public void Bet_ExceedsBalance_ClampsToZero()
     {
-        var (bal, _) = BankLedger.Apply(0, new BankBet(1000));
+        var (bal, _) = Apply(0, new BankBet(1000));
         Assert.Equal(0, bal);
     }
 
@@ -2775,21 +2778,21 @@ public class BankLedgerTests
     public void DoubleDown_ExceedsBalance_ClampsToZero()
     {
         // Player traded to cover the double — bank may be 0; deduction never goes negative
-        var (bal, _) = BankLedger.Apply(0, new BankDoubleDown(1000));
+        var (bal, _) = Apply(0, new BankDoubleDown(1000));
         Assert.Equal(0, bal);
     }
 
     [Fact]
     public void Split_ExceedsBalance_ClampsToZero()
     {
-        var (bal, _) = BankLedger.Apply(0, new BankSplit(1000));
+        var (bal, _) = Apply(0, new BankSplit(1000));
         Assert.Equal(0, bal);
     }
 
     [Fact]
     public void DoubleDown_BankExactlyCoversBet_BalanceIsZero()
     {
-        var (bal, entry) = BankLedger.Apply(500, new BankDoubleDown(500));
+        var (bal, entry) = Apply(500, new BankDoubleDown(500));
         Assert.Equal(0, bal);
         Assert.Equal(0, entry.Balance);
     }
@@ -2801,13 +2804,13 @@ public class BankLedgerTests
     {
         // Simulates: player banks 1000, bets 1000, deposits 1000 for double, double deducted at confirm
         long bank = 1000;
-        (bank, _) = BankLedger.Apply(bank, new BankBet(1000));       // StartDeal
+        (bank, _) = Apply(bank, new BankBet(1000));       // StartDeal
         Assert.Equal(0, bank);
 
-        (bank, _) = BankLedger.Apply(bank, new BankDeposit(1000));   // trade received, deposited
+        (bank, _) = Apply(bank, new BankDeposit(1000));   // trade received, deposited
         Assert.Equal(1000, bank);
 
-        (bank, _) = BankLedger.Apply(bank, new BankDoubleDown(1000)); // Confirm Dbl
+        (bank, _) = Apply(bank, new BankDoubleDown(1000)); // Confirm Dbl
         Assert.Equal(0, bank);
     }
 
@@ -2816,13 +2819,13 @@ public class BankLedgerTests
     {
         // Player trades 2000 (only 1000 needed for double) — excess stays in bank
         long bank = 1000;
-        (bank, _) = BankLedger.Apply(bank, new BankBet(1000));
+        (bank, _) = Apply(bank, new BankBet(1000));
         Assert.Equal(0, bank);
 
-        (bank, _) = BankLedger.Apply(bank, new BankDeposit(2000));
+        (bank, _) = Apply(bank, new BankDeposit(2000));
         Assert.Equal(2000, bank);
 
-        (bank, _) = BankLedger.Apply(bank, new BankDoubleDown(1000));
+        (bank, _) = Apply(bank, new BankDoubleDown(1000));
         Assert.Equal(1000, bank);
     }
 
@@ -2831,16 +2834,16 @@ public class BankLedgerTests
     [Fact]
     public void Entry_BalanceReflectsPostTransactionState()
     {
-        var (_, entry) = BankLedger.Apply(800, new BankBet(300));
+        var (_, entry) = Apply(800, new BankBet(300));
         Assert.Equal(500, entry.Balance); // post-deduction balance
         Assert.Equal(300, entry.Amount);
     }
 
     [Fact]
-    public void Entry_HasTimestamp()
+    public void Entry_PreservesTimestamp()
     {
-        var before = System.DateTime.Now;
-        var (_, entry) = BankLedger.Apply(0, new BankDeposit(1));
-        Assert.True(entry.Timestamp >= before);
+        var t = new System.DateTime(2025, 1, 15, 12, 0, 0);
+        var (_, entry) = BankLedger.Apply(0, new BankDeposit(1), t);
+        Assert.Equal(t, entry.Timestamp);
     }
 }

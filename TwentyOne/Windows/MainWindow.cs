@@ -442,7 +442,7 @@ public partial class MainWindow : Window, IDisposable
 
     private static void ApplyBank(PlayerStat stat, BankTransaction tx)
     {
-        var (newBalance, entry) = BankLedger.Apply(stat.Bank, tx);
+        var (newBalance, entry) = BankLedger.Apply(stat.Bank, tx, DateTime.Now);
         stat.Bank = newBalance;
         stat.BankLog.Add(entry);
     }

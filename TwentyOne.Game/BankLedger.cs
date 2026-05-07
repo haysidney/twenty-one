@@ -26,34 +26,25 @@ public static class BankLedger
 {
     /// <summary>
     /// Pure function. Returns new balance and a log entry. Never produces a negative balance.
+    /// The timestamp is supplied by the caller so the core stays free of <c>DateTime.Now</c>.
     /// </summary>
-    public static (long NewBalance, BankTransactionEntry Entry) Apply(long balance, BankTransaction tx)
+    public static (long NewBalance, BankTransactionEntry Entry) Apply(
+        long balance, BankTransaction tx, DateTime timestamp)
     {
-        var (newBalance, kind) = tx switch
+        var (newBalance, kind, amount) = tx switch
         {
-            BankDeposit    d => (balance + d.Amount,               BankTransactionKind.Deposit),
-            BankWithdrawal w => (Math.Max(0, balance - w.Amount),  BankTransactionKind.Withdrawal),
-            BankBet        b => (Math.Max(0, balance - b.Amount),  BankTransactionKind.Bet),
-            BankWin        w => (balance + w.Amount,               BankTransactionKind.Win),
-            BankDoubleDown d => (Math.Max(0, balance - d.Amount),  BankTransactionKind.DoubleDown),
-            BankSplit      s => (Math.Max(0, balance - s.Amount),  BankTransactionKind.Split),
+            BankDeposit    d => (balance + d.Amount,              BankTransactionKind.Deposit,    d.Amount),
+            BankWithdrawal w => (Math.Max(0, balance - w.Amount), BankTransactionKind.Withdrawal, w.Amount),
+            BankBet        b => (Math.Max(0, balance - b.Amount), BankTransactionKind.Bet,        b.Amount),
+            BankWin        w => (balance + w.Amount,              BankTransactionKind.Win,        w.Amount),
+            BankDoubleDown d => (Math.Max(0, balance - d.Amount), BankTransactionKind.DoubleDown, d.Amount),
+            BankSplit      s => (Math.Max(0, balance - s.Amount), BankTransactionKind.Split,      s.Amount),
             _                => throw new ArgumentOutOfRangeException(nameof(tx)),
-        };
-
-        var amount = tx switch
-        {
-            BankDeposit    d => d.Amount,
-            BankWithdrawal w => w.Amount,
-            BankBet        b => b.Amount,
-            BankWin        w => w.Amount,
-            BankDoubleDown d => d.Amount,
-            BankSplit      s => s.Amount,
-            _                => 0L,
         };
 
         var entry = new BankTransactionEntry
         {
-            Timestamp = DateTime.Now,
+            Timestamp = timestamp,
             Kind      = kind,
             Amount    = amount,
             Balance   = newBalance,
