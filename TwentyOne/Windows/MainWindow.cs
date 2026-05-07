@@ -757,6 +757,21 @@ private static unsafe void SendChatMessage(string message)
         }
     }
 
+    /// <summary>
+    /// Renders a player-hand score cell: bust → red, 21 → gold, otherwise plain.
+    /// Stood hands collapse the soft/hard pair to a single number; everything
+    /// else uses ScoreString.
+    /// </summary>
+    private static void DrawScoreCell(IReadOnlyList<int> cards, HandState state)
+    {
+        if (cards.Count == 0) return;
+        var val = GameEngine.HandValue(cards);
+        var s   = state == HandState.Stand ? val.ToString() : GameEngine.ScoreString(cards);
+        if      (val > 21)  ImGui.TextColored(GameColors.BustRed, s);
+        else if (val == 21) ImGui.TextColored(GameColors.BlackjackGold, s);
+        else                ImGui.Text(s);
+    }
+
     private static (string Label, Vector4 Color) PayoutDisplay(GameState state, int playerIndex, int handIndex) =>
         GameEngine.GetPayoutResult(state, playerIndex, handIndex) switch
         {
@@ -1835,19 +1850,7 @@ private static unsafe void SendChatMessage(string message)
 
                     // ── Score column ──────────────────────────────────────────
                     ImGui.TableSetColumnIndex(4);
-                    if (hand.Cards.Count > 0)
-                    {
-                        var val      = GameEngine.HandValue(hand.Cards);
-                        var scoreStr = hand.State == HandState.Stand
-                            ? val.ToString()
-                            : GameEngine.ScoreString(hand.Cards);
-                        if (val > 21)
-                            ImGui.TextColored(GameColors.BustRed, scoreStr);
-                        else if (val == 21)
-                            ImGui.TextColored(GameColors.BlackjackGold, scoreStr);
-                        else
-                            ImGui.Text(scoreStr);
-                    }
+                    DrawScoreCell(hand.Cards, hand.State);
 
                     // ── Status column ─────────────────────────────────────────
                     ImGui.TableSetColumnIndex(5);
