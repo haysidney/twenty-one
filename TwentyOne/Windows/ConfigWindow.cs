@@ -77,7 +77,7 @@ public class ConfigWindow : Window, IDisposable
         ImGui.SetNextItemWidth(70);
         if (ImGui.Combo("##bjpayout", ref bjIdx, bjOptions, bjOptions.Length))
         {
-            config.GameState.BjPayout = (BlackjackPayout)bjIdx;
+            config.GameState.BjPayout = (PayoutRatio)bjIdx;
             config.Save();
         }
 
@@ -91,6 +91,21 @@ public class ConfigWindow : Window, IDisposable
         {
             config.GameState.FiveCardCharlie = (FiveCardCharlieRule)charlieIdx;
             config.Save();
+        }
+
+        if (config.GameState.FiveCardCharlie != FiveCardCharlieRule.Disabled)
+        {
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text("Charlie Payout");
+            ImGui.SameLine();
+            var charliePayoutOptions = new[] { "3:2", "6:5", "1:1" };
+            var charliePayoutIdx     = (int)config.GameState.CharliePayout;
+            ImGui.SetNextItemWidth(70);
+            if (ImGui.Combo("##charliepayout", ref charliePayoutIdx, charliePayoutOptions, charliePayoutOptions.Length))
+            {
+                config.GameState.CharliePayout = (PayoutRatio)charliePayoutIdx;
+                config.Save();
+            }
         }
 
         ImGui.Spacing();

@@ -477,11 +477,17 @@ public partial class MainWindow : Window, IDisposable
                     PayoutResult.BjWin      => Math.Ceiling(GameEngine.GetEffectiveBet(p, p.Hands[hi])
                                                 * (state.BjPayout switch
                                                 {
-                                                    BlackjackPayout.SixToFive => 1.2m,
-                                                    BlackjackPayout.EvenMoney => 1.0m,
+                                                    PayoutRatio.SixToFive => 1.2m,
+                                                    PayoutRatio.EvenMoney => 1.0m,
                                                     _                         => 1.5m,
                                                 })),
-                    PayoutResult.CharlieWin => GameEngine.GetEffectiveBet(p, p.Hands[hi]),
+                    PayoutResult.CharlieWin => Math.Ceiling(GameEngine.GetEffectiveBet(p, p.Hands[hi])
+                                                * (state.CharliePayout switch
+                                                {
+                                                    PayoutRatio.SixToFive => 1.2m,
+                                                    PayoutRatio.EvenMoney => 1.0m,
+                                                    _                     => 1.5m,
+                                                })),
                     PayoutResult.Lose       => -GameEngine.GetEffectiveBet(p, p.Hands[hi]),
                     _                       => 0m,
                 };
@@ -523,11 +529,16 @@ public partial class MainWindow : Window, IDisposable
                     PayoutResult.Win        => eb2 * 2m,
                     PayoutResult.BjWin      => eb2 + Math.Ceiling(eb2 * (state.BjPayout switch
                                                 {
-                                                    BlackjackPayout.SixToFive => 1.2m,
-                                                    BlackjackPayout.EvenMoney => 1.0m,
+                                                    PayoutRatio.SixToFive => 1.2m,
+                                                    PayoutRatio.EvenMoney => 1.0m,
                                                     _                         => 1.5m,
                                                 })),
-                    PayoutResult.CharlieWin => eb2 * 2m,
+                    PayoutResult.CharlieWin => eb2 + Math.Ceiling(eb2 * (state.CharliePayout switch
+                                                {
+                                                    PayoutRatio.SixToFive => 1.2m,
+                                                    PayoutRatio.EvenMoney => 1.0m,
+                                                    _                     => 1.5m,
+                                                })),
                     PayoutResult.Push       => eb2,
                     _                       => 0m,
                 };
@@ -1418,8 +1429,8 @@ private static unsafe void SendChatMessage(string message)
                         PayoutResult.BjWin      => Math.Round(GameEngine.GetEffectiveBet(player, player.Hands[bhi])
                                                     * (State.BjPayout switch
                                                     {
-                                                        BlackjackPayout.SixToFive => 1.2m,
-                                                        BlackjackPayout.EvenMoney => 1.0m,
+                                                        PayoutRatio.SixToFive => 1.2m,
+                                                        PayoutRatio.EvenMoney => 1.0m,
                                                         _                         => 1.5m,
                                                     }), 2),
                         PayoutResult.CharlieWin => GameEngine.GetEffectiveBet(player, player.Hands[bhi]),

@@ -532,10 +532,10 @@ public class PayoutTests
     }
 
     [Theory]
-    [InlineData(BlackjackPayout.ThreeToTwo, "+150")]   // 100 * 1.5 = 150
-    [InlineData(BlackjackPayout.SixToFive,  "+120")]   // 100 * 1.2 = 120
-    [InlineData(BlackjackPayout.EvenMoney,  "+100")]   // 100 * 1.0 = 100
-    public void BjPayoutAmounts(BlackjackPayout payout, string expected)
+    [InlineData(PayoutRatio.ThreeToTwo, "+150")]   // 100 * 1.5 = 150
+    [InlineData(PayoutRatio.SixToFive,  "+120")]   // 100 * 1.2 = 120
+    [InlineData(PayoutRatio.EvenMoney,  "+100")]   // 100 * 1.0 = 100
+    public void BjPayoutAmounts(PayoutRatio payout, string expected)
     {
         var state = new GameState
         {
@@ -552,7 +552,7 @@ public class PayoutTests
     public void RegularWin_ReturnsBetAmount()
     {
         var state = PayoutState([10, 9], HandState.Stand, [10, 7]);
-        state.BjPayout = BlackjackPayout.ThreeToTwo;
+        state.BjPayout = PayoutRatio.ThreeToTwo;
         Assert.Equal("+100", GameEngine.PayoutAmountString(state, 0));
     }
 }

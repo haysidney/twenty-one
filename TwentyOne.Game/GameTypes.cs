@@ -28,7 +28,7 @@ public class RoundHistoryEntry
 
 public enum HandState { Playing, Stand, Bust, Blackjack, Charlie }
 public enum GamePhase { Betting, Deal, PlayerTurns, DealerTurn, Payout }
-public enum BlackjackPayout { ThreeToTwo, SixToFive, EvenMoney }
+public enum PayoutRatio { ThreeToTwo, SixToFive, EvenMoney }
 public enum PayoutResult { None, Win, BjWin, CharlieWin, Lose, Push }
 public enum FiveCardCharlieRule { Disabled, BeatsAll, LosesToDealerBJ }
 
@@ -75,7 +75,8 @@ public class GameState
     public int ActiveHandIndex { get; set; } = -1;
     public bool WaitingForNextPlayer { get; set; } = false;
     public bool WaitingForDealer { get; set; } = false;
-    public BlackjackPayout BjPayout { get; set; } = BlackjackPayout.ThreeToTwo;
+    public PayoutRatio BjPayout { get; set; } = PayoutRatio.ThreeToTwo;
+    public PayoutRatio CharliePayout { get; set; } = PayoutRatio.EvenMoney;
     public FiveCardCharlieRule FiveCardCharlie { get; set; } = FiveCardCharlieRule.Disabled;
     // FullNames (or Nicknames for manual players) of players who won last round.
     public HashSet<string> LastRoundWinners { get; set; } = [];

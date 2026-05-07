@@ -230,7 +230,7 @@ public static class GameEngine
         {
             PayoutResult.Win        => bet,
             PayoutResult.BjWin      => Math.Ceiling(bet * BjMultiplier(state.BjPayout)),
-            PayoutResult.CharlieWin => bet,
+            PayoutResult.CharlieWin => Math.Ceiling(bet * CharlieMultiplier(state.CharliePayout)),
             PayoutResult.Lose       => -bet,
             _                       => 0m,
         };
@@ -244,12 +244,15 @@ public static class GameEngine
         return delta > 0 ? $"+{FormatGil(delta.Value)}" : FormatGil(delta.Value);
     }
 
-    private static decimal BjMultiplier(BlackjackPayout payout) => payout switch
+    private static decimal PayoutMultiplier(PayoutRatio ratio) => ratio switch
     {
-        BlackjackPayout.SixToFive => 1.2m,
-        BlackjackPayout.EvenMoney => 1.0m,
-        _                         => 1.5m,
+        PayoutRatio.SixToFive => 1.2m,
+        PayoutRatio.EvenMoney => 1.0m,
+        _                     => 1.5m,
     };
+
+    private static decimal BjMultiplier(PayoutRatio payout) => PayoutMultiplier(payout);
+    private static decimal CharlieMultiplier(PayoutRatio payout) => PayoutMultiplier(payout);
 
     // ── Internal state builders ───────────────────────────────────────────────
 
@@ -297,7 +300,7 @@ public static class GameEngine
         int?                  activeHandIndex       = null,
         bool?                 waitingForNextPlayer  = null,
         bool?                 waitingForDealer      = null,
-        BlackjackPayout?      bjPayout              = null,
+        PayoutRatio?      bjPayout              = null,
         HashSet<string>?      lastRoundWinners      = null,
         HashSet<string>?      lastRoundPushers      = null) =>
         new GameState
@@ -931,9 +934,12 @@ public static class GameEngine
                         for (var hi = 0; hi < p.Hands.Count; hi++)
                         {
                             var eb = GetEffectiveBet(p, p.Hands[hi]);
-                            total += GetPayoutResult(state, pi, hi) == PayoutResult.BjWin
-                                ? Math.Ceiling(eb * BjMultiplier(state.BjPayout))
-                                : eb;
+                            total += GetPayoutResult(state, pi, hi) switch
+                            {
+                                PayoutResult.BjWin      => Math.Ceiling(eb * BjMultiplier(state.BjPayout)),
+                                PayoutResult.CharlieWin => Math.Ceiling(eb * CharlieMultiplier(state.CharliePayout)),
+                                _                       => eb,
+                            };
                         }
                         var amtStr = total > 0 ? $"+{total:0.##}" : string.Empty;
                         Narrate(t.PayoutSplitCombined,
