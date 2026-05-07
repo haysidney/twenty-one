@@ -170,13 +170,13 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         ImGui.SameLine(0, 8);
         if (reconciled)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.35f, 0.9f, 0.35f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ProfitGreen);
             ImGui.TextUnformatted("OK");
             ImGui.PopStyleColor();
         }
         else
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.35f, 0.35f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BustRed);
             ImGui.TextUnformatted("MISMATCH");
             ImGui.PopStyleColor();
         }
@@ -284,10 +284,10 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
                 ImGui.TableSetColumnIndex(8);
                 ImGui.AlignTextToFramePadding();
                 var netColor = stat.TotalWon > 0
-                    ? new Vector4(0.35f, 0.9f, 0.35f, 1f)
+                    ? GameColors.ProfitGreen
                     : stat.TotalWon < 0
-                        ? new Vector4(1f, 0.35f, 0.35f, 1f)
-                        : new Vector4(0.7f, 0.7f, 0.7f, 1f);
+                        ? GameColors.BustRed
+                        : GameColors.PushGrey;
                 var netStr = stat.TotalWon > 0 ? $"+{GameEngine.FormatGil(stat.TotalWon)}" : GameEngine.FormatGil(stat.TotalWon);
                 ImGui.TextColored(netColor, netStr);
             }
@@ -381,10 +381,10 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     private static void ColoredGilText(long value)
     {
         var color = value > 0
-            ? new Vector4(0.35f, 0.9f, 0.35f, 1f)
+            ? GameColors.ProfitGreen
             : value < 0
-                ? new Vector4(1f, 0.35f, 0.35f, 1f)
-                : new Vector4(0.7f, 0.7f, 0.7f, 1f);
+                ? GameColors.BustRed
+                : GameColors.PushGrey;
         var text = value > 0 ? $"+{GameEngine.FormatGil(value)}" : GameEngine.FormatGil(value);
         ImGui.TextColored(color, text);
     }

@@ -87,7 +87,7 @@ public class DebugWindow : Window
         var active = mainWindow.ActiveScenario;
         if (active != null)
         {
-            ImGui.TextColored(new Vector4(1f, 0.7f, 0.2f, 1f), $"Active: {active.Name}");
+            ImGui.TextColored(GameColors.ActiveOrange, $"Active: {active.Name}");
             if (_playlistFile.Length > 0)
                 ImGui.TextDisabled(_playlistFile);
             ImGui.TextUnformatted($"Next: {active.PeekNext() ?? "(done)"}  ({active.Remaining} remaining)");

@@ -152,17 +152,17 @@ public class HistoryWindow : Window
             ImGui.TableSetColumnIndex(1);
             ImGui.AlignTextToFramePadding();
             if (winners.Count > 0)
-                ImGui.TextColored(new Vector4(0.35f, 0.9f, 0.35f, 1f), string.Join(", ", winners));
+                ImGui.TextColored(GameColors.ProfitGreen, string.Join(", ", winners));
 
             ImGui.TableSetColumnIndex(2);
             ImGui.AlignTextToFramePadding();
             if (losers.Count > 0)
-                ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f), string.Join(", ", losers));
+                ImGui.TextColored(GameColors.BustRed, string.Join(", ", losers));
 
             ImGui.TableSetColumnIndex(3);
             ImGui.AlignTextToFramePadding();
             if (pushes.Count > 0)
-                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), string.Join(", ", pushes));
+                ImGui.TextColored(GameColors.PushGrey, string.Join(", ", pushes));
 
             ImGui.TableSetColumnIndex(4);
             ImGui.AlignTextToFramePadding();
@@ -363,17 +363,17 @@ public class HistoryWindow : Window
             ImGui.TableSetColumnIndex(1);
             ImGui.AlignTextToFramePadding();
             if (r.Winners.Count > 0)
-                ImGui.TextColored(new Vector4(0.35f, 0.9f, 0.35f, 1f), string.Join(", ", r.Winners));
+                ImGui.TextColored(GameColors.ProfitGreen, string.Join(", ", r.Winners));
 
             ImGui.TableSetColumnIndex(2);
             ImGui.AlignTextToFramePadding();
             if (r.Losers.Count > 0)
-                ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f), string.Join(", ", r.Losers));
+                ImGui.TextColored(GameColors.BustRed, string.Join(", ", r.Losers));
 
             ImGui.TableSetColumnIndex(3);
             ImGui.AlignTextToFramePadding();
             if (r.Pushes.Count > 0)
-                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), string.Join(", ", r.Pushes));
+                ImGui.TextColored(GameColors.PushGrey, string.Join(", ", r.Pushes));
 
             ImGui.TableSetColumnIndex(4);
             ImGui.AlignTextToFramePadding();
@@ -398,10 +398,10 @@ public class HistoryWindow : Window
     private static void DrawNetCell(long net)
     {
         var col = net > 0
-            ? new Vector4(0.35f, 0.9f, 0.35f, 1f)
+            ? GameColors.ProfitGreen
             : net < 0
-                ? new Vector4(1f, 0.35f, 0.35f, 1f)
-                : new Vector4(0.7f, 0.7f, 0.7f, 1f);
+                ? GameColors.BustRed
+                : GameColors.PushGrey;
         var str = net > 0 ? $"+{GameEngine.FormatGil(net)}" : GameEngine.FormatGil(net);
         ImGui.TextColored(col, str);
     }

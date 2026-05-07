@@ -754,35 +754,28 @@ private static unsafe void SendChatMessage(string message)
         switch (hand.State)
         {
             case HandState.Bust:
-                ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f), "Bust"); break;
+                ImGui.TextColored(GameColors.BustRed, "Bust"); break;
             case HandState.Blackjack:
-                ImGui.TextColored(new Vector4(1f, 0.85f, 0f, 1f), "Blackjack"); break;
+                ImGui.TextColored(GameColors.BlackjackGold, "Blackjack"); break;
             case HandState.Stand:
-                ImGui.TextColored(new Vector4(0.55f, 0.55f, 0.55f, 1f), "Stand"); break;
+                ImGui.TextColored(GameColors.StandGrey, "Stand"); break;
             case HandState.Playing:
                 if (hand.Cards.Count > 0)
-                    ImGui.TextColored(new Vector4(0.4f, 0.9f, 0.4f, 1f), "Playing");
+                    ImGui.TextColored(GameColors.PlayingGreen, "Playing");
                 break;
         }
     }
 
-    private static (string Label, Vector4 Color) PayoutDisplay(GameState state, int playerIndex, int handIndex)
-    {
-        var grey  = new Vector4(0.55f, 0.55f, 0.55f, 1f);
-        var red   = new Vector4(1f, 0.35f, 0.35f, 1f);
-        var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
-        var gold  = new Vector4(1f, 0.85f, 0f, 1f);
-
-        return GameEngine.GetPayoutResult(state, playerIndex, handIndex) switch
+    private static (string Label, Vector4 Color) PayoutDisplay(GameState state, int playerIndex, int handIndex) =>
+        GameEngine.GetPayoutResult(state, playerIndex, handIndex) switch
         {
-            PayoutResult.Win        => ("Win",     green),
-            PayoutResult.BjWin      => ("BJ Win",  gold),
-            PayoutResult.CharlieWin => ("Charlie", green),
-            PayoutResult.Lose       => ("Lose",    red),
-            PayoutResult.Push       => ("Push",    grey),
+            PayoutResult.Win        => ("Win",     GameColors.ProfitGreen),
+            PayoutResult.BjWin      => ("BJ Win",  GameColors.BlackjackGold),
+            PayoutResult.CharlieWin => ("Charlie", GameColors.ProfitGreen),
+            PayoutResult.Lose       => ("Lose",    GameColors.BustRed),
+            PayoutResult.Push       => ("Push",    GameColors.StandGrey),
             _                       => (string.Empty, default),
         };
-    }
 
     private static uint ToU32(Vector4 c) =>
         ((uint)(c.X * 255) & 0xFF) |
@@ -1005,8 +998,8 @@ private static unsafe void SendChatMessage(string message)
                             _                              => "?"
                         });
                         ImGui.TableSetColumnIndex(2);
-                        if (isCredit) ImGui.TextColored(new Vector4(0.4f, 1f, 0.4f, 1f), $"+{entry.Amount:N0}");
-                        else          ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), $"-{entry.Amount:N0}");
+                        if (isCredit) ImGui.TextColored(GameColors.CreditGreen, $"+{entry.Amount:N0}");
+                        else          ImGui.TextColored(GameColors.DebitRed, $"-{entry.Amount:N0}");
                         ImGui.TableSetColumnIndex(3); ImGui.TextUnformatted($"{entry.Balance:N0}");
                     }
                     ImGui.EndTable();
@@ -1025,7 +1018,7 @@ private static unsafe void SendChatMessage(string message)
         // ── Trade bet prompt modal ─────────────────────────────────────────────
         if (pendingBetPrompt.HasValue)
             ImGui.OpenPopup("Set bet from trade?##tradeBet");
-        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, new Vector4(0, 0, 0, 0));
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
         var showBetModal = ImGui.BeginPopupModal("Set bet from trade?##tradeBet", ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.PopStyleColor();
         if (showBetModal)
@@ -1053,7 +1046,7 @@ private static unsafe void SendChatMessage(string message)
         // ── Bet-or-bank trade prompt modal (both options on, Betting phase) ──────
         if (pendingBetOrBankPrompt.HasValue)
             ImGui.OpenPopup("Trade received##betOrBank");
-        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, new Vector4(0, 0, 0, 0));
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
         var showBetOrBankModal = ImGui.BeginPopupModal("Trade received##betOrBank", ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.PopStyleColor();
         if (showBetOrBankModal)
@@ -1095,7 +1088,7 @@ private static unsafe void SendChatMessage(string message)
         // ── Bank trade prompt modal ────────────────────────────────────────────
         if (pendingBankTradePrompt.HasValue)
             ImGui.OpenPopup("Bank trade##bankTradePrompt");
-        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, new Vector4(0, 0, 0, 0));
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
         var showBankModal = ImGui.BeginPopupModal("Bank trade##bankTradePrompt", ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.PopStyleColor();
         if (showBankModal)
@@ -1131,7 +1124,7 @@ private static unsafe void SendChatMessage(string message)
 
         if (isHistoryView)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.85f, 0.3f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BannerGold);
             ImGui.TextUnformatted("Viewing previous round");
             ImGui.PopStyleColor();
             ImGui.SameLine();
@@ -1142,7 +1135,7 @@ private static unsafe void SendChatMessage(string message)
 #if DEBUG
         if (ActiveScenario != null)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.7f, 0.2f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ActiveOrange);
             var nextStep = ActiveScenario.PeekNext() ?? "(done)";
             ImGui.TextUnformatted($"[SCENARIO] {ActiveScenario.Name}  |  Next: {nextStep}  ({ActiveScenario.Remaining} left)");
             ImGui.PopStyleColor();
@@ -1158,7 +1151,7 @@ private static unsafe void SendChatMessage(string message)
 
         if (!venueMemoryDismissed && !isHistoryView && GetVenueMemorySuggestion() is var suggestion && suggestion.HasValue)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.4f, 0.85f, 1f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ModalTitleBlue);
             ImGui.TextUnformatted($"The last time you were here you used \"{suggestion.Value.Name}\". Switch to it?");
             ImGui.PopStyleColor();
             ImGui.SameLine();
@@ -1186,7 +1179,7 @@ private static unsafe void SendChatMessage(string message)
                     venue.RoundHistory.Count,
                     DateTime.Now))
             {
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.85f, 0.3f, 1f));
+                ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BannerGold);
                 ImGui.TextUnformatted("It's been a while (or you're at a new location), want to mark a new session in the ledger?");
                 ImGui.PopStyleColor();
                 ImGui.SameLine();
@@ -1266,9 +1259,9 @@ private static unsafe void SendChatMessage(string message)
             var val      = GameEngine.HandValue(State.DealerHand.Cards);
             var scoreStr = GameEngine.ScoreString(State.DealerHand.Cards);
             if (val > 21)
-                ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f), $"= {scoreStr}  BUST");
+                ImGui.TextColored(GameColors.BustRed, $"= {scoreStr}  BUST");
             else if (val == 21 && State.DealerHand.Cards.Count == 2)
-                ImGui.TextColored(new Vector4(1f, 0.85f, 0f, 1f), $"= {scoreStr}  Blackjack");
+                ImGui.TextColored(GameColors.BlackjackGold, $"= {scoreStr}  Blackjack");
             else
             {
                 ImGui.Text($"= {scoreStr}");
@@ -1278,8 +1271,8 @@ private static unsafe void SendChatMessage(string message)
                 {
                     ImGui.SameLine();
                     var rc = rec == "HIT"
-                        ? new Vector4(0.4f, 0.9f, 0.4f, 1f)
-                        : new Vector4(0.6f, 0.6f, 0.6f, 1f);
+                        ? GameColors.PlayingGreen
+                        : GameColors.DisabledGrey;
                     ImGui.TextColored(rc, $"→ {rec}");
                 }
             }
@@ -1369,7 +1362,7 @@ private static unsafe void SendChatMessage(string message)
             {
                 var bankLabel = GameEngine.FormatGil(bankVal);
                 if (shortfall > 0)
-                    ImGui.TextColored(new Vector4(1f, 0.8f, 0.2f, 1f), bankLabel);
+                    ImGui.TextColored(GameColors.WarningAmber, bankLabel);
                 else
                     ImGui.TextUnformatted(bankLabel);
                 if (ImGui.IsItemHovered())
@@ -1571,9 +1564,9 @@ private static unsafe void SendChatMessage(string message)
                     ImGui.TableSetColumnIndex(5);
                     if (Phase == GamePhase.Payout)
                     {
-                        var green = new Vector4(0.35f, 0.9f, 0.35f, 1f);
-                        var red   = new Vector4(1f, 0.35f, 0.35f, 1f);
-                        var grey  = new Vector4(0.55f, 0.55f, 0.55f, 1f);
+                        var green = GameColors.ProfitGreen;
+                        var red   = GameColors.BustRed;
+                        var grey  = GameColors.StandGrey;
                         var sumTotalOwed = 0m;
                         var sumNetDelta  = 0m;
                         for (var hh = 0; hh < p.Hands.Count; hh++)
@@ -1860,9 +1853,9 @@ private static unsafe void SendChatMessage(string message)
                             ? val.ToString()
                             : GameEngine.ScoreString(hand.Cards);
                         if (val > 21)
-                            ImGui.TextColored(new Vector4(1f, 0.35f, 0.35f, 1f), scoreStr);
+                            ImGui.TextColored(GameColors.BustRed, scoreStr);
                         else if (val == 21)
-                            ImGui.TextColored(new Vector4(1f, 0.85f, 0f, 1f), scoreStr);
+                            ImGui.TextColored(GameColors.BlackjackGold, scoreStr);
                         else
                             ImGui.Text(scoreStr);
                     }
