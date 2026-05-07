@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using TwentyOne.Game;
+using TwentyOne.Tests.Helpers;
 using Xunit;
 
 namespace TwentyOne.Tests;
@@ -129,12 +130,11 @@ public class DealerRecommendationTests
 
 public class ApplyAddDealerCardTests
 {
-    private static GameState DealerTurnState() => new GameState
-    {
-        Phase      = GamePhase.DealerTurn,
-        DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-        Players    = [new Player { Nickname = "Lorah", Bet = "10", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
-    };
+    private static GameState DealerTurnState() => new GameStateBuilder()
+        .Phase(GamePhase.DealerTurn)
+        .Dealer(10)
+        .Player("Lorah", "10", 5, 8)
+        .Build();
 
     [Fact]
     public void AddDealerCard_DealerTurn_NarratesNormalDraw()
@@ -178,17 +178,12 @@ public class ApplyAddDealerCardTests
 
 public class ApplyAddPlayerCardTests
 {
-    private static GameState ActivePlayerState(int activeIndex = 0) => new GameState
-    {
-        Phase             = GamePhase.PlayerTurns,
-        ActivePlayerIndex = activeIndex,
-        ActiveHandIndex   = 0,
-        Players =
-        [
-            new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] },
-            new Player { Nickname = "Bekki",   Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
-        ],
-    };
+    private static GameState ActivePlayerState(int activeIndex = 0) => new GameStateBuilder()
+        .Phase(GamePhase.PlayerTurns)
+        .ActiveHand(activeIndex)
+        .Player("Lorah", 5, 6)
+        .Player("Bekki", 10, 8)
+        .Build();
 
     [Fact]
     public void AddPlayerCard_NarratesHit()
