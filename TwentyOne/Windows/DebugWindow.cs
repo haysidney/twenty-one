@@ -84,7 +84,7 @@ public class DebugWindow : Window
         ImGui.Separator();
         ImGui.TextUnformatted("Scenario");
 
-        var active = mainWindow.ActiveScenario;
+        var active = mainWindow.Scenario.ActiveScenario;
         if (active != null)
         {
             ImGui.TextColored(GameColors.ActiveOrange, $"Active: {active.Name}");
@@ -96,17 +96,17 @@ public class DebugWindow : Window
                 mainWindow.ExecuteNextScenarioStep();
             ImGui.SameLine();
             if (ImGui.SmallButton("Fast Forward##scenFF"))
-                mainWindow.ScenarioFastForward = true;
+                mainWindow.Scenario.FastForward = true;
             ImGui.SameLine();
             if (ImGui.SmallButton("Abort##scenAbort"))
             {
-                mainWindow.ActiveScenario = null;
-                mainWindow.ScenarioFastForward = false;
-                mainWindow.DebugRollQueue.Clear();
+                mainWindow.Scenario.ActiveScenario = null;
+                mainWindow.Scenario.FastForward = false;
+                mainWindow.Scenario.RollQueue.Clear();
             }
-            var gate = mainWindow.ScenarioGateButtons;
+            var gate = mainWindow.Scenario.GateButtons;
             if (ImGui.Checkbox("Gate buttons##scenGate", ref gate))
-                mainWindow.ScenarioGateButtons = gate;
+                mainWindow.Scenario.GateButtons = gate;
         }
         else
         {
@@ -155,7 +155,7 @@ public class DebugWindow : Window
         ImGui.Separator();
         ImGui.TextUnformatted("Roll Queue");
 
-        var queue = mainWindow.DebugRollQueue;
+        var queue = mainWindow.Scenario.RollQueue;
         ImGui.TextUnformatted($"Queued rolls: {queue.Count}");
         if (queue.Count > 0)
         {
@@ -246,24 +246,24 @@ public class DebugWindow : Window
         config.RedoStack.Clear();
         config.Save();
         mainWindow.ClearBetEdits();
-        mainWindow.ScenarioFastForward = false;
+        mainWindow.Scenario.FastForward = false;
 
         // Enqueue rolls
-        var queue = mainWindow.DebugRollQueue;
+        var queue = mainWindow.Scenario.RollQueue;
         queue.Clear();
         foreach (var r in file.Rolls ?? [])
             if (r >= 1 && r <= 13)
                 queue.Enqueue(r);
 
         // Set active scenario
-        mainWindow.ActiveScenario = new ActiveScenario(
+        mainWindow.Scenario.ActiveScenario = new ActiveScenario(
             file.Name ?? Path.GetFileNameWithoutExtension(path),
             file.Actions ?? []);
     }
 
     private void EnqueueRollString(string input)
     {
-        var queue = mainWindow.DebugRollQueue;
+        var queue = mainWindow.Scenario.RollQueue;
         foreach (var part in input.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             if (int.TryParse(part, out var r) && r >= 1 && r <= 13)
                 queue.Enqueue(r);

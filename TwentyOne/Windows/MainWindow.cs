@@ -61,36 +61,20 @@ public partial class MainWindow : Window, IDisposable
     // deferred roll: set by OnChatMessage, applied at the start of the next Draw()
     private (bool IsDealer, int PlayerIndex, int HandIndex, int Roll)?      deferredRoll;
 #if DEBUG
-    // debug roll queue: consumed by QueueHitRoll before sending chat, bypasses /random
-    public readonly Queue<int> DebugRollQueue = new();
-    private DebugWindow        debugWindow    = null!;
+    // Scenario runtime state (active scenario, gating, fast-forward, roll queue).
+    public readonly TwentyOne.Debug.ScenarioRunner Scenario = new();
+    private DebugWindow                            debugWindow = null!;
     public void SetDebugWindow(DebugWindow w) => debugWindow = w;
-
-    // active scenario: non-null while a scripted test scenario is running
-    public ActiveScenario? ActiveScenario { get; set; }
-    // when true, only the button matching the next scenario action is enabled
-    public bool ScenarioGateButtons = true;
-#if DEBUG
-    // when true, auto-steps through scenario actions as chatQueue drains each frame
-    public bool ScenarioFastForward = false;
-#endif
 
     // Called by DebugWindow after overwriting GameState so stale bet edits don't index OOB.
     public void ClearBetEdits() => betEdits.Clear();
 
-    // Returns true if no scenario is active, gating is off, or the next step matches key.
-    private bool IsScenarioStep(string key)
-        => ActiveScenario == null || !ScenarioGateButtons || ActiveScenario.PeekNext() == key;
-
-    // Advances the scenario pointer after a scripted button is clicked.
-    private void ScenarioAdvance() => ActiveScenario?.Advance();
-
     // Executes the next scripted action programmatically (Step button fallback).
     public void ExecuteNextScenarioStep()
     {
-        var step = ActiveScenario?.PeekNext();
+        var step = Scenario.ActiveScenario?.PeekNext();
         if (step == null) return;
-        ScenarioAdvance();
+        Scenario.Advance();
         switch (step)
         {
             case "StartDeal":
@@ -512,7 +496,7 @@ public partial class MainWindow : Window, IDisposable
     private void QueueHitRoll(bool isDealer, int playerIndex, int handIndex)
     {
 #if DEBUG
-        if (DebugRollQueue.TryDequeue(out var debugRoll))
+        if (Scenario.RollQueue.TryDequeue(out var debugRoll))
         {
             LogRoll(isDealer, playerIndex, debugRoll);
             deferredRoll = (isDealer, playerIndex, handIndex, debugRoll);
@@ -689,10 +673,10 @@ public partial class MainWindow : Window, IDisposable
 
 #if DEBUG
         // Fast-forward: fire the next scenario step as soon as the chat queue and pending state drain
-        if (ScenarioFastForward && ActiveScenario?.PeekNext() != null
+        if (Scenario.FastForward && Scenario.ActiveScenario?.PeekNext() != null
             && chatQueue.Count == 0 && pendingHit == null && !deferredRoll.HasValue)
             ExecuteNextScenarioStep();
-        if (ActiveScenario?.PeekNext() == null) ScenarioFastForward = false;
+        if (Scenario.ActiveScenario?.PeekNext() == null) Scenario.FastForward = false;
 #endif
 
         // Process deferred roll from OnChatMessage
@@ -1007,17 +991,17 @@ public partial class MainWindow : Window, IDisposable
             ImGui.Separator();
         }
 #if DEBUG
-        if (ActiveScenario != null)
+        if (Scenario.ActiveScenario is { } activeScenario)
         {
             ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ActiveOrange);
-            var nextStep = ActiveScenario.PeekNext() ?? "(done)";
-            ImGui.TextUnformatted($"[SCENARIO] {ActiveScenario.Name}  |  Next: {nextStep}  ({ActiveScenario.Remaining} left)");
+            var nextStep = activeScenario.PeekNext() ?? "(done)";
+            ImGui.TextUnformatted($"[SCENARIO] {activeScenario.Name}  |  Next: {nextStep}  ({activeScenario.Remaining} left)");
             ImGui.PopStyleColor();
             ImGui.SameLine();
             if (ImGui.SmallButton("Abort##scenBannerAbort"))
             {
-                ActiveScenario = null;
-                DebugRollQueue.Clear();
+                Scenario.ActiveScenario = null;
+                Scenario.RollQueue.Clear();
             }
             ImGui.Separator();
         }
@@ -1156,13 +1140,13 @@ public partial class MainWindow : Window, IDisposable
         {
             if (State.DealerHand.Cards.Count > 0) ImGui.SameLine();
 #if DEBUG
-            var _scenDHit = IsScenarioStep("DealerHit");
+            var _scenDHit = Scenario.IsStep("DealerHit");
             if (!_scenDHit) ImGui.BeginDisabled();
 #endif
             if (ImGui.SmallButton("Hit##dealer"))
             {
 #if DEBUG
-                ScenarioAdvance();
+                Scenario.Advance();
 #endif
                 Apply(new AnnounceDealerHit());
                 QueueHitRoll(isDealer: true, -1, -1);
@@ -1796,13 +1780,13 @@ public partial class MainWindow : Window, IDisposable
                     var asp = ImGui.GetStyle().ItemSpacing.X;
                     float ABW(string s) => ImGui.CalcTextSize(s).X + ImGui.GetStyle().FramePadding.X * 2;
 #if DEBUG
-                    var _scenHit        = IsScenarioStep($"Hit:{pi}:{hi}");
-                    var _scenStand      = IsScenarioStep($"Stand:{pi}:{hi}");
-                    var _scenDbl        = IsScenarioStep($"Dbl:{pi}:{hi}");
-                    var _scenSpl        = IsScenarioStep($"Spl:{pi}:{hi}");
-                    var _scenConfirmDbl = IsScenarioStep($"ConfirmDbl:{pi}:{hi}");
-                    var _scenConfirmSpl = IsScenarioStep($"ConfirmSpl:{pi}:{hi}");
-                    var _scenAdvPlayer  = IsScenarioStep("AdvancePlayer");
+                    var _scenHit        = Scenario.IsStep($"Hit:{pi}:{hi}");
+                    var _scenStand      = Scenario.IsStep($"Stand:{pi}:{hi}");
+                    var _scenDbl        = Scenario.IsStep($"Dbl:{pi}:{hi}");
+                    var _scenSpl        = Scenario.IsStep($"Spl:{pi}:{hi}");
+                    var _scenConfirmDbl = Scenario.IsStep($"ConfirmDbl:{pi}:{hi}");
+                    var _scenConfirmSpl = Scenario.IsStep($"ConfirmSpl:{pi}:{hi}");
+                    var _scenAdvPlayer  = Scenario.IsStep("AdvancePlayer");
 #endif
 
                     if (Phase == GamePhase.PlayerTurns && State.WaitingForNextPlayer
@@ -1817,7 +1801,7 @@ public partial class MainWindow : Window, IDisposable
                         if (ImGui.SmallButton($"{advLabel}##{pi}_{hi}"))
                         {
 #if DEBUG
-                            ScenarioAdvance();
+                            Scenario.Advance();
 #endif
                             Apply(new AdvanceToNextPlayer());
                         }
@@ -1834,7 +1818,7 @@ public partial class MainWindow : Window, IDisposable
                         if (ImGui.SmallButton($"Confirm Dbl##{pi}_{hi}"))
                         {
 #if DEBUG
-                            ScenarioAdvance();
+                            Scenario.Advance();
 #endif
                             Apply(new AnnounceDoubleConfirm(pi, hi));
                             Apply(new DoubleDown(pi, hi));
@@ -1865,7 +1849,7 @@ public partial class MainWindow : Window, IDisposable
                         if (ImGui.SmallButton($"Confirm Spl##{pi}_{hi}"))
                         {
 #if DEBUG
-                            ScenarioAdvance();
+                            Scenario.Advance();
 #endif
                             var splKey2    = p.StatsKey();
                             var splAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
@@ -1908,7 +1892,7 @@ public partial class MainWindow : Window, IDisposable
                         if (ImGui.SmallButton($"Stand##{pi}_{hi}"))
                         {
 #if DEBUG
-                            ScenarioAdvance();
+                            Scenario.Advance();
 #endif
                             Apply(new StandPlayer(pi, hi));
                         }
@@ -1926,7 +1910,7 @@ public partial class MainWindow : Window, IDisposable
                         if (ImGui.SmallButton($"Hit##{pi}_{hi}"))
                         {
 #if DEBUG
-                            ScenarioAdvance();
+                            Scenario.Advance();
 #endif
                             Apply(new AnnouncePlayerHit(pi, hi));
                             QueueHitRoll(isDealer: false, pi, hi);
@@ -1946,7 +1930,7 @@ public partial class MainWindow : Window, IDisposable
                         if (ImGui.SmallButton($"Dbl##{pi}_{hi}"))
                         {
 #if DEBUG
-                            ScenarioAdvance();
+                            Scenario.Advance();
 #endif
                             var dblBet     = GameEngine.GetEffectiveBet(p, hand);
                             var dblBank    = p.BankBalance(config);
@@ -1973,7 +1957,7 @@ public partial class MainWindow : Window, IDisposable
                         if (ImGui.SmallButton($"Spl##{pi}_{hi}"))
                         {
 #if DEBUG
-                            ScenarioAdvance();
+                            Scenario.Advance();
 #endif
                             var splBet     = GameEngine.GetEffectiveBet(p, hand);
                             var splBank    = p.BankBalance(config);
@@ -2189,13 +2173,13 @@ public partial class MainWindow : Window, IDisposable
                            && !isReorderMode;
                 if (!canDeal) ImGui.BeginDisabled();
 #if DEBUG
-                var _scenStartDeal = IsScenarioStep("StartDeal");
+                var _scenStartDeal = Scenario.IsStep("StartDeal");
                 if (!_scenStartDeal) ImGui.BeginDisabled();
 #endif
                 if (ImGui.Button("Start Deal →"))
                 {
 #if DEBUG
-                    ScenarioAdvance();
+                    Scenario.Advance();
 #endif
                     // Flush uncommitted bet edits before transitioning
                     foreach (var (idx, val) in betEdits.ToList())
@@ -2240,13 +2224,13 @@ public partial class MainWindow : Window, IDisposable
                 var dealDone = GameEngine.IsDealComplete(State);
                 if (!dealDone) ImGui.BeginDisabled();
 #if DEBUG
-                var _scenBPT = IsScenarioStep("BeginPlayerTurns");
+                var _scenBPT = Scenario.IsStep("BeginPlayerTurns");
                 if (!_scenBPT) ImGui.BeginDisabled();
 #endif
                 if (ImGui.Button("Begin Player Turns →"))
                 {
 #if DEBUG
-                    ScenarioAdvance();
+                    Scenario.Advance();
 #endif
                     Apply(new BeginPlayerTurns());
                 }
@@ -2265,13 +2249,13 @@ public partial class MainWindow : Window, IDisposable
                 if (State.WaitingForDealer)
                 {
 #if DEBUG
-                    var _scenBDT = IsScenarioStep("BeginDealerTurn");
+                    var _scenBDT = Scenario.IsStep("BeginDealerTurn");
                     if (!_scenBDT) ImGui.BeginDisabled();
 #endif
                     if (ImGui.Button("Begin Dealer Turn →"))
                     {
 #if DEBUG
-                        ScenarioAdvance();
+                        Scenario.Advance();
 #endif
                         Apply(new BeginDealerTurn());
                     }
@@ -2284,13 +2268,13 @@ public partial class MainWindow : Window, IDisposable
                     var canPayout = GameEngine.CanGoToPayout(State);
                     if (!canPayout) ImGui.BeginDisabled();
 #if DEBUG
-                    var _scenGTP = IsScenarioStep("GoToPayout");
+                    var _scenGTP = Scenario.IsStep("GoToPayout");
                     if (!_scenGTP) ImGui.BeginDisabled();
 #endif
                     if (ImGui.Button("Go to Payout →"))
                     {
 #if DEBUG
-                        ScenarioAdvance();
+                        Scenario.Advance();
 #endif
                         Apply(new GoToPayout());
                         UpdatePlayerStats();
@@ -2306,13 +2290,13 @@ public partial class MainWindow : Window, IDisposable
 
             case GamePhase.Payout:
 #if DEBUG
-                var _scenNR = IsScenarioStep("NewRound");
+                var _scenNR = Scenario.IsStep("NewRound");
                 if (!_scenNR) ImGui.BeginDisabled();
 #endif
                 if (ImGui.Button("New Round"))
                 {
 #if DEBUG
-                    ScenarioAdvance();
+                    Scenario.Advance();
 #endif
                     Apply(new NewRound());
                 }
