@@ -70,6 +70,400 @@ public partial class MainWindow
         (((uint)(c.Z * 255) & 0xFF) << 16) |
         (((uint)(c.W * 255) & 0xFF) << 24);
 
+    // ── Draw sub-methods ──────────────────────────────────────────────────────
+
+    private void DrawBankManageWindow(bool uiBusy)
+    {
+        if (bankManagePlayerIndex < 0 || bankManagePlayerIndex >= State.Players.Count) return;
+
+        var bankWinOpen = true;
+        var bmp         = State.Players[bankManagePlayerIndex];
+        var bmpKey      = bmp.StatsKey();
+        ImGui.SetNextWindowSize(new Vector2(380, 480), ImGuiCond.FirstUseEver);
+        if (ImGui.Begin("Bank##bankManage", ref bankWinOpen, ImGuiWindowFlags.NoCollapse))
+        {
+            if (!config.PlayerStatsStore.TryGetValue(bmpKey, out var bmpStat))
+            {
+                bmpStat = new PlayerStat { DisplayName = bmp.DisplayName };
+                config.PlayerStatsStore[bmpKey] = bmpStat;
+            }
+            var bmpBank = bmpStat.Bank;
+
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text($"{bmp.DisplayName}");
+            ImGui.SameLine();
+            ImGui.TextDisabled($"Bank: {bmpBank:N0}");
+            if (ImGui.IsItemClicked()) ImGui.SetClipboardText(bmpBank.ToString());
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Click to copy");
+            if (bmp.World.Length > 0)
+            {
+                ImGui.SameLine();
+                if (uiBusy) ImGui.BeginDisabled();
+                if (ImGui.Button("Trade##bankmantradetop"))
+                    Plugin.TradePlayer(bmp.FullName, bmp.World);
+                if (uiBusy) ImGui.EndDisabled();
+            }
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            // Deposit
+            ImGui.AlignTextToFramePadding(); ImGui.Text("Deposit"); ImGui.SameLine(80);
+            ImGui.SetNextItemWidth(140);
+            ImGui.InputText("##bankdep", ref bankDepositBuf, 20);
+            ImGui.SameLine();
+            var canDep2 = long.TryParse(bankDepositBuf, out var depAmt2) && depAmt2 > 0;
+            if (!canDep2) ImGui.BeginDisabled();
+            if (ImGui.Button("Confirm##bankdepconfirm"))
+            {
+                ApplyBank(bmpStat, new BankDeposit(depAmt2));
+                Apply(new AnnounceBankDeposit(bankManagePlayerIndex, depAmt2, bmpStat.Bank));
+                bankDepositBuf = string.Empty;
+            }
+            if (!canDep2) ImGui.EndDisabled();
+
+            ImGui.Spacing();
+
+            // Withdraw
+            ImGui.AlignTextToFramePadding(); ImGui.Text("Withdraw"); ImGui.SameLine(80);
+            ImGui.SetNextItemWidth(140);
+            ImGui.InputText("##bankwd", ref bankWithdrawBuf, 20);
+            ImGui.SameLine();
+            var canWd2 = long.TryParse(bankWithdrawBuf, out var wdAmt2) && wdAmt2 > 0 && wdAmt2 <= bmpBank;
+            if (!canWd2) ImGui.BeginDisabled();
+            if (ImGui.Button("Confirm##bankwdconfirm"))
+            {
+                ApplyBank(bmpStat, new BankWithdrawal(wdAmt2));
+                Apply(new AnnounceBankWithdraw(bankManagePlayerIndex, wdAmt2, bmpStat.Bank));
+                bankWithdrawBuf = string.Empty;
+            }
+            if (!canWd2) ImGui.EndDisabled();
+
+            ImGui.Spacing();
+
+            // Remind (bank > 0 + bet set)
+            var bmpBetForRemind = betEdits.TryGetValue(bankManagePlayerIndex, out var bmpPending) ? bmpPending : bmp.Bet;
+            if (bmpBank > 0 && !string.IsNullOrWhiteSpace(bmpBetForRemind))
+            {
+                if (uiBusy) ImGui.BeginDisabled();
+                if (ImGui.Button("Remind##bankremind"))
+                {
+                    if (betEdits.TryGetValue(bankManagePlayerIndex, out var pendingBet) && pendingBet != bmp.Bet)
+                    {
+                        betEdits.Remove(bankManagePlayerIndex);
+                        Apply(new SetPlayerBet(bankManagePlayerIndex, pendingBet));
+                    }
+                    Apply(new AnnounceBankRemind(bankManagePlayerIndex, bmpBank));
+                }
+                if (uiBusy) ImGui.EndDisabled();
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Remind player of their bet and bank balance");
+            }
+
+            ImGui.Spacing();
+
+            // Clear all
+            var ctrlDown = ImGui.GetIO().KeyCtrl;
+            if (!ctrlDown) ImGui.BeginDisabled();
+            if (ImGui.Button("Clear All##bankClear"))
+            {
+                bmpStat.Bank = 0;
+                bmpStat.BankLog.Clear();
+                config.Save();
+            }
+            if (!ctrlDown) ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip("Hold Ctrl to clear balance and transaction history");
+
+            ImGui.Spacing();
+
+            // Transaction history
+            ImGui.Separator();
+            ImGui.Text("History");
+            var log    = bmpStat.BankLog;
+            var tableH = ImGui.GetContentRegionAvail().Y;
+            if (ImGui.BeginTable("##banklog", 4,
+                ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
+                new Vector2(0, tableH)))
+            {
+                ImGui.TableSetupScrollFreeze(0, 1);
+                ImGui.TableSetupColumn("Time",    ImGuiTableColumnFlags.None, 60);
+                ImGui.TableSetupColumn("Type",    ImGuiTableColumnFlags.None, 80);
+                ImGui.TableSetupColumn("Amount",  ImGuiTableColumnFlags.None, 80);
+                ImGui.TableSetupColumn("Balance", ImGuiTableColumnFlags.None, 80);
+                ImGui.TableHeadersRow();
+
+                for (var li = log.Count - 1; li >= 0; li--)
+                {
+                    var entry    = log[li];
+                    var isCredit = entry.Kind is BankTransactionKind.Deposit or BankTransactionKind.Win;
+                    ImGui.TableNextRow();
+                    ImGui.TableSetColumnIndex(0); ImGui.TextUnformatted(entry.Timestamp.ToString("HH:mm"));
+                    ImGui.TableSetColumnIndex(1); ImGui.TextUnformatted(entry.Kind switch
+                    {
+                        BankTransactionKind.Deposit    => "Deposit",
+                        BankTransactionKind.Withdrawal => "Withdraw",
+                        BankTransactionKind.Bet        => "Bet",
+                        BankTransactionKind.Win        => "Win",
+                        BankTransactionKind.DoubleDown => "Double",
+                        BankTransactionKind.Split      => "Split",
+                        _                              => "?"
+                    });
+                    ImGui.TableSetColumnIndex(2);
+                    if (isCredit) ImGui.TextColored(GameColors.CreditGreen, $"+{entry.Amount:N0}");
+                    else          ImGui.TextColored(GameColors.DebitRed, $"-{entry.Amount:N0}");
+                    ImGui.TableSetColumnIndex(3); ImGui.TextUnformatted($"{entry.Balance:N0}");
+                }
+                ImGui.EndTable();
+            }
+        }
+        ImGui.End();
+        if (!bankWinOpen)
+        {
+            bankManagePlayerIndex = -1;
+            bankDepositBuf        = string.Empty;
+            bankWithdrawBuf       = string.Empty;
+        }
+    }
+
+    private void DrawTradeBetPromptModal()
+    {
+        if (pendingBetPrompt.HasValue)
+            ImGui.OpenPopup("Set bet from trade?##tradeBet");
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
+        var show = ImGui.BeginPopupModal("Set bet from trade?##tradeBet", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.PopStyleColor();
+        if (!show) return;
+
+        var (bpi, bgil) = pendingBetPrompt!.Value;
+        var bplayer     = State.Players[bpi];
+        ImGui.Text($"Set {bplayer.DisplayName}'s bet to {bgil:N0} gil?");
+        ImGui.Spacing();
+        if (ImGui.Button("Yes"))
+        {
+            betEdits.Remove(bpi);
+            Apply(new SetPlayerBet(bpi, bgil.ToString()));
+            pendingBetPrompt = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("No"))
+        {
+            pendingBetPrompt = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.EndPopup();
+    }
+
+    private void DrawBetOrBankPromptModal()
+    {
+        if (pendingBetOrBankPrompt.HasValue)
+            ImGui.OpenPopup("Trade received##betOrBank");
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
+        var show = ImGui.BeginPopupModal("Trade received##betOrBank", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.PopStyleColor();
+        if (!show) return;
+
+        var (bobpi, bobgil) = pendingBetOrBankPrompt!.Value;
+        var bobPlayer = State.Players[bobpi];
+        ImGui.Text($"Received {bobgil:N0} gil from {bobPlayer.DisplayName}.");
+        ImGui.Spacing();
+        if (ImGui.Button("Set as bet##bobBet"))
+        {
+            betEdits.Remove(bobpi);
+            Apply(new SetPlayerBet(bobpi, bobgil.ToString()));
+            pendingBetOrBankPrompt = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Bank deposit##bobBank"))
+        {
+            var bobKey = bobPlayer.StatsKey();
+            if (!config.PlayerStatsStore.TryGetValue(bobKey, out var bobStat))
+            {
+                bobStat = new PlayerStat { DisplayName = bobPlayer.DisplayName };
+                config.PlayerStatsStore[bobKey] = bobStat;
+            }
+            ApplyBank(bobStat, new BankDeposit(bobgil));
+            Apply(new AnnounceBankDeposit(bobpi, bobgil, bobStat.Bank));
+            pendingBetOrBankPrompt = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Ignore##bobIgnore"))
+        {
+            pendingBetOrBankPrompt = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.EndPopup();
+    }
+
+    private void DrawHistoryViewBanner()
+    {
+        if (!isHistoryView) return;
+        ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BannerGold);
+        ImGui.TextUnformatted("Viewing previous round");
+        ImGui.PopStyleColor();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Exit History View"))
+            ExitHistoryView();
+        ImGui.Separator();
+    }
+
+#if DEBUG
+    private void DrawScenarioBanner()
+    {
+        if (Scenario.ActiveScenario is not { } activeScenario) return;
+        ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ActiveOrange);
+        var nextStep = activeScenario.PeekNext() ?? "(done)";
+        ImGui.TextUnformatted($"[SCENARIO] {activeScenario.Name}  |  Next: {nextStep}  ({activeScenario.Remaining} left)");
+        ImGui.PopStyleColor();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Abort##scenBannerAbort"))
+        {
+            Scenario.ActiveScenario = null;
+            Scenario.RollQueue.Clear();
+        }
+        ImGui.Separator();
+    }
+#endif
+
+    private void DrawVenueMemoryBanner()
+    {
+        if (venueMemoryDismissed || isHistoryView) return;
+        if (GetVenueMemorySuggestion() is not { } suggestion) return;
+
+        ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ModalTitleBlue);
+        ImGui.TextUnformatted($"The last time you were here you used \"{suggestion.Name}\". Switch to it?");
+        ImGui.PopStyleColor();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Yes##venueMemoryYes"))
+        {
+            config.ActiveVenueIndex = suggestion.Index;
+            sessionLedgerWindow.SyncBuffers();
+            config.Save();
+            venueMemoryDismissed = true;
+        }
+        ImGui.SameLine();
+        if (ImGui.SmallButton("X##venueMemoryDismiss"))
+            venueMemoryDismissed = true;
+        ImGui.Separator();
+    }
+
+    private void DrawSessionBanner()
+    {
+        if (sessionBannerDismissed || isHistoryView) return;
+
+        var venue   = config.ActiveVenue;
+        var addrKey = Plugin.GetCurrentHousingAddressKey();
+        if (!SessionManager.ShouldShowSessionBanner(
+                venue.ActiveSessionStartedAt,
+                venue.ActiveSessionLocationKey,
+                addrKey,
+                venue.RoundHistory.Count,
+                DateTime.Now))
+            return;
+
+        ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BannerGold);
+        ImGui.TextUnformatted("It's been a while (or you're at a new location), want to mark a new session in the ledger?");
+        ImGui.PopStyleColor();
+        ImGui.SameLine();
+        var venueNames      = config.Venues.ConvertAll(v => v.Name).ToArray();
+        var vIdx            = config.ActiveVenueIndex;
+        var roundInProgress = config.GameState.IsRoundActive();
+        ImGui.SetNextItemWidth(140);
+        if (roundInProgress) ImGui.BeginDisabled();
+        if (ImGui.Combo("##sessionVenueCombo", ref vIdx, venueNames, venueNames.Length)
+            && vIdx != config.ActiveVenueIndex)
+        {
+            if (addrKey != null)
+                config.VenueMemory[addrKey] = config.Venues[vIdx].Id.ToString();
+            config.ActiveVenueIndex = vIdx;
+            sessionLedgerWindow.SyncBuffers();
+            config.Save();
+        }
+        if (roundInProgress) ImGui.EndDisabled();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("New Session##sessionBannerStart"))
+        {
+            sessionLedgerWindow.NewSession();
+            sessionBannerDismissed = true;
+        }
+        ImGui.SameLine();
+        if (ImGui.SmallButton("X##sessionBannerDismiss"))
+            sessionBannerDismissed = true;
+        ImGui.Separator();
+    }
+
+    private void DrawTopBar()
+    {
+        if (ImGui.SmallButton("Config"))
+            configWindow.Toggle();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Session Ledger"))
+            sessionLedgerWindow.Toggle();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("History"))
+            historyWindow.Toggle();
+#if DEBUG
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Debug"))
+            debugWindow.Toggle();
+#endif
+
+        var canUndo = config.UndoStack.Count > 0;
+        var canRedo = config.RedoStack.Count > 0;
+        var undoW   = ImGui.CalcTextSize("Undo").X + ImGui.GetStyle().FramePadding.X * 2;
+        var redoW   = ImGui.CalcTextSize("Redo").X + ImGui.GetStyle().FramePadding.X * 2;
+        var spacing = ImGui.GetStyle().ItemSpacing.X;
+        ImGui.SameLine(ImGui.GetWindowWidth() - undoW - redoW - spacing * 2
+                       - ImGui.GetStyle().WindowPadding.X);
+        if (!canUndo) ImGui.BeginDisabled();
+        if (ImGui.SmallButton("Undo")) Undo();
+        if (!canUndo) ImGui.EndDisabled();
+        ImGui.SameLine();
+        if (!canRedo) ImGui.BeginDisabled();
+        if (ImGui.SmallButton("Redo")) Redo();
+        if (!canRedo) ImGui.EndDisabled();
+    }
+
+    private void DrawBankTradePromptModal()
+    {
+        if (pendingBankTradePrompt.HasValue)
+            ImGui.OpenPopup("Bank trade##bankTradePrompt");
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
+        var show = ImGui.BeginPopupModal("Bank trade##bankTradePrompt", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.PopStyleColor();
+        if (!show) return;
+
+        var (btpi, btamt, btwd) = pendingBankTradePrompt!.Value;
+        var btplayer = State.Players[btpi];
+        var btKey    = btplayer.StatsKey();
+        if (!config.PlayerStatsStore.TryGetValue(btKey, out var btStat))
+        {
+            btStat = new PlayerStat { DisplayName = btplayer.DisplayName };
+            config.PlayerStatsStore[btKey] = btStat;
+        }
+        var verb = btwd ? "Withdraw" : "Deposit";
+        ImGui.Text($"{verb} {btamt:N0} gil {(btwd ? "from" : "to")} {btplayer.DisplayName}'s bank?");
+        ImGui.Spacing();
+        if (ImGui.Button("Yes##bankTradeYes"))
+        {
+            ApplyBank(btStat, btwd ? new BankWithdrawal(btamt) : new BankDeposit(btamt));
+            Apply(btwd
+                ? new AnnounceBankWithdraw(btpi, btamt, btStat.Bank)
+                : new AnnounceBankDeposit (btpi, btamt, btStat.Bank));
+            pendingBankTradePrompt = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("No##bankTradeNo"))
+        {
+            pendingBankTradePrompt = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.EndPopup();
+    }
+
     // ── Draw ──────────────────────────────────────────────────────────────────
 
     public override void Draw()
@@ -137,383 +531,18 @@ public partial class MainWindow
             if (uiBusy) ImGui.BeginDisabled();
         }
 
-        // ── Bank manage window ─────────────────────────────────────────────────
-        if (bankManagePlayerIndex >= 0 && bankManagePlayerIndex < State.Players.Count)
-        {
-            var bankWinOpen = true;
-            var bmp     = State.Players[bankManagePlayerIndex];
-            var bmpKey  = bmp.StatsKey();
-            ImGui.SetNextWindowSize(new Vector2(380, 480), ImGuiCond.FirstUseEver);
-            if (ImGui.Begin("Bank##bankManage", ref bankWinOpen, ImGuiWindowFlags.NoCollapse))
-            {
-                if (!config.PlayerStatsStore.TryGetValue(bmpKey, out var bmpStat))
-                {
-                    bmpStat = new PlayerStat { DisplayName = bmp.DisplayName };
-                    config.PlayerStatsStore[bmpKey] = bmpStat;
-                }
-                var bmpBank = bmpStat.Bank;
+        DrawBankManageWindow(uiBusy);
+        DrawTradeBetPromptModal();
+        DrawBetOrBankPromptModal();
+        DrawBankTradePromptModal();
 
-                ImGui.AlignTextToFramePadding();
-                ImGui.Text($"{bmp.DisplayName}");
-                ImGui.SameLine();
-                ImGui.TextDisabled($"Bank: {bmpBank:N0}");
-                if (ImGui.IsItemClicked()) ImGui.SetClipboardText(bmpBank.ToString());
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Click to copy");
-                if (bmp.World.Length > 0)
-                {
-                    ImGui.SameLine();
-                    if (uiBusy) ImGui.BeginDisabled();
-                    if (ImGui.Button("Trade##bankmantradetop"))
-                        Plugin.TradePlayer(bmp.FullName, bmp.World);
-                    if (uiBusy) ImGui.EndDisabled();
-                }
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                // Deposit
-                ImGui.AlignTextToFramePadding(); ImGui.Text("Deposit"); ImGui.SameLine(80);
-                ImGui.SetNextItemWidth(140);
-                ImGui.InputText("##bankdep", ref bankDepositBuf, 20);
-                ImGui.SameLine();
-                var canDep2 = long.TryParse(bankDepositBuf, out var depAmt2) && depAmt2 > 0;
-                if (!canDep2) ImGui.BeginDisabled();
-                if (ImGui.Button("Confirm##bankdepconfirm"))
-                {
-                    ApplyBank(bmpStat, new BankDeposit(depAmt2));
-                    Apply(new AnnounceBankDeposit(bankManagePlayerIndex, depAmt2, bmpStat.Bank));
-                    bankDepositBuf = string.Empty;
-                }
-                if (!canDep2) ImGui.EndDisabled();
-
-                ImGui.Spacing();
-
-                // Withdraw
-                ImGui.AlignTextToFramePadding(); ImGui.Text("Withdraw"); ImGui.SameLine(80);
-                ImGui.SetNextItemWidth(140);
-                ImGui.InputText("##bankwd", ref bankWithdrawBuf, 20);
-                ImGui.SameLine();
-                var canWd2 = long.TryParse(bankWithdrawBuf, out var wdAmt2) && wdAmt2 > 0 && wdAmt2 <= bmpBank;
-                if (!canWd2) ImGui.BeginDisabled();
-                if (ImGui.Button("Confirm##bankwdconfirm"))
-                {
-                    ApplyBank(bmpStat, new BankWithdrawal(wdAmt2));
-                    Apply(new AnnounceBankWithdraw(bankManagePlayerIndex, wdAmt2, bmpStat.Bank));
-                    bankWithdrawBuf = string.Empty;
-                }
-                if (!canWd2) ImGui.EndDisabled();
-
-                ImGui.Spacing();
-
-                // Remind (bank > 0 + bet set)
-                var bmpBetForRemind = betEdits.TryGetValue(bankManagePlayerIndex, out var bmpPending) ? bmpPending : bmp.Bet;
-                if (bmpBank > 0 && !string.IsNullOrWhiteSpace(bmpBetForRemind))
-                {
-                    if (uiBusy) ImGui.BeginDisabled();
-                    if (ImGui.Button("Remind##bankremind"))
-                    {
-                        if (betEdits.TryGetValue(bankManagePlayerIndex, out var pendingBet) && pendingBet != bmp.Bet)
-                        {
-                            betEdits.Remove(bankManagePlayerIndex);
-                            Apply(new SetPlayerBet(bankManagePlayerIndex, pendingBet));
-                        }
-                        Apply(new AnnounceBankRemind(bankManagePlayerIndex, bmpBank));
-                    }
-                    if (uiBusy) ImGui.EndDisabled();
-                    if (ImGui.IsItemHovered())
-                        ImGui.SetTooltip("Remind player of their bet and bank balance");
-                }
-
-                ImGui.Spacing();
-
-                // Clear all
-                var ctrlDown = ImGui.GetIO().KeyCtrl;
-                if (!ctrlDown) ImGui.BeginDisabled();
-                if (ImGui.Button("Clear All##bankClear"))
-                {
-                    bmpStat.Bank = 0;
-                    bmpStat.BankLog.Clear();
-                    config.Save();
-                }
-                if (!ctrlDown) ImGui.EndDisabled();
-                if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                    ImGui.SetTooltip("Hold Ctrl to clear balance and transaction history");
-
-                ImGui.Spacing();
-
-                // Transaction history
-                ImGui.Separator();
-                ImGui.Text("History");
-                var log = bmpStat.BankLog;
-                var tableH = ImGui.GetContentRegionAvail().Y;
-                if (ImGui.BeginTable("##banklog", 4,
-                    ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
-                    new Vector2(0, tableH)))
-                {
-                    ImGui.TableSetupScrollFreeze(0, 1);
-                    ImGui.TableSetupColumn("Time",    ImGuiTableColumnFlags.None, 60);
-                    ImGui.TableSetupColumn("Type",    ImGuiTableColumnFlags.None, 80);
-                    ImGui.TableSetupColumn("Amount",  ImGuiTableColumnFlags.None, 80);
-                    ImGui.TableSetupColumn("Balance", ImGuiTableColumnFlags.None, 80);
-                    ImGui.TableHeadersRow();
-
-                    for (var li = log.Count - 1; li >= 0; li--)
-                    {
-                        var entry = log[li];
-                        var isCredit = entry.Kind is BankTransactionKind.Deposit or BankTransactionKind.Win;
-                        ImGui.TableNextRow();
-                        ImGui.TableSetColumnIndex(0); ImGui.TextUnformatted(entry.Timestamp.ToString("HH:mm"));
-                        ImGui.TableSetColumnIndex(1); ImGui.TextUnformatted(entry.Kind switch
-                        {
-                            BankTransactionKind.Deposit    => "Deposit",
-                            BankTransactionKind.Withdrawal => "Withdraw",
-                            BankTransactionKind.Bet        => "Bet",
-                            BankTransactionKind.Win        => "Win",
-                            BankTransactionKind.DoubleDown => "Double",
-                            BankTransactionKind.Split      => "Split",
-                            _                              => "?"
-                        });
-                        ImGui.TableSetColumnIndex(2);
-                        if (isCredit) ImGui.TextColored(GameColors.CreditGreen, $"+{entry.Amount:N0}");
-                        else          ImGui.TextColored(GameColors.DebitRed, $"-{entry.Amount:N0}");
-                        ImGui.TableSetColumnIndex(3); ImGui.TextUnformatted($"{entry.Balance:N0}");
-                    }
-                    ImGui.EndTable();
-                }
-
-            }
-            ImGui.End();
-            if (!bankWinOpen)
-            {
-                bankManagePlayerIndex = -1;
-                bankDepositBuf        = string.Empty;
-                bankWithdrawBuf       = string.Empty;
-            }
-        }
-
-        // ── Trade bet prompt modal ─────────────────────────────────────────────
-        if (pendingBetPrompt.HasValue)
-            ImGui.OpenPopup("Set bet from trade?##tradeBet");
-        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
-        var showBetModal = ImGui.BeginPopupModal("Set bet from trade?##tradeBet", ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.PopStyleColor();
-        if (showBetModal)
-        {
-            var (bpi, bgil) = pendingBetPrompt!.Value;
-            var bplayer     = State.Players[bpi];
-            ImGui.Text($"Set {bplayer.DisplayName}'s bet to {bgil:N0} gil?");
-            ImGui.Spacing();
-            if (ImGui.Button("Yes"))
-            {
-                betEdits.Remove(bpi);
-                Apply(new SetPlayerBet(bpi, bgil.ToString()));
-                pendingBetPrompt = null;
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("No"))
-            {
-                pendingBetPrompt = null;
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.EndPopup();
-        }
-
-        // ── Bet-or-bank trade prompt modal (both options on, Betting phase) ──────
-        if (pendingBetOrBankPrompt.HasValue)
-            ImGui.OpenPopup("Trade received##betOrBank");
-        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
-        var showBetOrBankModal = ImGui.BeginPopupModal("Trade received##betOrBank", ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.PopStyleColor();
-        if (showBetOrBankModal)
-        {
-            var (bobpi, bobgil) = pendingBetOrBankPrompt!.Value;
-            var bobPlayer = State.Players[bobpi];
-            ImGui.Text($"Received {bobgil:N0} gil from {bobPlayer.DisplayName}.");
-            ImGui.Spacing();
-            if (ImGui.Button("Set as bet##bobBet"))
-            {
-                betEdits.Remove(bobpi);
-                Apply(new SetPlayerBet(bobpi, bobgil.ToString()));
-                pendingBetOrBankPrompt = null;
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("Bank deposit##bobBank"))
-            {
-                var bobKey = bobPlayer.StatsKey();
-                if (!config.PlayerStatsStore.TryGetValue(bobKey, out var bobStat))
-                {
-                    bobStat = new PlayerStat { DisplayName = bobPlayer.DisplayName };
-                    config.PlayerStatsStore[bobKey] = bobStat;
-                }
-                ApplyBank(bobStat, new BankDeposit(bobgil));
-                Apply(new AnnounceBankDeposit(bobpi, bobgil, bobStat.Bank));
-                pendingBetOrBankPrompt = null;
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("Ignore##bobIgnore"))
-            {
-                pendingBetOrBankPrompt = null;
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.EndPopup();
-        }
-
-        // ── Bank trade prompt modal ────────────────────────────────────────────
-        if (pendingBankTradePrompt.HasValue)
-            ImGui.OpenPopup("Bank trade##bankTradePrompt");
-        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
-        var showBankModal = ImGui.BeginPopupModal("Bank trade##bankTradePrompt", ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.PopStyleColor();
-        if (showBankModal)
-        {
-            var (btpi, btamt, btwd) = pendingBankTradePrompt!.Value;
-            var btplayer = State.Players[btpi];
-            var btKey    = btplayer.StatsKey();
-            if (!config.PlayerStatsStore.TryGetValue(btKey, out var btStat))
-            {
-                btStat = new PlayerStat { DisplayName = btplayer.DisplayName };
-                config.PlayerStatsStore[btKey] = btStat;
-            }
-            var verb = btwd ? "Withdraw" : "Deposit";
-            ImGui.Text($"{verb} {btamt:N0} gil {(btwd ? "from" : "to")} {btplayer.DisplayName}'s bank?");
-            ImGui.Spacing();
-            if (ImGui.Button("Yes##bankTradeYes"))
-            {
-                ApplyBank(btStat, btwd ? new BankWithdrawal(btamt) : new BankDeposit(btamt));
-                Apply(btwd
-                    ? new AnnounceBankWithdraw(btpi, btamt, btStat.Bank)
-                    : new AnnounceBankDeposit (btpi, btamt, btStat.Bank));
-                pendingBankTradePrompt = null;
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("No##bankTradeNo"))
-            {
-                pendingBankTradePrompt = null;
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.EndPopup();
-        }
-
-        if (isHistoryView)
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BannerGold);
-            ImGui.TextUnformatted("Viewing previous round");
-            ImGui.PopStyleColor();
-            ImGui.SameLine();
-            if (ImGui.SmallButton("Exit History View"))
-                ExitHistoryView();
-            ImGui.Separator();
-        }
+        DrawHistoryViewBanner();
 #if DEBUG
-        if (Scenario.ActiveScenario is { } activeScenario)
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ActiveOrange);
-            var nextStep = activeScenario.PeekNext() ?? "(done)";
-            ImGui.TextUnformatted($"[SCENARIO] {activeScenario.Name}  |  Next: {nextStep}  ({activeScenario.Remaining} left)");
-            ImGui.PopStyleColor();
-            ImGui.SameLine();
-            if (ImGui.SmallButton("Abort##scenBannerAbort"))
-            {
-                Scenario.ActiveScenario = null;
-                Scenario.RollQueue.Clear();
-            }
-            ImGui.Separator();
-        }
+        DrawScenarioBanner();
 #endif
-
-        if (!venueMemoryDismissed && !isHistoryView && GetVenueMemorySuggestion() is var suggestion && suggestion.HasValue)
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ModalTitleBlue);
-            ImGui.TextUnformatted($"The last time you were here you used \"{suggestion.Value.Name}\". Switch to it?");
-            ImGui.PopStyleColor();
-            ImGui.SameLine();
-            if (ImGui.SmallButton("Yes##venueMemoryYes"))
-            {
-                config.ActiveVenueIndex = suggestion.Value.Index;
-                sessionLedgerWindow.SyncBuffers();
-                config.Save();
-                venueMemoryDismissed = true;
-            }
-            ImGui.SameLine();
-            if (ImGui.SmallButton("X##venueMemoryDismiss"))
-                venueMemoryDismissed = true;
-            ImGui.Separator();
-        }
-
-        if (!sessionBannerDismissed && !isHistoryView)
-        {
-            var venue = config.ActiveVenue;
-            var addrKey = Plugin.GetCurrentHousingAddressKey();
-            if (SessionManager.ShouldShowSessionBanner(
-                    venue.ActiveSessionStartedAt,
-                    venue.ActiveSessionLocationKey,
-                    addrKey,
-                    venue.RoundHistory.Count,
-                    DateTime.Now))
-            {
-                ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BannerGold);
-                ImGui.TextUnformatted("It's been a while (or you're at a new location), want to mark a new session in the ledger?");
-                ImGui.PopStyleColor();
-                ImGui.SameLine();
-                var venueNames = config.Venues.ConvertAll(v => v.Name).ToArray();
-                var vIdx = config.ActiveVenueIndex;
-                var roundInProgress = config.GameState.IsRoundActive();
-                ImGui.SetNextItemWidth(140);
-                if (roundInProgress) ImGui.BeginDisabled();
-                if (ImGui.Combo("##sessionVenueCombo", ref vIdx, venueNames, venueNames.Length)
-                    && vIdx != config.ActiveVenueIndex)
-                {
-                    if (addrKey != null)
-                        config.VenueMemory[addrKey] = config.Venues[vIdx].Id.ToString();
-                    config.ActiveVenueIndex = vIdx;
-                    sessionLedgerWindow.SyncBuffers();
-                    config.Save();
-                }
-                if (roundInProgress) ImGui.EndDisabled();
-                ImGui.SameLine();
-                if (ImGui.SmallButton("New Session##sessionBannerStart"))
-                {
-                    sessionLedgerWindow.NewSession();
-                    sessionBannerDismissed = true;
-                }
-                ImGui.SameLine();
-                if (ImGui.SmallButton("X##sessionBannerDismiss"))
-                    sessionBannerDismissed = true;
-                ImGui.Separator();
-            }
-        }
-
-        if (ImGui.SmallButton("Config"))
-            configWindow.Toggle();
-        ImGui.SameLine();
-        if (ImGui.SmallButton("Session Ledger"))
-            sessionLedgerWindow.Toggle();
-        ImGui.SameLine();
-        if (ImGui.SmallButton("History"))
-            historyWindow.Toggle();
-#if DEBUG
-        ImGui.SameLine();
-        if (ImGui.SmallButton("Debug"))
-            debugWindow.Toggle();
-#endif
-
-        var canUndo = config.UndoStack.Count > 0;
-        var canRedo = config.RedoStack.Count > 0;
-        var undoW   = ImGui.CalcTextSize("Undo").X + ImGui.GetStyle().FramePadding.X * 2;
-        var redoW   = ImGui.CalcTextSize("Redo").X + ImGui.GetStyle().FramePadding.X * 2;
-        var spacing = ImGui.GetStyle().ItemSpacing.X;
-        ImGui.SameLine(ImGui.GetWindowWidth() - undoW - redoW - spacing * 2
-                       - ImGui.GetStyle().WindowPadding.X);
-        if (!canUndo) ImGui.BeginDisabled();
-        if (ImGui.SmallButton("Undo")) Undo();
-        if (!canUndo) ImGui.EndDisabled();
-        ImGui.SameLine();
-        if (!canRedo) ImGui.BeginDisabled();
-        if (ImGui.SmallButton("Redo")) Redo();
-        if (!canRedo) ImGui.EndDisabled();
+        DrawVenueMemoryBanner();
+        DrawSessionBanner();
+        DrawTopBar();
 
         if (uiBusy) ImGui.BeginDisabled();
 
