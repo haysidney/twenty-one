@@ -550,6 +550,71 @@ public class PayoutTests
         state.BjPayout = PayoutRatio.ThreeToTwo;
         Assert.Equal("+100", GameEngine.PayoutAmountString(state, 0));
     }
+
+    // PayoutTotalOwed = gross gil deposited at settlement (bet returned + profit).
+    // Used by the bank-tooltip "After settlement" projection and UpdatePlayerStats.
+
+    [Fact]
+    public void PayoutTotalOwed_Win_IsTwiceBet()
+    {
+        var state = PayoutState([10, 9], HandState.Stand, [10, 7]);
+        Assert.Equal(200m, GameEngine.PayoutTotalOwed(state, 0));
+    }
+
+    [Theory]
+    [InlineData(PayoutRatio.ThreeToTwo, 250)]   // 100 + 150
+    [InlineData(PayoutRatio.SixToFive,  220)]   // 100 + 120
+    [InlineData(PayoutRatio.EvenMoney,  200)]   // 100 + 100
+    public void PayoutTotalOwed_BjWin_IsBetPlusBjMultiplier(PayoutRatio payout, int expected)
+    {
+        var state = new GameState
+        {
+            Phase    = GamePhase.Payout,
+            BjPayout = payout,
+            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands =
+                [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
+        };
+        Assert.Equal((decimal)expected, GameEngine.PayoutTotalOwed(state, 0));
+    }
+
+    [Theory]
+    [InlineData(PayoutRatio.ThreeToTwo, 250)]
+    [InlineData(PayoutRatio.SixToFive,  220)]
+    [InlineData(PayoutRatio.EvenMoney,  200)]
+    public void PayoutTotalOwed_CharlieWin_IsBetPlusCharlieMultiplier(PayoutRatio payout, int expected)
+    {
+        var state = new GameState
+        {
+            Phase         = GamePhase.Payout,
+            CharliePayout = payout,
+            DealerHand    = new Hand { Cards = [10, 7], State = HandState.Stand },
+            Players       = [new Player { Nickname = "Lorah", Bet = "100", Hands =
+                [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] }],
+        };
+        Assert.Equal((decimal)expected, GameEngine.PayoutTotalOwed(state, 0));
+    }
+
+    [Fact]
+    public void PayoutTotalOwed_Push_ReturnsBet()
+    {
+        var state = PayoutState([10, 7], HandState.Stand, [10, 7]);
+        Assert.Equal(100m, GameEngine.PayoutTotalOwed(state, 0));
+    }
+
+    [Fact]
+    public void PayoutTotalOwed_Lose_IsZero()
+    {
+        var state = PayoutState([10, 6], HandState.Stand, [10, 7]);
+        Assert.Equal(0m, GameEngine.PayoutTotalOwed(state, 0));
+    }
+
+    [Fact]
+    public void PayoutTotalOwed_Bust_IsZero()
+    {
+        var state = PayoutState([10, 9, 5], HandState.Bust, [10, 7]);
+        Assert.Equal(0m, GameEngine.PayoutTotalOwed(state, 0));
+    }
 }
 
 public class RosterManagementTests

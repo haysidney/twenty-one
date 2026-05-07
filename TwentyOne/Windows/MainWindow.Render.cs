@@ -653,12 +653,14 @@ public partial class MainWindow
             var parsedBet       = GameEngine.ParseBet(effectiveBetStr);
             var shortfall       = parsedBet > 0 ? Math.Max(0m, parsedBet - bankVal) : 0m;
 
-            var bankDelta = 0m;
+            var bankDelta  = 0m;
+            var bankCredit = 0m;
             if (Phase == GamePhase.Payout && bankVal > 0)
                 for (var bhi = 0; bhi < player.Hands.Count; bhi++)
                 {
                     var d = GameEngine.PayoutDelta(State, actualIdx, bhi);
                     if (d > 0) bankDelta += d.Value;
+                    bankCredit += GameEngine.PayoutTotalOwed(State, actualIdx, bhi);
                 }
 
             ImGui.AlignTextToFramePadding();
@@ -674,11 +676,14 @@ public partial class MainWindow
                     var tip = new System.Text.StringBuilder();
                     if (shortfall > 0)
                         tip.AppendLine($"Short by {GameEngine.FormatGil(shortfall)} — needs trade before deal");
-                    if (Phase == GamePhase.Payout && bankDelta != 0)
+                    if (Phase == GamePhase.Payout && bankCredit > 0)
                     {
-                        var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
-                        tip.AppendLine($"This round: {deltaStr}");
-                        tip.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankDelta))}");
+                        if (bankDelta != 0)
+                        {
+                            var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
+                            tip.AppendLine($"This round: {deltaStr}");
+                        }
+                        tip.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankCredit))}");
                     }
                     tip.Append("Click to copy");
                     ImGui.SetTooltip(tip.ToString());
