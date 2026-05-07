@@ -2036,7 +2036,7 @@ private static unsafe void SendChatMessage(string message)
                             Apply(new DoubleDown(pi, hi));
                             var dblKey2    = PlayerStatKey(p);
                             var dblAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-                            if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0)
+                            if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0 && IsBanking(dblStat2))
                             {
                                 var before2 = dblStat2.Bank;
                                 ApplyBank(dblStat2, new BankDoubleDown(dblAmt2));
@@ -2065,7 +2065,7 @@ private static unsafe void SendChatMessage(string message)
 #endif
                             var splKey2    = PlayerStatKey(p);
                             var splAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-                            if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0)
+                            if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0 && IsBanking(splStat2))
                             {
                                 var before2 = splStat2.Bank;
                                 ApplyBank(splStat2, new BankSplit(splAmt2));
