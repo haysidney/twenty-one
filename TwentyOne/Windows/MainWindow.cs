@@ -217,10 +217,8 @@ public partial class MainWindow : Window, IDisposable
     // pending trade confirmation for double/split: set when dealer clicks the button, cleared on confirm/cancel
     private (int PlayerIndex, int HandIndex)? pendingDouble;
     private (int PlayerIndex, int HandIndex)? pendingSplit;
-    // trade bet detection: track in-progress trade partner + received/gave gil
-    private (string FullName, string World)? pendingTradePartner;
-    private long                              pendingTradeGil;
-    private long                              pendingGaveGil;
+    // chat-stream trade-detection state (partner / received-gil / given-gil) lives in TradeMonitor.
+    private readonly TradeMonitor              tradeMonitor = new();
     // prompt to set a player's bet after a completed trade; shown as a modal
     private (int PlayerIndex, long Gil)?      pendingBetPrompt;
     // prompt shown when both AutoBetFromTrades and AutoDepositFromTrades are on during Betting phase
@@ -562,87 +560,24 @@ public partial class MainWindow : Window, IDisposable
     [GeneratedRegex(@"Random! \(1-13\)\D*(\d+)")]
     private static partial Regex DiceRollRegex();
 
-    // "Trade request sent to Firstname Lastname." — we initiated trade
-    [GeneratedRegex(@"^Trade request sent to (.+)\.$")]
-    private static partial Regex TradeSentRegex();
-
-    // "Firstname Lastname wishes to trade with you." — they initiated trade
-    [GeneratedRegex(@"^(.+) wishes to trade with you\.$")]
-    private static partial Regex TradeWishesRegex();
-
-    // "You receive 1,234 gil." — gil received during trade
-    [GeneratedRegex(@"^You receive ([\d,]+) gil\.$")]
-    private static partial Regex TradeGilRegex();
-
-    // "You hand over 1,234 gil." — gil given during trade
-    [GeneratedRegex(@"^You hand over ([\d,]+) gil\.$")]
-    private static partial Regex GaveGilRegex();
-
     private void OnChatMessage(IHandleableChatMessage msg)
     {
         var sender  = msg.Sender;
         var message = msg.Message;
 
         // ── Trade detection (bet auto-fill + bank deposit/withdraw) ──────────
-        var isBetPhase    = config.AutoBetFromTrades    && Phase == GamePhase.Betting;
-        var isBankMonitor = config.AutoDepositFromTrades;
-        if (isBetPhase || isBankMonitor)
+        var msgText = message.TextValue;
+        var payload = message.Payloads.OfType<PlayerPayload>().FirstOrDefault();
+        switch (tradeMonitor.OnChat(msgText, payload, Phase, State, config))
         {
-            var msgText = message.TextValue;
-
-            var tradeMatch = TradeSentRegex().Match(msgText);
-            if (!tradeMatch.Success) tradeMatch = TradeWishesRegex().Match(msgText);
-            if (tradeMatch.Success)
-            {
-                var payload = message.Payloads.OfType<PlayerPayload>().FirstOrDefault();
-                pendingTradePartner = payload != null
-                    ? (payload.PlayerName, payload.World.ValueNullable?.Name.ToString() ?? string.Empty)
-                    : (tradeMatch.Groups[1].Value, string.Empty);
-            }
-            else if (TradeGilRegex().Match(msgText) is { Success: true } m2
-                     && long.TryParse(m2.Groups[1].Value.Replace(",", ""), out var gil))
-            {
-                pendingTradeGil = gil;
-            }
-            else if (GaveGilRegex().Match(msgText) is { Success: true } m3
-                     && long.TryParse(m3.Groups[1].Value.Replace(",", ""), out var gave))
-            {
-                pendingGaveGil = gave;
-            }
-            else if (msgText == "Trade complete." && pendingTradePartner.HasValue)
-            {
-                var (fullName, world) = pendingTradePartner.Value;
-                var pi = State.Players.FindIndex(p =>
-                    string.Equals(p.FullName, fullName, StringComparison.OrdinalIgnoreCase) &&
-                    (world.Length == 0 || string.Equals(p.World, world, StringComparison.OrdinalIgnoreCase)));
-                if (pi >= 0)
-                {
-                    if (pendingGaveGil > 0 && isBankMonitor)
-                    {
-                        var wdBank = State.Players[pi].BankBalance(config);
-                        if (wdBank > 0)
-                            pendingBankTradePrompt = (pi, pendingGaveGil, true);
-                    }
-                    else if (pendingTradeGil > 0)
-                    {
-                        if (isBetPhase && isBankMonitor)
-                            pendingBetOrBankPrompt = (pi, pendingTradeGil);
-                        else if (isBetPhase)
-                            pendingBetPrompt = (pi, pendingTradeGil);
-                        else if (isBankMonitor)
-                            pendingBankTradePrompt = (pi, pendingTradeGil, false);
-                    }
-                }
-                pendingTradePartner = null;
-                pendingTradeGil     = 0;
-                pendingGaveGil      = 0;
-            }
-            else if (msgText == "Trade canceled." || msgText == "Trade cancelled.")
-            {
-                pendingTradePartner = null;
-                pendingTradeGil     = 0;
-                pendingGaveGil      = 0;
-            }
+            case TradeMonitor.Outcome.PromptBet pb:
+                pendingBetPrompt = (pb.Pi, pb.Gil); break;
+            case TradeMonitor.Outcome.PromptBankDeposit pbd:
+                pendingBankTradePrompt = (pbd.Pi, pbd.Gil, false); break;
+            case TradeMonitor.Outcome.PromptBankWithdraw pbw:
+                pendingBankTradePrompt = (pbw.Pi, pbw.Gil, true); break;
+            case TradeMonitor.Outcome.PromptBetOrBank pbob:
+                pendingBetOrBankPrompt = (pbob.Pi, pbob.Gil); break;
         }
 
         // ── Roll detection ────────────────────────────────────────────────────
@@ -652,9 +587,9 @@ public partial class MainWindow : Window, IDisposable
 
         if (!isPublic)
         {
-            var localName = objectTable.LocalPlayer?.Name.TextValue;
-            var payload   = sender.Payloads.OfType<PlayerPayload>().FirstOrDefault();
-            if (localName == null || payload != null || !sender.TextValue.Contains(localName)) return;
+            var localName     = objectTable.LocalPlayer?.Name.TextValue;
+            var senderPayload = sender.Payloads.OfType<PlayerPayload>().FirstOrDefault();
+            if (localName == null || senderPayload != null || !sender.TextValue.Contains(localName)) return;
         }
 
         var rollMsgText = message.TextValue;
