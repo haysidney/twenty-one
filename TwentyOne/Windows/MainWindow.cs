@@ -229,14 +229,8 @@ public partial class MainWindow : Window, IDisposable
     // IsFirstCard=true → emit AnnouncePlayerDeal before rolling
     private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex, bool IsFirstCard)> autoDealQueue = new();
 
-    // rate-limited outgoing queue — narration strings and roll commands share a single FIFO and lastChatSent
-    // each entry: (IsRoll, Invoke, MinWaitMs) — narration passes through freely; rolls block until pendingHit is clear
-    // MinWaitMs: minimum ms to wait after the *previous* entry before sending this one (0 = use cooldownMs)
-    // IsSlashRateLimited: true for /random and /dice — enforces SlashCommandCooldownMs if longer than channel cooldown
-    private static readonly HashSet<string> RateLimitedSlashCommands = ["/random", "/dice"];
-    private readonly Queue<(bool IsRoll, Action Invoke, int MinWaitAfterMs, int MinWaitBeforeMs, bool IsSlashRateLimited)> chatQueue = new();
-    private          DateTime                                                                       lastChatSent      = DateTime.UtcNow;
-    private          int                                                                            lastSentMinWaitMs = 0;
+    // Outgoing FFXIV-chat FIFO with per-message and global cooldowns. See ChatQueue.
+    private readonly ChatQueue chatQueue = new();
 
     // ── Convenience accessors ─────────────────────────────────────────────────
 
@@ -359,36 +353,7 @@ public partial class MainWindow : Window, IDisposable
             {
                 config.NarrationLog.Add(chat.Text);
                 if (config.ChatEnabled)
-                {
-                    var raw            = chat.Text;
-                    int minWaitAfter   = 0;
-                    int minWaitBefore  = 0;
-                    var mAfter = System.Text.RegularExpressions.Regex.Match(raw, @"<wait\.(\d+)>\s*$");
-                    if (mAfter.Success)
-                    {
-                        minWaitAfter = int.Parse(mAfter.Groups[1].Value) * 1000;
-                        raw          = raw[..mAfter.Index].Trim();
-                    }
-                    var mBefore = System.Text.RegularExpressions.Regex.Match(raw, @"^\s*<wait\.(\d+)>");
-                    if (mBefore.Success)
-                    {
-                        minWaitBefore = int.Parse(mBefore.Groups[1].Value) * 1000;
-                        raw           = raw[(mBefore.Index + mBefore.Length)..].Trim();
-                    }
-                    string msg;
-                    if (raw.StartsWith('/'))
-                    {
-                        if (!config.AllowCrossChannelCommands && IsCrossChannelCommand(raw, config.ChatChannel))
-                            raw = "/echo " + raw.Split(' ', 2)[1];
-                        msg = raw;
-                    }
-                    else
-                    {
-                        msg = config.ChatChannel + " " + raw;
-                    }
-                    var slashRateLimited = RateLimitedSlashCommands.Contains(raw.Split(' ')[0]);
-                    chatQueue.Enqueue((false, () => SendChatMessage(msg), minWaitAfter, minWaitBefore, slashRateLimited));
-                }
+                    chatQueue.EnqueueChat(chat.Text, config.ChatChannel, config.AllowCrossChannelCommands, SendChatMessage);
             }
             else if (effect is AutoHit ah)
             {
@@ -526,27 +491,7 @@ public partial class MainWindow : Window, IDisposable
 
     // ── Chat / roll ───────────────────────────────────────────────────────────
 
-    // Chat commands that send messages visible to other players (not client-side).
-    private static readonly HashSet<string> ChannelCommands = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "/say", "/s", "/yell", "/y", "/shout", "/sh",
-        "/party", "/p", "/alliance", "/a",
-        "/fc", "/linkshell", "/l",
-        "/ls1", "/ls2", "/ls3", "/ls4", "/ls5", "/ls6", "/ls7", "/ls8",
-        "/cwlinkshell", "/cwl",
-        "/cwl1", "/cwl2", "/cwl3", "/cwl4", "/cwl5", "/cwl6", "/cwl7", "/cwl8",
-        "/tell", "/t", "/reply", "/r", "/novice", "/beginner",
-    };
-
-    // Returns true if `raw` is a channel-sending command targeting a different channel than `configChannel`.
-    private static bool IsCrossChannelCommand(string raw, string configChannel)
-    {
-        var cmd = raw.Split(' ', 2)[0];
-        if (!ChannelCommands.Contains(cmd)) return false;
-        return !string.Equals(cmd, configChannel, StringComparison.OrdinalIgnoreCase);
-    }
-
-private static unsafe void SendChatMessage(string message)
+    private static unsafe void SendChatMessage(string message)
     {
         var uiModule = UIModule.Instance();
         if (uiModule == null) return;
@@ -561,10 +506,10 @@ private static unsafe void SendChatMessage(string message)
     }
 
     private void QueueTrade(string fullName, string world, int minWaitBeforeMs = 0) =>
-        chatQueue.Enqueue((false, () => Plugin.TradePlayer(fullName, world), 0, minWaitBeforeMs, false));
+        chatQueue.Enqueue(new ChatQueue.Entry(false, () => Plugin.TradePlayer(fullName, world), 0, minWaitBeforeMs, false));
 
     private void QueueTarget(string fullName, string world, int minWaitBeforeMs = 0) =>
-        chatQueue.Enqueue((false, () => Plugin.TargetPlayer(fullName, world), 0, minWaitBeforeMs, false));
+        chatQueue.Enqueue(new ChatQueue.Entry(false, () => Plugin.TargetPlayer(fullName, world), 0, minWaitBeforeMs, false));
 
     private void QueueHitRoll(bool isDealer, int playerIndex, int handIndex)
     {
@@ -583,7 +528,7 @@ private static unsafe void SendChatMessage(string message)
             deferredRoll = (isDealer, playerIndex, handIndex, simRoll);
             return;
         }
-        chatQueue.Enqueue((true, () => SendHitRoll(isDealer, playerIndex, handIndex), 0, 0, true));
+        chatQueue.Enqueue(new ChatQueue.Entry(true, () => SendHitRoll(isDealer, playerIndex, handIndex), 0, 0, true));
     }
 
     private unsafe void SendHitRoll(bool isDealer, int playerIndex, int handIndex)
@@ -802,22 +747,10 @@ private static unsafe void SendChatMessage(string message)
             sessionBannerDismissed  = false;
         }
 
-        // Drain outgoing queue — hold a roll entry until the previous roll's response has arrived
+        // Drain outgoing queue — hold a roll entry until the previous roll's response has arrived.
         var isPublicChannel = config.ChatChannel is "/say" or "/yell" or "/shout";
-        var cooldownMs = isPublicChannel ? config.PublicChatCooldownMs : config.PrivateChatCooldownMs;
-        if (chatQueue.Count > 0)
-        {
-            var (isRoll, invoke, minWaitAfterMs, minWaitBeforeMs, isSlashRateLimited) = chatQueue.Peek();
-            var effectiveCooldown = isSlashRateLimited ? Math.Max(cooldownMs, config.SlashCommandCooldownMs) : cooldownMs;
-            var requiredMs = Math.Max(effectiveCooldown, lastSentMinWaitMs) + minWaitBeforeMs;
-            if ((DateTime.UtcNow - lastChatSent).TotalMilliseconds >= requiredMs && (!isRoll || pendingHit == null))
-            {
-                chatQueue.Dequeue();
-                invoke();
-                lastChatSent      = DateTime.UtcNow;
-                lastSentMinWaitMs = minWaitAfterMs;
-            }
-        }
+        var cooldownMs      = isPublicChannel ? config.PublicChatCooldownMs : config.PrivateChatCooldownMs;
+        chatQueue.TryDrain(DateTime.UtcNow, cooldownMs, config.SlashCommandCooldownMs, blockedByPendingHit: pendingHit != null);
 
 #if DEBUG
         // Fast-forward: fire the next scenario step as soon as the chat queue and pending state drain
