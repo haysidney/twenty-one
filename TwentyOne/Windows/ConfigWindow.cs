@@ -76,10 +76,7 @@ public class ConfigWindow : Window, IDisposable
         var bjIdx     = (int)config.GameState.BjPayout;
         ImGui.SetNextItemWidth(70);
         if (ImGui.Combo("##bjpayout", ref bjIdx, bjOptions, bjOptions.Length))
-        {
-            config.GameState.BjPayout = (PayoutRatio)bjIdx;
-            config.Save();
-        }
+            config.SetGameRule(s => s.BjPayout = (PayoutRatio)bjIdx);
 
         ImGui.AlignTextToFramePadding();
         ImGui.Text("Five Card Charlie");
@@ -88,10 +85,7 @@ public class ConfigWindow : Window, IDisposable
         var charlieIdx     = (int)config.GameState.FiveCardCharlie;
         ImGui.SetNextItemWidth(150);
         if (ImGui.Combo("##fiveCardCharlie", ref charlieIdx, charlieOptions, charlieOptions.Length))
-        {
-            config.GameState.FiveCardCharlie = (FiveCardCharlieRule)charlieIdx;
-            config.Save();
-        }
+            config.SetGameRule(s => s.FiveCardCharlie = (FiveCardCharlieRule)charlieIdx);
 
         if (config.GameState.FiveCardCharlie != FiveCardCharlieRule.Disabled)
         {
@@ -102,10 +96,7 @@ public class ConfigWindow : Window, IDisposable
             var charliePayoutIdx     = (int)config.GameState.CharliePayout;
             ImGui.SetNextItemWidth(70);
             if (ImGui.Combo("##charliepayout", ref charliePayoutIdx, charliePayoutOptions, charliePayoutOptions.Length))
-            {
-                config.GameState.CharliePayout = (PayoutRatio)charliePayoutIdx;
-                config.Save();
-            }
+                config.SetGameRule(s => s.CharliePayout = (PayoutRatio)charliePayoutIdx);
         }
 
         ImGui.Spacing();
@@ -518,10 +509,7 @@ public class ConfigWindow : Window, IDisposable
             ImGui.TextDisabled("Deal summary (components of a single message)");
             var skipOne = config.GameState.SkipDealSummaryOnePlayer;
             if (ImGui.Checkbox("Skip deal summary when only one player##skipDS1P", ref skipOne))
-            {
-                config.GameState.SkipDealSummaryOnePlayer = skipOne;
-                config.Save();
-            }
+                config.SetGameRule(s => s.SkipDealSummaryOnePlayer = skipOne);
             if (ImGui.BeginTable("##ntDeal", 3, flags))
             {
                 ImGui.TableSetupColumn("##ntDealLabel", ImGuiTableColumnFlags.WidthFixed, 90);
