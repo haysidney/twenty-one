@@ -333,28 +333,13 @@ public partial class MainWindow : Window, IDisposable
             if (config.GameState.WaitingForNextPlayer)
                 config.UndoStack.Add(config.GameState);
         }
-        else if (action is not AnnounceBettingOpen
-                         and not AnnounceBetRequest
-                         and not AnnounceBetConfirm
-                         and not AnnounceBankRemind
-                         and not AnnounceBankShortfall
-                         and not AnnounceBankDeposit
-                         and not AnnounceBankWithdraw
-                         and not AnnounceDouble
-                         and not AnnounceDoubleConfirm
-                         and not AnnounceSplit
-                         and not AnnounceDealerHit
-                         and not AnnouncePlayerHit
-                         and not AnnouncePlayerTurn
-                         and not AnnouncePlayerDeal
-                         and not AnnounceDealerDeal
-                         and not BeginDealerTurn)
+        else if (action.PushesUndo
+                 && !IsTransientSplitState(config.GameState)
+                 && !IsTransientDoubleState(config.GameState))
         {
             // GameEngine is pure — it never mutates state, so pushing the current
             // reference is safe; future Apply calls create entirely new objects.
-            // Skip transient states that auto-resolve immediately in normal play.
-            if (!IsTransientSplitState(config.GameState) && !IsTransientDoubleState(config.GameState))
-                config.UndoStack.Add(config.GameState);
+            config.UndoStack.Add(config.GameState);
         }
         config.RedoStack.Clear();
 

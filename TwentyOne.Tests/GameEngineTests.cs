@@ -2847,3 +2847,59 @@ public class BankLedgerTests
         Assert.Equal(t, entry.Timestamp);
     }
 }
+
+public class GameActionPushesUndoTests
+{
+    public static System.Collections.Generic.IEnumerable<object[]> NonPushingActions => new[]
+    {
+        new object[] { new AnnounceBettingOpen() },
+        new object[] { new AnnounceBetRequest(0) },
+        new object[] { new AnnounceBetConfirm(0, 0) },
+        new object[] { new AnnounceBankRemind(0, 0) },
+        new object[] { new AnnounceBankShortfall(0, 0) },
+        new object[] { new AnnounceBankDeposit(0, 0, 0) },
+        new object[] { new AnnounceBankWithdraw(0, 0, 0) },
+        new object[] { new AnnounceDouble(0, 0) },
+        new object[] { new AnnounceDoubleConfirm(0, 0) },
+        new object[] { new AnnounceSplit(0, 0) },
+        new object[] { new AnnounceDealerHit() },
+        new object[] { new AnnouncePlayerHit(0, 0) },
+        new object[] { new AnnouncePlayerTurn(0, 0) },
+        new object[] { new AnnouncePlayerDeal(0) },
+        new object[] { new AnnounceDealerDeal() },
+        new object[] { new BeginDealerTurn() },
+    };
+
+    [Theory]
+    [MemberData(nameof(NonPushingActions))]
+    public void NarrationOnlyAndBeginDealerTurn_DoNotPushUndo(GameAction action)
+    {
+        Assert.False(action.PushesUndo);
+    }
+
+    public static System.Collections.Generic.IEnumerable<object[]> PushingActions => new[]
+    {
+        new object[] { new AddDealerCard(7) },
+        new object[] { new AddPlayerCard(0, 0, 7) },
+        new object[] { new StandPlayer(0, 0) },
+        new object[] { new DoubleDown(0, 0) },
+        new object[] { new SplitHand(0, 0) },
+        new object[] { new StartDeal() },
+        new object[] { new BeginPlayerTurns() },
+        new object[] { new AdvanceToNextPlayer() },
+        new object[] { new GoToPayout() },
+        new object[] { new NewRound() },
+        new object[] { new AddPlayer("Lorah") },
+        new object[] { new RemovePlayer(0) },
+        new object[] { new SetPlayerBet(0, "100") },
+        new object[] { new RenamePlayer(0, "Lorah") },
+        new object[] { new ToggleSittingOut(0) },
+    };
+
+    [Theory]
+    [MemberData(nameof(PushingActions))]
+    public void StateChangingActions_PushUndo(GameAction action)
+    {
+        Assert.True(action.PushesUndo);
+    }
+}
