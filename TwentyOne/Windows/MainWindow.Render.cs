@@ -979,28 +979,28 @@ public partial class MainWindow
 
     private void DrawTradeBetPromptModal()
     {
-        if (pendingBetPrompt.HasValue)
+        if (pendingPrompt is PendingPrompt.Bet)
             ImGui.OpenPopup("Set bet from trade?##tradeBet");
         ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
         var show = ImGui.BeginPopupModal("Set bet from trade?##tradeBet", ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.PopStyleColor();
         if (!show) return;
 
-        var (bpi, bgil) = pendingBetPrompt!.Value;
-        var bplayer     = State.Players[bpi];
-        ImGui.Text($"Set {bplayer.DisplayName}'s bet to {bgil:N0} gil?");
+        var b = (PendingPrompt.Bet)pendingPrompt!;
+        var bplayer = State.Players[b.Pi];
+        ImGui.Text($"Set {bplayer.DisplayName}'s bet to {b.Gil:N0} gil?");
         ImGui.Spacing();
         if (ImGui.Button("Yes"))
         {
-            betEdits.Remove(bpi);
-            Apply(new SetPlayerBet(bpi, bgil.ToString()));
-            pendingBetPrompt = null;
+            betEdits.Remove(b.Pi);
+            Apply(new SetPlayerBet(b.Pi, b.Gil.ToString()));
+            pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
         ImGui.SameLine();
         if (ImGui.Button("No"))
         {
-            pendingBetPrompt = null;
+            pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
         ImGui.EndPopup();
@@ -1008,22 +1008,22 @@ public partial class MainWindow
 
     private void DrawBetOrBankPromptModal()
     {
-        if (pendingBetOrBankPrompt.HasValue)
+        if (pendingPrompt is PendingPrompt.BetOrBank)
             ImGui.OpenPopup("Trade received##betOrBank");
         ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
         var show = ImGui.BeginPopupModal("Trade received##betOrBank", ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.PopStyleColor();
         if (!show) return;
 
-        var (bobpi, bobgil) = pendingBetOrBankPrompt!.Value;
-        var bobPlayer = State.Players[bobpi];
-        ImGui.Text($"Received {bobgil:N0} gil from {bobPlayer.DisplayName}.");
+        var b = (PendingPrompt.BetOrBank)pendingPrompt!;
+        var bobPlayer = State.Players[b.Pi];
+        ImGui.Text($"Received {b.Gil:N0} gil from {bobPlayer.DisplayName}.");
         ImGui.Spacing();
         if (ImGui.Button("Set as bet##bobBet"))
         {
-            betEdits.Remove(bobpi);
-            Apply(new SetPlayerBet(bobpi, bobgil.ToString()));
-            pendingBetOrBankPrompt = null;
+            betEdits.Remove(b.Pi);
+            Apply(new SetPlayerBet(b.Pi, b.Gil.ToString()));
+            pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
         ImGui.SameLine();
@@ -1035,15 +1035,15 @@ public partial class MainWindow
                 bobStat = new PlayerStat { DisplayName = bobPlayer.DisplayName };
                 config.PlayerStatsStore[bobKey] = bobStat;
             }
-            ApplyBank(bobStat, new BankDeposit(bobgil));
-            Apply(new AnnounceBankDeposit(bobpi, bobgil, bobStat.Bank));
-            pendingBetOrBankPrompt = null;
+            ApplyBank(bobStat, new BankDeposit(b.Gil));
+            Apply(new AnnounceBankDeposit(b.Pi, b.Gil, bobStat.Bank));
+            pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
         ImGui.SameLine();
         if (ImGui.Button("Ignore##bobIgnore"))
         {
-            pendingBetOrBankPrompt = null;
+            pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
         ImGui.EndPopup();
@@ -1180,14 +1180,16 @@ public partial class MainWindow
 
     private void DrawBankTradePromptModal()
     {
-        if (pendingBankTradePrompt.HasValue)
+        if (pendingPrompt is PendingPrompt.BankDeposit or PendingPrompt.BankWithdraw)
             ImGui.OpenPopup("Bank trade##bankTradePrompt");
         ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
         var show = ImGui.BeginPopupModal("Bank trade##bankTradePrompt", ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.PopStyleColor();
         if (!show) return;
 
-        var (btpi, btamt, btwd) = pendingBankTradePrompt!.Value;
+        var isWd   = pendingPrompt is PendingPrompt.BankWithdraw;
+        var btpi   = isWd ? ((PendingPrompt.BankWithdraw)pendingPrompt!).Pi : ((PendingPrompt.BankDeposit)pendingPrompt!).Pi;
+        var btamt  = isWd ? ((PendingPrompt.BankWithdraw)pendingPrompt!).Gil : ((PendingPrompt.BankDeposit)pendingPrompt!).Gil;
         var btplayer = State.Players[btpi];
         var btKey    = btplayer.StatsKey();
         if (!config.PlayerStatsStore.TryGetValue(btKey, out var btStat))
@@ -1195,22 +1197,22 @@ public partial class MainWindow
             btStat = new PlayerStat { DisplayName = btplayer.DisplayName };
             config.PlayerStatsStore[btKey] = btStat;
         }
-        var verb = btwd ? "Withdraw" : "Deposit";
-        ImGui.Text($"{verb} {btamt:N0} gil {(btwd ? "from" : "to")} {btplayer.DisplayName}'s bank?");
+        var verb = isWd ? "Withdraw" : "Deposit";
+        ImGui.Text($"{verb} {btamt:N0} gil {(isWd ? "from" : "to")} {btplayer.DisplayName}'s bank?");
         ImGui.Spacing();
         if (ImGui.Button("Yes##bankTradeYes"))
         {
-            ApplyBank(btStat, btwd ? new BankWithdrawal(btamt) : new BankDeposit(btamt));
-            Apply(btwd
+            ApplyBank(btStat, isWd ? new BankWithdrawal(btamt) : new BankDeposit(btamt));
+            Apply(isWd
                 ? new AnnounceBankWithdraw(btpi, btamt, btStat.Bank)
                 : new AnnounceBankDeposit (btpi, btamt, btStat.Bank));
-            pendingBankTradePrompt = null;
+            pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
         ImGui.SameLine();
         if (ImGui.Button("No##bankTradeNo"))
         {
-            pendingBankTradePrompt = null;
+            pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
         ImGui.EndPopup();

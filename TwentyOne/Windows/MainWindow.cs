@@ -53,8 +53,15 @@ public partial class MainWindow : Window, IDisposable
     private int    bankManagePlayerIndex = -1;
     private string bankDepositBuf        = string.Empty;
     private string bankWithdrawBuf       = string.Empty;
-    // prompt shown when a trade with the bank player completes: (playerIndex, amount, isWithdraw)
-    private (int PlayerIndex, long Amount, bool IsWithdraw)? pendingBankTradePrompt;
+    // Discriminated prompt for trade-result modals. Only one may be active at a time.
+    private abstract record PendingPrompt
+    {
+        public sealed record Bet(int Pi, long Gil) : PendingPrompt;
+        public sealed record BankDeposit(int Pi, long Gil) : PendingPrompt;
+        public sealed record BankWithdraw(int Pi, long Gil) : PendingPrompt;
+        public sealed record BetOrBank(int Pi, long Gil) : PendingPrompt;
+    }
+    private PendingPrompt? pendingPrompt;
 
     // pending hit: null = not waiting; IsPublic=true means /random was sent, false means /dice
     private (bool IsDealer, int PlayerIndex, int HandIndex, bool IsPublic)? pendingHit;
@@ -203,10 +210,6 @@ public partial class MainWindow : Window, IDisposable
     private (int PlayerIndex, int HandIndex)? pendingSplit;
     // chat-stream trade-detection state (partner / received-gil / given-gil) lives in TradeMonitor.
     private readonly TradeMonitor              tradeMonitor = new();
-    // prompt to set a player's bet after a completed trade; shown as a modal
-    private (int PlayerIndex, long Gil)?      pendingBetPrompt;
-    // prompt shown when both AutoBetFromTrades and AutoDepositFromTrades are on during Betting phase
-    private (int PlayerIndex, long Gil)?      pendingBetOrBankPrompt;
     // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
     // IsFirstCard=true → emit AnnouncePlayerDeal before rolling
     private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex, bool IsFirstCard)> autoDealQueue = new();
@@ -555,13 +558,13 @@ public partial class MainWindow : Window, IDisposable
         switch (tradeMonitor.OnChat(msgText, payload, Phase, State, config))
         {
             case TradeMonitor.Outcome.PromptBet pb:
-                pendingBetPrompt = (pb.Pi, pb.Gil); break;
+                pendingPrompt = new PendingPrompt.Bet(pb.Pi, pb.Gil); break;
             case TradeMonitor.Outcome.PromptBankDeposit pbd:
-                pendingBankTradePrompt = (pbd.Pi, pbd.Gil, false); break;
+                pendingPrompt = new PendingPrompt.BankDeposit(pbd.Pi, pbd.Gil); break;
             case TradeMonitor.Outcome.PromptBankWithdraw pbw:
-                pendingBankTradePrompt = (pbw.Pi, pbw.Gil, true); break;
+                pendingPrompt = new PendingPrompt.BankWithdraw(pbw.Pi, pbw.Gil); break;
             case TradeMonitor.Outcome.PromptBetOrBank pbob:
-                pendingBetOrBankPrompt = (pbob.Pi, pbob.Gil); break;
+                pendingPrompt = new PendingPrompt.BetOrBank(pbob.Pi, pbob.Gil); break;
         }
 
         // ── Roll detection ────────────────────────────────────────────────────
