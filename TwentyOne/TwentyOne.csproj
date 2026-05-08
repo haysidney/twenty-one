@@ -12,6 +12,12 @@
     <Tags>Blackjack;Black Jack;Cards;Dealer;Croupier;Casino;Venue;Game</Tags>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="*">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\TwentyOne.Game\TwentyOne.Game.csproj" />
   </ItemGroup>
 </Project>
