@@ -23,6 +23,9 @@ internal sealed class GameStateBuilder
     private PayoutRatio          _charliePayout     = PayoutRatio.EvenMoney;
     private bool                 _waitingForNextPlayer;
     private bool                 _waitingForDealer;
+    private bool                 _skipDealSummaryOnePlayer = true;
+    private HashSet<string>?     _lastRoundWinners;
+    private HashSet<string>?     _lastRoundPushers;
 
     public GameStateBuilder Phase(GamePhase phase)
     {
@@ -109,17 +112,42 @@ internal sealed class GameStateBuilder
         return this;
     }
 
-    public GameState Build() => new GameState
+    public GameStateBuilder SkipDealSummaryOnePlayer(bool value = true)
     {
-        Phase                 = _phase,
-        DealerHand            = new Hand { Cards = [.._dealerCards], State = _dealerState },
-        Players               = _players,
-        ActivePlayerIndex     = _activePlayerIndex,
-        ActiveHandIndex       = _activeHandIndex,
-        FiveCardCharlie       = _fiveCardCharlie,
-        BjPayout              = _bjPayout,
-        CharliePayout         = _charliePayout,
-        WaitingForNextPlayer  = _waitingForNextPlayer,
-        WaitingForDealer      = _waitingForDealer,
-    };
+        _skipDealSummaryOnePlayer = value;
+        return this;
+    }
+
+    public GameStateBuilder LastRoundWinners(params string[] names)
+    {
+        _lastRoundWinners = new HashSet<string>(names);
+        return this;
+    }
+
+    public GameStateBuilder LastRoundPushers(params string[] names)
+    {
+        _lastRoundPushers = new HashSet<string>(names);
+        return this;
+    }
+
+    public GameState Build()
+    {
+        var state = new GameState
+        {
+            Phase                    = _phase,
+            DealerHand               = new Hand { Cards = [.._dealerCards], State = _dealerState },
+            Players                  = _players,
+            ActivePlayerIndex        = _activePlayerIndex,
+            ActiveHandIndex          = _activeHandIndex,
+            FiveCardCharlie          = _fiveCardCharlie,
+            BjPayout                 = _bjPayout,
+            CharliePayout            = _charliePayout,
+            WaitingForNextPlayer     = _waitingForNextPlayer,
+            WaitingForDealer         = _waitingForDealer,
+            SkipDealSummaryOnePlayer = _skipDealSummaryOnePlayer,
+        };
+        if (_lastRoundWinners is not null) state.LastRoundWinners = _lastRoundWinners;
+        if (_lastRoundPushers is not null) state.LastRoundPushers = _lastRoundPushers;
+        return state;
+    }
 }

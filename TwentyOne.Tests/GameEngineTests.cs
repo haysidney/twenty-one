@@ -149,11 +149,10 @@ public class ApplyAddDealerCardTests
     [Fact]
     public void AddDealerCard_DealerTurn_NarratesBust()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 8], State = HandState.Playing },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(10, 8)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddDealerCard(5));
         Assert.Contains("Bust", ((SendChat)effects[0]).Text);
     }
@@ -161,7 +160,7 @@ public class ApplyAddDealerCardTests
     [Fact]
     public void AddDealerCard_DealPhase_NoNarration()
     {
-        var state = new GameState { Phase = GamePhase.Deal };
+        var state = new GameStateBuilder().Phase(GamePhase.Deal).Build();
         var (_, effects) = GameEngine.Apply(state, new AddDealerCard(10));
         Assert.Empty(effects);
     }
@@ -197,17 +196,11 @@ public class ApplyAddPlayerCardTests
     [Fact]
     public void AddPlayerCard_Bust_NarratesBustAndAdvances()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
-                new Player { Nickname = "Bekki",   Hands = [new Hand { Cards = [5, 6],  State = HandState.Playing }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", 10, 8)
+            .Player("Bekki", 5, 6)
+            .Build();
         var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
         Assert.Contains("busts", ((SendChat)effects[0]).Text);
         Assert.True(newState.WaitingForNextPlayer);
@@ -221,16 +214,10 @@ public class ApplyAddPlayerCardTests
     [Fact]
     public void AddPlayerCard_LastPlayerBusts_SkipsToPayout()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", 10, 8)
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
         // All players bust → DealerTurn without WaitingForDealer (shows "Go to Payout" directly).
         Assert.Equal(GamePhase.DealerTurn, newState.Phase);
@@ -240,17 +227,11 @@ public class ApplyAddPlayerCardTests
     [Fact]
     public void AddPlayerCard_AllBustExceptStanding_TransitionsToDealerTurn()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
-                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", 10, 8)
+            .Player("Bekki", HandState.Stand, 10, 7)
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
         Assert.Equal(GamePhase.DealerTurn, newState.Phase);
     }
@@ -258,12 +239,11 @@ public class ApplyAddPlayerCardTests
     [Fact]
     public void AddPlayerCard_DealPhase_NoNarration()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.Deal,
-            ActivePlayerIndex = -1,
-            Players           = [new Player { Nickname = "Lorah", Hands = [new Hand()] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .ActiveHand(-1)
+            .Player("Lorah")
+            .Build();
         var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 5));
         Assert.Empty(effects);
         Assert.Equal(GamePhase.Deal, newState.Phase);
@@ -275,7 +255,7 @@ public class ApplyAnnounceTests
     [Fact]
     public void AnnounceDealerDeal_EmitsNarrationNoStateChange()
     {
-        var state = new GameState { Phase = GamePhase.Deal };
+        var state = new GameStateBuilder().Phase(GamePhase.Deal).Build();
         var (newState, effects) = GameEngine.Apply(state, new AnnounceDealerDeal());
         Assert.Single(effects);
         Assert.Equal("Dealer's Card:", ((SendChat)effects[0]).Text);
@@ -285,11 +265,10 @@ public class ApplyAnnounceTests
     [Fact]
     public void AnnouncePlayerDeal_EmitsPlayerNameNarration()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Deal,
-            Players = [new Player { Nickname = "Lorah", Hands = [new Hand()] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Player("Lorah")
+            .Build();
         var (newState, effects) = GameEngine.Apply(state, new AnnouncePlayerDeal(0));
         Assert.Single(effects);
         Assert.Equal("Lorah's Hand:", ((SendChat)effects[0]).Text);
@@ -302,17 +281,11 @@ public class ApplyStandPlayerTests
     [Fact]
     public void Stand_NarratesAndAdvancesToNextPlayer()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] },
-                new Player { Nickname = "Bekki",   Hands = [new Hand { Cards = [9, 8],  State = HandState.Playing }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", 10, 7)
+            .Player("Bekki", 9, 8)
+            .Build();
         var (newState, effects) = GameEngine.Apply(state, new StandPlayer(0, 0));
         Assert.Contains("Lorah stands", ((SendChat)effects[0]).Text);
         Assert.Equal(HandState.Stand, newState.Players[0].Hands[0].State);
@@ -326,13 +299,10 @@ public class ApplyStandPlayerTests
     [Fact]
     public void Stand_LastPlayer_TransitionsToDealerTurn()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players           = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", 10, 7)
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new StandPlayer(0, 0));
         Assert.Equal(GamePhase.DealerTurn, newState.Phase);
     }
@@ -340,11 +310,10 @@ public class ApplyStandPlayerTests
     [Fact]
     public void Stand_AlreadyStood_NoChange()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.PlayerTurns,
-            Players = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", HandState.Stand, 10, 7)
+            .Build();
         var (newState, effects) = GameEngine.Apply(state, new StandPlayer(0, 0));
         Assert.Same(state, newState);
         Assert.Empty(effects);
@@ -356,7 +325,7 @@ public class ApplyPhaseTransitionTests
     [Fact]
     public void StartDeal_TransitionsToDeal()
     {
-        var state    = new GameState { Phase = GamePhase.Betting };
+        var state    = new GameStateBuilder().Phase(GamePhase.Betting).Build();
         var (ns, _)  = GameEngine.Apply(state, new StartDeal());
         Assert.Equal(GamePhase.Deal, ns.Phase);
     }
@@ -365,16 +334,12 @@ public class ApplyPhaseTransitionTests
     public void AddPlayerCard_CompletingDeal_NarratesDealSummary()
     {
         // Last card dealt (Bekki's 2nd card) completes the deal — summary fires here.
-        var state = new GameState
-        {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-            Players =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8],  State = HandState.Playing }] },
-                new Player { Nickname = "Bekki",   Hands = [new Hand { Cards = [10], State = HandState.Playing }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Dealer(10)
+            .Player("Lorah", 5, 8)
+            .Player("Bekki", 10)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(1, 0, 9));
         Assert.Single(effects);
         Assert.Contains("Deal —", ((SendChat)effects[0]).Text);
@@ -383,16 +348,12 @@ public class ApplyPhaseTransitionTests
     [Fact]
     public void BeginPlayerTurns_SetsFirstActivePlayer()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-            Players =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8],  State = HandState.Playing }] },
-                new Player { Nickname = "Bekki",   Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Dealer(10)
+            .Player("Lorah", 5, 8)
+            .Player("Bekki", 10, 9)
+            .Build();
         var (newState, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
         Assert.Single(effects);
         Assert.Contains("Lorah's turn", ((SendChat)effects[0]).Text);
@@ -403,15 +364,11 @@ public class ApplyPhaseTransitionTests
     [Fact]
     public void BeginPlayerTurns_BlackjackPlayer_NarratesAndWaits()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-            Players =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Dealer(10)
+            .Player("Lorah", HandState.Blackjack, 1, 10)
+            .Build();
         var (newState, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
         // All hands are BJ → skip directly to DealerTurn (dealer has 10 upcard, need hole card)
         Assert.Equal(GamePhase.DealerTurn, newState.Phase);
@@ -423,15 +380,11 @@ public class ApplyPhaseTransitionTests
     [Fact]
     public void BeginPlayerTurns_AllBlackjacks_AdvanceToNextPlayerGoesToDealerTurn()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-            Players =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Dealer(10)
+            .Player("Lorah", HandState.Blackjack, 1, 10)
+            .Build();
         var (mid, _)      = GameEngine.Apply(state, new BeginPlayerTurns());
         var (newState, _) = GameEngine.Apply(mid, new AdvanceToNextPlayer());
         Assert.Equal(GamePhase.DealerTurn, newState.Phase);
@@ -440,15 +393,11 @@ public class ApplyPhaseTransitionTests
     [Fact]
     public void NewRound_ResetsHandsKeepsPlayers()
     {
-        var state = new GameState
-        {
-            Phase  = GamePhase.Payout,
-            Players =
-            [
-                new Player { Nickname = "Lorah", Bet = "10", Hands = [new Hand { Cards = [5, 8], State = HandState.Stand }] },
-            ],
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "10", HandState.Stand, 5, 8)
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new NewRound());
         Assert.Equal(GamePhase.Betting, newState.Phase);
         Assert.Equal("Lorah", newState.Players[0].Nickname);
@@ -461,13 +410,12 @@ public class ApplyPhaseTransitionTests
 public class PayoutTests
 {
     private static GameState PayoutState(int[] playerCards, HandState playerState,
-        int[] dealerCards, HandState dealerState = HandState.Stand) => new GameState
-    {
-        Phase      = GamePhase.Payout,
-        DealerHand = new Hand { Cards = [..dealerCards], State = dealerState },
-        Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands =
-            [new Hand { Cards = [..playerCards], State = playerState }] }],
-    };
+        int[] dealerCards, HandState dealerState = HandState.Stand) =>
+        new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .Dealer(dealerState, dealerCards)
+            .Player("Lorah", "100", playerState, playerCards)
+            .Build();
 
     [Fact]
     public void PlayerBusts_Loses()
@@ -532,14 +480,12 @@ public class PayoutTests
     [InlineData(PayoutRatio.EvenMoney,  "+100")]   // 100 * 1.0 = 100
     public void BjPayoutAmounts(PayoutRatio payout, string expected)
     {
-        var state = new GameState
-        {
-            Phase    = GamePhase.Payout,
-            BjPayout = payout,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands =
-                [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .BjPayout(payout)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Blackjack, 1, 10)
+            .Build();
         Assert.Equal(expected, GameEngine.PayoutAmountString(state, 0));
     }
 
@@ -567,14 +513,12 @@ public class PayoutTests
     [InlineData(PayoutRatio.EvenMoney,  200)]   // 100 + 100
     public void PayoutTotalOwed_BjWin_IsBetPlusBjMultiplier(PayoutRatio payout, int expected)
     {
-        var state = new GameState
-        {
-            Phase    = GamePhase.Payout,
-            BjPayout = payout,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands =
-                [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .BjPayout(payout)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Blackjack, 1, 10)
+            .Build();
         Assert.Equal((decimal)expected, GameEngine.PayoutTotalOwed(state, 0));
     }
 
@@ -584,14 +528,12 @@ public class PayoutTests
     [InlineData(PayoutRatio.EvenMoney,  200)]
     public void PayoutTotalOwed_CharlieWin_IsBetPlusCharlieMultiplier(PayoutRatio payout, int expected)
     {
-        var state = new GameState
-        {
-            Phase         = GamePhase.Payout,
-            CharliePayout = payout,
-            DealerHand    = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players       = [new Player { Nickname = "Lorah", Bet = "100", Hands =
-                [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .Charlie(FiveCardCharlieRule.Disabled, payout)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Charlie, 2, 3, 4, 5, 6)
+            .Build();
         Assert.Equal((decimal)expected, GameEngine.PayoutTotalOwed(state, 0));
     }
 
@@ -619,7 +561,7 @@ public class PayoutTests
 
 public class RosterManagementTests
 {
-    private static GameState BettingState() => new GameState { Phase = GamePhase.Betting };
+    private static GameState BettingState() => new GameStateBuilder().Phase(GamePhase.Betting).Build();
 
     [Fact]
     public void AddPlayer_AppendsPlayer()
@@ -632,11 +574,11 @@ public class RosterManagementTests
     [Fact]
     public void RemovePlayer_RemovesCorrectIndex()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Betting,
-            Players = [new Player { Nickname = "Lorah" }, new Player { Nickname = "Bekki" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah")
+            .Player("Bekki")
+            .Build();
         var (ns, _) = GameEngine.Apply(state, new RemovePlayer(0));
         Assert.Single(ns.Players);
         Assert.Equal("Bekki", ns.Players[0].Nickname);
@@ -645,11 +587,10 @@ public class RosterManagementTests
     [Fact]
     public void SetPlayerBet_UpdatesBet()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Betting,
-            Players = [new Player { Nickname = "Lorah", Bet = "10" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah", "10")
+            .Build();
         var (ns, _) = GameEngine.Apply(state, new SetPlayerBet(0, "50"));
         Assert.Equal("50", ns.Players[0].Bet);
     }
@@ -657,10 +598,9 @@ public class RosterManagementTests
     [Fact]
     public void RenamePlayer_UpdatesNickname()
     {
-        var state = new GameState
-        {
-            Players = [new Player { Nickname = "Lorah", Bet = "10" }],
-        };
+        var state = new GameStateBuilder()
+            .Player("Lorah", "10")
+            .Build();
         var (ns, _) = GameEngine.Apply(state, new RenamePlayer(0, "Nolla"));
         Assert.Equal("Nolla", ns.Players[0].Nickname);
         Assert.Equal("Nolla", ns.Players[0].DisplayName);
@@ -670,10 +610,9 @@ public class RosterManagementTests
     [Fact]
     public void RenamePlayer_PreservesFullNameAndWorld()
     {
-        var state = new GameState
-        {
-            Players = [new Player { FullName = "Lorah Banehene", World = "Adamantoise", Bet = "50" }],
-        };
+        var state = new GameStateBuilder()
+            .Player(new Player { FullName = "Lorah Banehene", World = "Adamantoise", Bet = "50" })
+            .Build();
         var (ns, _) = GameEngine.Apply(state, new RenamePlayer(0, "Lory"));
         Assert.Equal("Lory", ns.Players[0].Nickname);
         Assert.Equal("Lory", ns.Players[0].DisplayName);
@@ -684,10 +623,9 @@ public class RosterManagementTests
     [Fact]
     public void RenamePlayer_ClearNickname_RevealsFfxivFirstName()
     {
-        var state = new GameState
-        {
-            Players = [new Player { Nickname = "Lory", FullName = "Lorah Banehene", World = "Adamantoise" }],
-        };
+        var state = new GameStateBuilder()
+            .Player(new Player { Nickname = "Lory", FullName = "Lorah Banehene", World = "Adamantoise" })
+            .Build();
         var (ns, _) = GameEngine.Apply(state, new RenamePlayer(0, ""));
         Assert.Equal("", ns.Players[0].Nickname);
         Assert.Equal("Lorah", ns.Players[0].DisplayName);
@@ -703,11 +641,10 @@ public class RosterManagementTests
     [Fact]
     public void ReorderPlayers_ChangesOrder()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Betting,
-            Players = [new Player { Nickname = "Lorah" }, new Player { Nickname = "Bekki" }, new Player { Nickname = "Nolla" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah").Player("Bekki").Player("Nolla")
+            .Build();
         var (ns, _) = GameEngine.Apply(state, new ReorderPlayers([2, 0, 1]));
         Assert.Equal("Nolla", ns.Players[0].Nickname);
         Assert.Equal("Lorah", ns.Players[1].Nickname);
@@ -717,11 +654,10 @@ public class RosterManagementTests
     [Fact]
     public void ReorderPlayers_NoOpOutsideBetting()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.PlayerTurns,
-            Players = [new Player { Nickname = "Lorah" }, new Player { Nickname = "Bekki" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah").Player("Bekki")
+            .Build();
         var (ns, _) = GameEngine.Apply(state, new ReorderPlayers([1, 0]));
         Assert.Equal("Lorah", ns.Players[0].Nickname);
         Assert.Equal("Bekki", ns.Players[1].Nickname);
@@ -730,17 +666,11 @@ public class RosterManagementTests
 
 public class NarrationTemplateTests
 {
-    private static GameState PlayerTurnsState() => new()
-    {
-        Phase             = GamePhase.PlayerTurns,
-        ActivePlayerIndex = 0,
-        ActiveHandIndex   = 0,
-        DealerHand        = new Hand { Cards = [10], State = HandState.Playing },
-        Players           =
-        [
-            new Player { Nickname = "Lorah", Bet = "50", Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] },
-        ],
-    };
+    private static GameState PlayerTurnsState() => new GameStateBuilder()
+        .Phase(GamePhase.PlayerTurns)
+        .Dealer(10)
+        .Player("Lorah", "50", 5, 6)
+        .Build();
 
     [Fact]
     public void CustomPlayerHit_UsesTemplate()
@@ -754,13 +684,10 @@ public class NarrationTemplateTests
     public void CustomPlayerBust_UsesTemplate()
     {
         var t = new NarrationTemplates { PlayerBust = [["OUT: {name}"]] };
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players           = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", 10, 8)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7), t);
         Assert.Equal("OUT: Lorah", ((SendChat)effects[0]).Text);
     }
@@ -769,11 +696,10 @@ public class NarrationTemplateTests
     public void CustomDealerHit_UsesTemplate()
     {
         var t = new NarrationTemplates { DealerHit = [["D+{card}={score}"]] };
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(10)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddDealerCard(7), t);
         Assert.Equal("D+7=17", ((SendChat)effects[0]).Text);
     }
@@ -782,11 +708,10 @@ public class NarrationTemplateTests
     public void DealerStand_NarratedAfterFinalHit()
     {
         var t = new NarrationTemplates { DealerStand = [["DS:{cards}={score}"]] };
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(10)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddDealerCard(7), t);
         // effects[0] = DealerHit, effects[1] = DealerStand
         Assert.Equal(2, effects.Count);
@@ -797,13 +722,10 @@ public class NarrationTemplateTests
     public void CustomPlayerStand_UsesTemplate()
     {
         var t = new NarrationTemplates { PlayerStand = [["{name} done ({score})"]] };
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players           = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 7], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", 10, 7)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new StandPlayer(0, 0), t);
         Assert.Equal("Lorah done (17)", ((SendChat)effects[0]).Text);
     }
@@ -813,13 +735,12 @@ public class NarrationTemplateTests
     {
         var t = new NarrationTemplates { DealSummaryPrefix = "DEALT: ", DealSummaryDealer = "" };
         // Deal is incomplete: Lorah has 1 card. Adding 2nd card completes the deal.
-        var state = new GameState
-        {
-            Phase                   = GamePhase.Deal,
-            SkipDealSummaryOnePlayer = false,
-            DealerHand              = new Hand { Cards = [10], State = HandState.Playing },
-            Players                 = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .SkipDealSummaryOnePlayer(false)
+            .Dealer(10)
+            .Player("Lorah", 5)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 8), t);
         Assert.StartsWith("DEALT: ", ((SendChat)effects[0]).Text);
     }
@@ -828,12 +749,11 @@ public class NarrationTemplateTests
     public void PayoutWin_UsesTemplate()
     {
         var t = new NarrationTemplates { PayoutWin = [["W:{name}"]], PayoutDealerStands = [["D"]] };
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Stand, 10, 9)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         Assert.Equal("W:Lorah", ((SendChat)effects[2]).Text);
     }
@@ -842,12 +762,11 @@ public class NarrationTemplateTests
     public void PayoutBjWin_UsesTemplate()
     {
         var t = new NarrationTemplates { PayoutBjWin = [["BJ:{name}"]], PayoutDealerStands = [["D"]] };
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Blackjack, 1, 10)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         Assert.Equal("BJ:Lorah", ((SendChat)effects[2]).Text);
     }
@@ -856,12 +775,11 @@ public class NarrationTemplateTests
     public void PayoutLose_UsesTemplate()
     {
         var t = new NarrationTemplates { PayoutLose = [["L:{name}"]], PayoutDealerStands = [["D"]] };
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 9], State = HandState.Stand },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 9)
+            .Player("Lorah", "100", HandState.Stand, 10, 7)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         Assert.Equal("L:Lorah", ((SendChat)effects[2]).Text);
     }
@@ -870,12 +788,11 @@ public class NarrationTemplateTests
     public void PayoutPush_UsesTemplate()
     {
         var t = new NarrationTemplates { PayoutPush = [["P:{name}"]], PayoutDealerStands = [["D"]] };
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Stand, 10, 7)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         Assert.Equal("P:Lorah", ((SendChat)effects[2]).Text);
     }
@@ -902,12 +819,11 @@ public class NarrationTemplateTests
     public void PlayerTurnStart_IncludesScore()
     {
         // BeginPlayerTurns triggers NarratePlayerTurn; verify {score} is substituted
-        var state = new GameState
-        {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Dealer(10)
+            .Player("Lorah", 5, 8)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
         // effects[0] = PlayerTurnStart (deal summary is emitted when the last card is dealt)
         var turnStart = ((SendChat)effects[0]).Text;
@@ -918,12 +834,11 @@ public class NarrationTemplateTests
     public void PlayerTurnStart_IncludesPlayerCards()
     {
         var t = new NarrationTemplates { PlayerTurnStart = [["{cards}"]] };
-        var state = new GameState
-        {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Dealer(10)
+            .Player("Lorah", 5, 8)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
         var turnStart = ((SendChat)effects[0]).Text;
         Assert.Contains("5", turnStart);
@@ -933,13 +848,12 @@ public class NarrationTemplateTests
     [Fact]
     public void DealerTurnStart_SubstitutesCardsAndScore()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.DealerTurn,
-            WaitingForDealer  = true,
-            DealerHand        = new Hand { Cards = [10, 7], State = HandState.Playing },
-            Players           = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .WaitingForDealer()
+            .Dealer(10, 7)
+            .Player("Lorah", HandState.Stand, 5, 8)
+            .Build();
         var t = new NarrationTemplates { DealerTurnStart = [["Dealer: {cards} ({score})"]] };
         var (_, effects) = GameEngine.Apply(state, new BeginDealerTurn(), t);
         var text = ((SendChat)effects[0]).Text;
@@ -951,11 +865,10 @@ public class NarrationTemplateTests
     public void DealerHit_SubstitutesDealerName()
     {
         var t     = new NarrationTemplates { DealerHit = [["{dealer}+{card}"]] };
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10], State = HandState.Playing },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(10)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddDealerCard(7), t, dealerName: "Vera");
         Assert.Equal("Vera+7", ((SendChat)effects[0]).Text);
     }
@@ -964,13 +877,12 @@ public class NarrationTemplateTests
     public void DealerTurnStart_SubstitutesDealerName()
     {
         var t     = new NarrationTemplates { DealerTurnStart = [["{dealer}: {cards}"]] };
-        var state = new GameState
-        {
-            Phase            = GamePhase.DealerTurn,
-            WaitingForDealer = true,
-            DealerHand       = new Hand { Cards = [10, 7], State = HandState.Playing },
-            Players          = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 8], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .WaitingForDealer()
+            .Dealer(10, 7)
+            .Player("Lorah", HandState.Stand, 5, 8)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new BeginDealerTurn(), t, dealerName: "Vera");
         Assert.StartsWith("Vera:", ((SendChat)effects[0]).Text);
     }
@@ -979,12 +891,11 @@ public class NarrationTemplateTests
     public void PayoutHeader_EmittedFirst()
     {
         var t     = new NarrationTemplates { PayoutHeader = [["SUMMARY"]], PayoutDealerStands = [["D"]], PayoutWin = [[""]] };
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Stand, 10, 9)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         Assert.Equal("SUMMARY", ((SendChat)effects[0]).Text);
     }
@@ -993,12 +904,11 @@ public class NarrationTemplateTests
     public void PayoutDealerBust_SubstitutesDealerName()
     {
         var t     = new NarrationTemplates { PayoutDealerBust = [["{dealer} BUST"]], PayoutWin = [[""]] };
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 7, 8], State = HandState.Bust },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Bust, 10, 7, 8)
+            .Player("Lorah", "100", HandState.Stand, 10, 9)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t, dealerName: "Vera");
         Assert.Equal("Vera BUST", ((SendChat)effects[1]).Text);
     }
@@ -1007,13 +917,12 @@ public class NarrationTemplateTests
     public void DealSummaryDealer_SubstitutesDealerName()
     {
         var t     = new NarrationTemplates { DealSummaryDealer = "|{dealer}:{cards}", DealSummaryPrefix = "", DealSummaryPlayer = "" };
-        var state = new GameState
-        {
-            Phase                   = GamePhase.Deal,
-            SkipDealSummaryOnePlayer = false,
-            DealerHand              = new Hand { Cards = [10], State = HandState.Playing },
-            Players                 = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .SkipDealSummaryOnePlayer(false)
+            .Dealer(10)
+            .Player("Lorah", 5)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 8), t, dealerName: "Vera");
         Assert.Contains("Vera:", ((SendChat)effects[0]).Text);
     }
@@ -1021,16 +930,12 @@ public class NarrationTemplateTests
     [Fact]
     public void PlayerCharlie_UsesTemplate()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            FiveCardCharlie   = FiveCardCharlieRule.BeatsAll,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            DealerHand        = new Hand { Cards = [7] },
-            Players           = [new Player { Nickname = "Lorah", Bet = "100",
-                Hands = [new Hand { Cards = [2, 3, 4, 5], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Charlie(FiveCardCharlieRule.BeatsAll)
+            .Dealer(7)
+            .Player("Lorah", "100", 2, 3, 4, 5)
+            .Build();
         var t = new NarrationTemplates { PlayerCharlie = [["CHARLIE {name} {card}"]] };
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 6), t);
         Assert.Equal("CHARLIE Lorah 6", ((SendChat)effects[0]).Text);
@@ -1039,14 +944,12 @@ public class NarrationTemplateTests
     [Fact]
     public void PayoutCharlieWin_UsesTemplate()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
-            DealerHand      = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players         = [new Player { Nickname = "Lorah", Bet = "100",
-                Hands = [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.BeatsAll)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Charlie, 2, 3, 4, 5, 6)
+            .Build();
         var t = new NarrationTemplates { PayoutCharlieWin = [["CHARLIEWIN {name} {amount}"]] };
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         Assert.Contains(effects.OfType<SendChat>(), e => e.Text.StartsWith("CHARLIEWIN Lorah"));
@@ -1058,16 +961,10 @@ public class ImmutabilityTests
     [Fact]
     public void Apply_NeverMutatesInputState()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", 5, 6)
+            .Build();
         var originalCardCount = state.Players[0].Hands[0].Cards.Count;
 
         GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
@@ -1082,7 +979,7 @@ public class AnnounceBettingOpenTests
     [Fact]
     public void AnnounceBettingOpen_NarratesTemplate()
     {
-        var state = new GameState { Phase = GamePhase.Betting };
+        var state = new GameStateBuilder().Phase(GamePhase.Betting).Build();
         var (newState, effects) = GameEngine.Apply(state, new AnnounceBettingOpen());
         Assert.Same(state, newState);
         Assert.Equal(2, effects.Count); // default template: narration line + /wringhands emote
@@ -1092,7 +989,7 @@ public class AnnounceBettingOpenTests
     public void AnnounceBettingOpen_CustomTemplate()
     {
         var t = new NarrationTemplates { BettingOpen = [["Betting is now open!"]] };
-        var state = new GameState { Phase = GamePhase.Betting };
+        var state = new GameStateBuilder().Phase(GamePhase.Betting).Build();
         var (_, effects) = GameEngine.Apply(state, new AnnounceBettingOpen(), t);
         Assert.Equal("Betting is now open!", ((SendChat)effects[0]).Text);
     }
@@ -1103,16 +1000,12 @@ public class LastRoundWinnersTests
     [Fact]
     public void GoToPayout_SetsWinnersForWinningPlayers()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    =
-            [
-                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] },
-                new Player { Nickname = "Bekki", Bet = "100", Hands = [new Hand { Cards = [10, 6], State = HandState.Stand }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Stand, 10, 9)
+            .Player("Bekki", "100", HandState.Stand, 10, 6)
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new GoToPayout());
         Assert.Contains("Lorah", newState.LastRoundWinners);
         Assert.DoesNotContain("Bekki", newState.LastRoundWinners);
@@ -1121,12 +1014,11 @@ public class LastRoundWinnersTests
     [Fact]
     public void GoToPayout_BjWin_IncludedInWinners()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Blackjack, 1, 10)
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new GoToPayout());
         Assert.Contains("Lorah", newState.LastRoundWinners);
     }
@@ -1134,12 +1026,11 @@ public class LastRoundWinnersTests
     [Fact]
     public void NewRound_PreservesLastRoundWinners()
     {
-        var state = new GameState
-        {
-            Phase            = GamePhase.Payout,
-            LastRoundWinners = ["Lorah"],
-            Players          = [new Player { Nickname = "Lorah", Hands = [new Hand()] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .LastRoundWinners("Lorah")
+            .Player("Lorah")
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new NewRound());
         Assert.Contains("Lorah", newState.LastRoundWinners);
     }
@@ -1147,12 +1038,12 @@ public class LastRoundWinnersTests
     [Fact]
     public void GoToPayout_UsesFullNameForFfxivPlayers()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    = [new Player { FullName = "Lorah Doe", World = "Cactuar", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player(new Player { FullName = "Lorah Doe", World = "Cactuar", Bet = "100",
+                Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] })
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new GoToPayout());
         Assert.Contains("Lorah Doe", newState.LastRoundWinners);
     }
@@ -1166,230 +1057,201 @@ public class CanGoToPayoutTests
     [Fact]
     public void AllBJ_DealerUpCardNotTenValue_CanPayout()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            Players    = [BjPlayer("Lorah")],
-            DealerHand = new Hand { Cards = [7] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(7)
+            .Player(BjPlayer("Lorah"))
+            .Build();
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void AllBJ_DealerUpCardAce_NeedHoleCard()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            Players    = [BjPlayer("Lorah")],
-            DealerHand = new Hand { Cards = [1] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(1)
+            .Player(BjPlayer("Lorah"))
+            .Build();
         Assert.False(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void AllBJ_DealerUpCardTenValue_NeedHoleCard()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            Players    = [BjPlayer("Lorah")],
-            DealerHand = new Hand { Cards = [13] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(13)
+            .Player(BjPlayer("Lorah"))
+            .Build();
         Assert.False(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void AllBJ_DealerHasTwoCards_CanPayout()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            Players    = [BjPlayer("Lorah")],
-            DealerHand = new Hand { Cards = [1, 10] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(1, 10)
+            .Player(BjPlayer("Lorah"))
+            .Build();
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void NormalPlay_DealerMustStand_CanPayout()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Stand }] }],
-            DealerHand = new Hand { Cards = [10, 8] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(10, 8)
+            .Player("Lorah", HandState.Stand, 10, 8)
+            .Build();
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void NormalPlay_DealerMustHit_CannotPayout()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Stand }] }],
-            DealerHand = new Hand { Cards = [10, 6] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(10, 6)
+            .Player("Lorah", HandState.Stand, 10, 8)
+            .Build();
         Assert.False(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void DealerBust_CanGoToPayout()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Stand }] }],
-            DealerHand = new Hand { Cards = [6, 8, 13] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(6, 8, 13)
+            .Player("Lorah", HandState.Stand, 10, 8)
+            .Build();
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void AllCharlie_BeatsAll_CanPayout()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
-            Players    = [CharliePlayer("Lorah")],
-            DealerHand = new Hand { Cards = [13] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.BeatsAll)
+            .Dealer(13)
+            .Player(CharliePlayer("Lorah"))
+            .Build();
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void AllCharlie_BeatsAll_AceUpCard_CanPayout()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
-            Players    = [CharliePlayer("Lorah")],
-            DealerHand = new Hand { Cards = [1] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.BeatsAll)
+            .Dealer(1)
+            .Player(CharliePlayer("Lorah"))
+            .Build();
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void AllCharlie_LosesToDealerBJ_DealerUpCardNotTenValue_CanPayout()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
-            Players    = [CharliePlayer("Lorah")],
-            DealerHand = new Hand { Cards = [7] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.LosesToDealerBJ)
+            .Dealer(7)
+            .Player(CharliePlayer("Lorah"))
+            .Build();
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void AllCharlie_LosesToDealerBJ_DealerUpCardAce_NeedHoleCard()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
-            Players    = [CharliePlayer("Lorah")],
-            DealerHand = new Hand { Cards = [1] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.LosesToDealerBJ)
+            .Dealer(1)
+            .Player(CharliePlayer("Lorah"))
+            .Build();
         Assert.False(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void AllCharlie_LosesToDealerBJ_DealerUpCardTenValue_NeedHoleCard()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
-            Players    = [CharliePlayer("Lorah")],
-            DealerHand = new Hand { Cards = [13] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.LosesToDealerBJ)
+            .Dealer(13)
+            .Player(CharliePlayer("Lorah"))
+            .Build();
         Assert.False(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void AllCharlie_LosesToDealerBJ_DealerHasTwoCards_CanPayout()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
-            Players    = [CharliePlayer("Lorah")],
-            DealerHand = new Hand { Cards = [1, 10] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.LosesToDealerBJ)
+            .Dealer(1, 10)
+            .Player(CharliePlayer("Lorah"))
+            .Build();
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void MixedBJAndCharlie_BeatsAll_SafeUpcard_CanPayout()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
-            Players         =
-            [
-                BjPlayer("Lorah"),
-                CharliePlayer("Bekki"),
-            ],
-            DealerHand = new Hand { Cards = [7] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.BeatsAll)
+            .Dealer(7)
+            .Player(BjPlayer("Lorah"))
+            .Player(CharliePlayer("Bekki"))
+            .Build();
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void MixedBJAndCharlie_BeatsAll_AceUpcard_NeedsHoleCard()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
-            Players         =
-            [
-                BjPlayer("Lorah"),
-                CharliePlayer("Bekki"),
-            ],
-            DealerHand = new Hand { Cards = [1] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.BeatsAll)
+            .Dealer(1)
+            .Player(BjPlayer("Lorah"))
+            .Player(CharliePlayer("Bekki"))
+            .Build();
         Assert.False(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void MixedBJAndCharlie_LosesToDealerBJ_SafeUpcard_CanPayout()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
-            Players         =
-            [
-                BjPlayer("Lorah"),
-                CharliePlayer("Bekki"),
-            ],
-            DealerHand = new Hand { Cards = [7] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.LosesToDealerBJ)
+            .Dealer(7)
+            .Player(BjPlayer("Lorah"))
+            .Player(CharliePlayer("Bekki"))
+            .Build();
         Assert.True(GameEngine.CanGoToPayout(state));
     }
 
     [Fact]
     public void MixedBJAndCharlie_LosesToDealerBJ_AceUpcard_NeedsHoleCard()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
-            Players         =
-            [
-                BjPlayer("Lorah"),
-                CharliePlayer("Bekki"),
-            ],
-            DealerHand = new Hand { Cards = [1] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.LosesToDealerBJ)
+            .Dealer(1)
+            .Player(BjPlayer("Lorah"))
+            .Player(CharliePlayer("Bekki"))
+            .Build();
         Assert.False(GameEngine.CanGoToPayout(state));
     }
 
@@ -1399,17 +1261,12 @@ public class CanGoToPayoutTests
 
 public class DoubleDownTests
 {
-    private static GameState ActiveState(int[] cards, string bet = "100") => new()
-    {
-        Phase             = GamePhase.PlayerTurns,
-        ActivePlayerIndex = 0,
-        ActiveHandIndex   = 0,
-        DealerHand        = new Hand { Cards = [10], State = HandState.Playing },
-        Players           =
-        [
-            new Player { Nickname = "Lorah", Bet = bet, Hands = [new Hand { Cards = [..cards], State = HandState.Playing }] },
-        ],
-    };
+    private static GameState ActiveState(int[] cards, string bet = "100") => new GameStateBuilder()
+        .Phase(GamePhase.PlayerTurns)
+        .ActiveHand(0, 0)
+        .Dealer(10)
+        .Player("Lorah", bet, cards)
+        .Build();
 
     [Fact]
     public void DoubleDown_SetDoubledFlagAndDoublesBet()
@@ -1520,36 +1377,27 @@ public class DoubleDownTests
     [Fact]
     public void PayoutAmountString_DoubledHand_UsesDoubledBet()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.Payout,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    =
-            [
-                new Player
-                {
-                    Nickname = "Lorah", Bet = "100",
-                    Hands    = [new Hand { Cards = [10, 9], State = HandState.Stand, Doubled = true, Bet = "200" }],
-                },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands    = [new Hand { Cards = [10, 9], State = HandState.Stand, Doubled = true, Bet = "200" }],
+            })
+            .Build();
         Assert.Equal("+200", GameEngine.PayoutAmountString(state, 0, 0));
     }
 }
 
 public class SplitHandTests
 {
-    private static GameState ActiveState(int c0, int c1, string bet = "100") => new()
-    {
-        Phase             = GamePhase.PlayerTurns,
-        ActivePlayerIndex = 0,
-        ActiveHandIndex   = 0,
-        DealerHand        = new Hand { Cards = [10], State = HandState.Playing },
-        Players           =
-        [
-            new Player { Nickname = "Lorah", Bet = bet, Hands = [new Hand { Cards = [c0, c1], State = HandState.Playing }] },
-        ],
-    };
+    private static GameState ActiveState(int c0, int c1, string bet = "100") => new GameStateBuilder()
+        .Phase(GamePhase.PlayerTurns)
+        .ActiveHand(0, 0)
+        .Dealer(10)
+        .Player("Lorah", bet, c0, c1)
+        .Build();
 
     [Fact]
     public void SplitHand_CreatesTwoOneCardHands()
@@ -1596,26 +1444,21 @@ public class SplitHandTests
     public void AdvanceToNextPlayer_NarratesRollForOneCardHand()
     {
         var t = new NarrationTemplates { PlayerSplitRoll = [["Rolling for {name}"]] };
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            WaitingForNextPlayer = true,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            DealerHand        = new Hand { Cards = [10] },
-            Players           =
-            [
-                new Player
-                {
-                    Nickname = "Lorah", Bet = "100",
-                    Hands    =
-                    [
-                        new Hand { Cards = [8, 5], State = HandState.Stand, IsFromSplit = true },
-                        new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
-                    ],
-                },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .WaitingForNextPlayer()
+            .Dealer(10)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands =
+                [
+                    new Hand { Cards = [8, 5], State = HandState.Stand, IsFromSplit = true },
+                    new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
+                ],
+            })
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AdvanceToNextPlayer(), t);
         Assert.Contains(effects, e => e is SendChat c && c.Text == "Rolling for Lorah (Hand 2)");
         Assert.Contains(effects, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 1);
@@ -1654,22 +1497,16 @@ public class SplitHandTests
     [Fact]
     public void SplitAce_SecondCard_AutoStands()
     {
-        // Simulate split ace: 1-card hand with ace, IsFromSplit = true
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            DealerHand        = new Hand { Cards = [10] },
-            Players           =
-            [
-                new Player
-                {
-                    Nickname = "Lorah", Bet = "100",
-                    Hands    = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
-                },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands    = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
+            })
+            .Build();
         var (ns, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
         Assert.Equal(HandState.Stand, ns.Players[0].Hands[0].State);
         Assert.Contains("split ace", ((SendChat)effects[0]).Text.ToLower());
@@ -1678,23 +1515,17 @@ public class SplitHandTests
     [Fact]
     public void SplitAce_AcePlusTen_NotBlackjack()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            DealerHand        = new Hand { Cards = [10] },
-            Players           =
-            [
-                new Player
-                {
-                    Nickname = "Lorah", Bet = "100",
-                    Hands    = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
-                },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands    = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
+            })
+            .Build();
         var (ns, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 10));
-        // A + 10 = 21 but IsFromSplit → forced Stand, not Blackjack
         Assert.Equal(HandState.Stand, ns.Players[0].Hands[0].State);
         Assert.NotEqual(HandState.Blackjack, ns.Players[0].Hands[0].State);
     }
@@ -1710,29 +1541,23 @@ public class SplitHandTests
     [Fact]
     public void SplitHand_StandOnFirstHand_EmitsAutoHitForSecondHand()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            DealerHand        = new Hand { Cards = [10] },
-            Players           =
-            [
-                new Player
-                {
-                    Nickname = "Lorah", Bet = "100",
-                    Hands    =
-                    [
-                        new Hand { Cards = [8, 5], State = HandState.Playing, IsFromSplit = true },
-                        new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
-                    ],
-                },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands =
+                [
+                    new Hand { Cards = [8, 5], State = HandState.Playing, IsFromSplit = true },
+                    new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
+                ],
+            })
+            .Build();
         var (ns, effects) = GameEngine.Apply(state, new StandPlayer(0, 0));
         Assert.Equal(0, ns.ActiveHandIndex);
         Assert.True(ns.WaitingForNextPlayer);
-        // AutoHit for hand 1 fires when AdvanceToNextPlayer is clicked
         var (ns2, effects2) = GameEngine.Apply(ns, new AdvanceToNextPlayer());
         Assert.Equal(1, ns2.ActiveHandIndex);
         Assert.Contains(effects2, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 1);
@@ -1741,31 +1566,24 @@ public class SplitHandTests
     [Fact]
     public void SplitHand_BustOnFirstHand_EmitsAutoHitForSecondHand()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            DealerHand        = new Hand { Cards = [10] },
-            Players           =
-            [
-                new Player
-                {
-                    Nickname = "Lorah", Bet = "100",
-                    Hands    =
-                    [
-                        new Hand { Cards = [8, 7], State = HandState.Playing, IsFromSplit = true },
-                        new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
-                    ],
-                },
-            ],
-        };
-        // Draw a card that busts hand 0
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands =
+                [
+                    new Hand { Cards = [8, 7], State = HandState.Playing, IsFromSplit = true },
+                    new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
+                ],
+            })
+            .Build();
         var (ns, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 9));
         Assert.Equal(HandState.Bust, ns.Players[0].Hands[0].State);
         Assert.Equal(0, ns.ActiveHandIndex);
         Assert.True(ns.WaitingForNextPlayer);
-        // AutoHit for hand 1 fires when AdvanceToNextPlayer is clicked
         var (ns2, effects2) = GameEngine.Apply(ns, new AdvanceToNextPlayer());
         Assert.Equal(1, ns2.ActiveHandIndex);
         Assert.Contains(effects2, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 1);
@@ -1774,55 +1592,43 @@ public class SplitHandTests
     [Fact]
     public void SplitHand_MandatoryCardOnFirstHand_ThenNarratesTurn()
     {
-        // After the mandatory 2nd card lands on hand 0 (still Playing), no AutoHit —
-        // the player now acts on hand 0 before hand 1 gets its card.
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            DealerHand        = new Hand { Cards = [10] },
-            Players           =
-            [
-                new Player
-                {
-                    Nickname = "Lorah", Bet = "100",
-                    Hands    =
-                    [
-                        new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
-                        new Hand { Cards = [8],    State = HandState.Playing, IsFromSplit = true },
-                    ],
-                },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands =
+                [
+                    new Hand { Cards = [8], State = HandState.Playing, IsFromSplit = true },
+                    new Hand { Cards = [8], State = HandState.Playing, IsFromSplit = true },
+                ],
+            })
+            .Build();
         var (ns, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 5));
         Assert.Equal(2, ns.Players[0].Hands[0].Cards.Count);
         Assert.Equal(HandState.Playing, ns.Players[0].Hands[0].State);
-        Assert.Equal(0, ns.ActiveHandIndex); // still on hand 0
+        Assert.Equal(0, ns.ActiveHandIndex);
         Assert.DoesNotContain(effects, e => e is AutoHit);
     }
 
     [Fact]
     public void SplitPayout_EachHandIndependent()
     {
-        // Hand 0 wins, Hand 1 loses
-        var state = new GameState
-        {
-            Phase      = GamePhase.Payout,
-            DealerHand = new Hand { Cards = [10, 8], State = HandState.Stand },
-            Players    =
-            [
-                new Player
-                {
-                    Nickname = "Lorah", Bet = "100",
-                    Hands    =
-                    [
-                        new Hand { Cards = [10, 9], State = HandState.Stand, IsFromSplit = true }, // 19 > 18 → Win
-                        new Hand { Cards = [8, 6],  State = HandState.Stand, IsFromSplit = true }, // 14 < 18 → Lose
-                    ],
-                },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .Dealer(HandState.Stand, 10, 8)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands =
+                [
+                    new Hand { Cards = [10, 9], State = HandState.Stand, IsFromSplit = true },
+                    new Hand { Cards = [8, 6],  State = HandState.Stand, IsFromSplit = true },
+                ],
+            })
+            .Build();
         Assert.Equal(PayoutResult.Win,  GameEngine.GetPayoutResult(state, 0, 0));
         Assert.Equal(PayoutResult.Lose, GameEngine.GetPayoutResult(state, 0, 1));
         Assert.Equal("+100", GameEngine.PayoutAmountString(state, 0, 0));
@@ -1853,114 +1659,90 @@ public class SplitHandTests
     [Fact]
     public void IsDealComplete_TrueWhenDealerHas1AndPlayersHave2()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [10] },
-            Players    =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 9] }] },
-                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [3, 8] }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Dealer(10)
+            .Player("Lorah", 5, 9)
+            .Player("Bekki", 3, 8)
+            .Build();
         Assert.True(GameEngine.IsDealComplete(state));
     }
 
     [Fact]
     public void IsDealComplete_FalseWhenPlayerMissingSecondCard()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [10] },
-            Players    =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5] }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Dealer(10)
+            .Player("Lorah", 5)
+            .Build();
         Assert.False(GameEngine.IsDealComplete(state));
     }
 
     [Fact]
     public void IsDealComplete_FalseWhenDealerHasNoCard()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.Deal,
-            DealerHand = new Hand { Cards = [] },
-            Players    =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 9] }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Player("Lorah", 5, 9)
+            .Build();
         Assert.False(GameEngine.IsDealComplete(state));
     }
 
     [Fact]
     public void CanHitDealer_TrueDuringDealWithNoDealerCard()
     {
-        var state = new GameState { Phase = GamePhase.Deal, DealerHand = new Hand { Cards = [] } };
+        var state = new GameStateBuilder().Phase(GamePhase.Deal).Build();
         Assert.True(GameEngine.CanHitDealer(state));
     }
 
     [Fact]
     public void CanHitDealer_FalseDuringDealWhenDealerAlreadyHasCard()
     {
-        var state = new GameState { Phase = GamePhase.Deal, DealerHand = new Hand { Cards = [7] } };
+        var state = new GameStateBuilder().Phase(GamePhase.Deal).Dealer(7).Build();
         Assert.False(GameEngine.CanHitDealer(state));
     }
 
     [Fact]
     public void CanHitDealer_TrueDuringDealerTurnWhenShouldHit()
     {
-        // Soft 16 — dealer must hit
-        var state = new GameState { Phase = GamePhase.DealerTurn, DealerHand = new Hand { Cards = [1, 5] } };
+        var state = new GameStateBuilder().Phase(GamePhase.DealerTurn).Dealer(1, 5).Build();
         Assert.True(GameEngine.CanHitDealer(state));
     }
 
     [Fact]
     public void CanHitDealer_FalseDuringDealerTurnWhenShouldStand()
     {
-        // Hard 18 — dealer stands
-        var state = new GameState { Phase = GamePhase.DealerTurn, DealerHand = new Hand { Cards = [10, 8] } };
+        var state = new GameStateBuilder().Phase(GamePhase.DealerTurn).Dealer(10, 8).Build();
         Assert.False(GameEngine.CanHitDealer(state));
     }
 
     [Fact]
     public void CanHitDealer_FalseDuringDealerTurnWhenBust()
     {
-        var state = new GameState { Phase = GamePhase.DealerTurn, DealerHand = new Hand { Cards = [10, 8, 6] } };
+        var state = new GameStateBuilder().Phase(GamePhase.DealerTurn).Dealer(10, 8, 6).Build();
         Assert.False(GameEngine.CanHitDealer(state));
     }
 
     [Fact]
     public void CanHitDealer_False_WhenAllPlayersBJ_AndDealerCannotHaveBJ()
     {
-        // Dealer upcard = 4; all players have BJ → CanGoToPayout is true → Hit must be suppressed
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [4], State = HandState.Playing },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100",
-                Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Playing, 4)
+            .Player("Lorah", "100", HandState.Blackjack, 1, 10)
+            .Build();
         Assert.False(GameEngine.CanHitDealer(state));
     }
 
     [Fact]
     public void AnnounceSplit_NarratesWithAmount()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players           =
-            [
-                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [8, 8], State = HandState.Playing }] },
-            ],
-        };
-        // !FromBank: BankAfter = shortfall = full bet (100) when no bank
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Player("Lorah", "100", HandState.Playing, 8, 8)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AnnounceSplit(0, 0, FromBank: false, BankAfter: 100));
         Assert.Single(effects);
         Assert.Contains("100", ((SendChat)effects[0]).Text);
@@ -1970,39 +1752,28 @@ public class SplitHandTests
     [Fact]
     public void AnnounceSplit_FromBank_NarratesWithBankTemplate()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players           =
-            [
-                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [8, 8], State = HandState.Playing }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Player("Lorah", "100", HandState.Playing, 8, 8)
+            .Build();
         var t = new NarrationTemplates { PlayerSplitRequestBank = [["{name} spl bank {amount} left {bank}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceSplit(0, 0, FromBank: true, BankAfter: 250), t);
         Assert.Single(effects);
         var text = ((SendChat)effects[0]).Text;
         Assert.Contains("Lorah", text);
-        Assert.Contains("100", text);   // amount
-        Assert.Contains("250", text);   // bank remaining
+        Assert.Contains("100", text);
+        Assert.Contains("250", text);
     }
 
     [Fact]
     public void AnnounceSplit_FromBank_ZeroRemaining_ShowsZeroNotNegative()
     {
-        // Bank exactly covers the bet — BankAfter must be 0, never negative
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players           =
-            [
-                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [8, 8], State = HandState.Playing }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Player("Lorah", "100", HandState.Playing, 8, 8)
+            .Build();
         var t = new NarrationTemplates { PlayerSplitRequestBank = [["{name} {amount} {bank}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceSplit(0, 0, FromBank: true, BankAfter: 0), t);
         Assert.Single(effects);
@@ -2012,17 +1783,11 @@ public class SplitHandTests
     [Fact]
     public void AnnounceSplit_BankShort_UsesTradeTemplate()
     {
-        // Bank insufficient → FromBank=false → regular trade-request template, not bank template
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            Players           =
-            [
-                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [8, 8], State = HandState.Playing }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Player("Lorah", "100", HandState.Playing, 8, 8)
+            .Build();
         var t = new NarrationTemplates
         {
             PlayerSplitRequest     = [["TRADE {name} {amount}"]],
@@ -2036,11 +1801,10 @@ public class SplitHandTests
     [Fact]
     public void AnnounceBetRequest_NarratesPlayerName()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Betting,
-            Players = [new Player { Nickname = "Lorah" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah")
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AnnounceBetRequest(0));
         Assert.Single(effects);
         Assert.Contains("Lorah", ((SendChat)effects[0]).Text);
@@ -2049,11 +1813,10 @@ public class SplitHandTests
     [Fact]
     public void AnnounceBetConfirm_NarratesNameAndAmount_NoBank()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Betting,
-            Players = [new Player { Nickname = "Lorah", Bet = "50000" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah", "50000")
+            .Build();
         var t = new NarrationTemplates { PlayerBetConfirm = [["{name} bet={amount}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBetConfirm(0, 0L), t);
         Assert.Single(effects);
@@ -2063,11 +1826,10 @@ public class SplitHandTests
     [Fact]
     public void AnnounceBetConfirmBank_NarratesNameAmountAndBank()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Betting,
-            Players = [new Player { Nickname = "Lorah", Bet = "50000" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah", "50000")
+            .Build();
         var t = new NarrationTemplates { PlayerBetConfirmBank = [["{name} bet={amount} bank={bank} after={bank-after-bet}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBetConfirm(0, 100000L), t);
         Assert.Single(effects);
@@ -2077,11 +1839,10 @@ public class SplitHandTests
     [Fact]
     public void AnnounceBankRemind_NarratesNameAmountAndBank()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Betting,
-            Players = [new Player { Nickname = "Lorah", Bet = "50000" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah", "50000")
+            .Build();
         var t = new NarrationTemplates { PlayerBankRemind = [["{name} bet={amount} bank={bank}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBankRemind(0, 200000), t);
         Assert.Single(effects);
@@ -2091,11 +1852,10 @@ public class SplitHandTests
     [Fact]
     public void AnnounceBankShortfall_NarratesNameAndShortfall()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Betting,
-            Players = [new Player { Nickname = "Lorah", Bet = "100000" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah", "100000")
+            .Build();
         var t = new NarrationTemplates { PlayerBankShortfall = [["{name} needs {amount}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBankShortfall(0, 60000), t);
         Assert.Single(effects);
@@ -2105,11 +1865,10 @@ public class SplitHandTests
     [Fact]
     public void AnnounceBankDeposit_NarratesNameAmountAndNewBalance()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Betting,
-            Players = [new Player { Nickname = "Lorah" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah")
+            .Build();
         var t = new NarrationTemplates { PlayerBankDeposit = [["{name} dep={amount} bal={bank}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBankDeposit(0, 50000, 150000), t);
         Assert.Single(effects);
@@ -2119,11 +1878,10 @@ public class SplitHandTests
     [Fact]
     public void AnnounceBankWithdraw_NarratesNameAmountAndNewBalance()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Betting,
-            Players = [new Player { Nickname = "Lorah" }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah")
+            .Build();
         var t = new NarrationTemplates { PlayerBankWithdraw = [["{name} wd={amount} bal={bank}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceBankWithdraw(0, 30000, 70000), t);
         Assert.Single(effects);
@@ -2136,15 +1894,12 @@ public class AnnouncePlayerTurnTests
     [Fact]
     public void AnnouncePlayerTurn_NarratesPlayerTurnStart_NoStateChange()
     {
-        var state = new GameState
-        {
-            Phase             = GamePhase.PlayerTurns,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            DealerHand        = new Hand { Cards = [7] },
-            Players           = [new Player { Nickname = "Lorah", Bet = "100",
-                Hands = [new Hand { Cards = [5, 6], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(7)
+            .Player("Lorah", "100", HandState.Playing, 5, 6)
+            .Build();
         var t = new NarrationTemplates { PlayerTurnStart = [["{name}:{score}"]] };
         var (newState, effects) = GameEngine.Apply(state, new AnnouncePlayerTurn(0, 0), t);
         Assert.Same(state, newState);
@@ -2155,27 +1910,20 @@ public class AnnouncePlayerTurnTests
 
 public class PayoutSplitCombinedTests
 {
-    private static GameState SplitWinState(int[]hand0Cards, int[] hand1Cards, int[] dealerCards)
-    {
-        return new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [..dealerCards], State = HandState.Stand },
-            Players    =
-            [
-                new Player
-                {
-                    Nickname = "Lorah",
-                    Bet = "100",
-                    Hands =
-                    [
-                        new Hand { Cards = [..hand0Cards], State = HandState.Stand, IsFromSplit = true },
-                        new Hand { Cards = [..hand1Cards], State = HandState.Stand, IsFromSplit = true },
-                    ],
-                },
-            ],
-        };
-    }
+    private static GameState SplitWinState(int[] hand0Cards, int[] hand1Cards, int[] dealerCards) =>
+        new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, dealerCards)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands =
+                [
+                    new Hand { Cards = [..hand0Cards], State = HandState.Stand, IsFromSplit = true },
+                    new Hand { Cards = [..hand1Cards], State = HandState.Stand, IsFromSplit = true },
+                ],
+            })
+            .Build();
 
     [Fact]
     public void SplitBothHandsWin_EmitsCombinedNarration()
@@ -2185,7 +1933,6 @@ public class PayoutSplitCombinedTests
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.Contains(texts, s => s.StartsWith("SPLIT:Lorah="));
-        // Should not emit per-hand win lines
         Assert.DoesNotContain(texts, s => s.Contains("Hand 1") || s.Contains("Hand 2"));
     }
 
@@ -2196,31 +1943,25 @@ public class PayoutSplitCombinedTests
         var t = new NarrationTemplates { PayoutSplitCombined = [["{amount}"]], PayoutDealerStands = [["D"]] };
         var (_, effects) = GameEngine.Apply(state, new GoToPayout(), t);
         var combined = effects.OfType<SendChat>().Select(e => e.Text).First(s => s.Contains("+200"));
-        Assert.Contains("+200", combined); // 100 + 100
+        Assert.Contains("+200", combined);
     }
 
     [Fact]
     public void SplitMixedResult_EmitsPerHandNarration()
     {
-        // Lorah hand0 wins, hand1 loses — should NOT use combined template
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 8], State = HandState.Stand },
-            Players    =
-            [
-                new Player
-                {
-                    Nickname = "Lorah",
-                    Bet = "100",
-                    Hands =
-                    [
-                        new Hand { Cards = [10, 9], State = HandState.Stand, IsFromSplit = true },
-                        new Hand { Cards = [10, 7], State = HandState.Stand, IsFromSplit = true },
-                    ],
-                },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 8)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands =
+                [
+                    new Hand { Cards = [10, 9], State = HandState.Stand, IsFromSplit = true },
+                    new Hand { Cards = [10, 7], State = HandState.Stand, IsFromSplit = true },
+                ],
+            })
+            .Build();
         var t = new NarrationTemplates
         {
             PayoutSplitCombined = [["SPLIT"]],
@@ -2248,32 +1989,23 @@ public class PayoutSplitCombinedTests
 
 public class PlayerBJMovingAlongTests
 {
-    private static GameState MultiPlayerBJState() => new()
-    {
-        Phase      = GamePhase.PlayerTurns,
-        ActivePlayerIndex = 0,
-        ActiveHandIndex   = 0,
-        DealerHand = new Hand { Cards = [7], State = HandState.Playing },
-        Players    =
-        [
-            new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
-            new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }]  },
-        ],
-    };
+    private static GameState MultiPlayerBJState() => new GameStateBuilder()
+        .Phase(GamePhase.PlayerTurns)
+        .ActiveHand(0, 0)
+        .Dealer(HandState.Playing, 7)
+        .Player("Lorah", HandState.Blackjack, 1, 10)
+        .Player("Bekki", HandState.Playing, 10, 9)
+        .Build();
 
     [Fact]
     public void BeginPlayerTurns_BJ_MultiPlayer_EmitsMovingAlong()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.PlayerTurns,
-            DealerHand = new Hand { Cards = [7], State = HandState.Playing },
-            Players    =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
-                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }]  },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Dealer(HandState.Playing, 7)
+            .Player("Lorah", HandState.Blackjack, 1, 10)
+            .Player("Bekki", HandState.Playing, 10, 9)
+            .Build();
         var t = new NarrationTemplates { PlayerBJMovingAlong = [["MOVING: {name}"]] };
         var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
@@ -2283,12 +2015,11 @@ public class PlayerBJMovingAlongTests
     [Fact]
     public void BeginPlayerTurns_BJ_SinglePlayer_NoMovingAlong()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.PlayerTurns,
-            DealerHand = new Hand { Cards = [7], State = HandState.Playing },
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Dealer(HandState.Playing, 7)
+            .Player("Lorah", HandState.Blackjack, 1, 10)
+            .Build();
         var t = new NarrationTemplates { PlayerBJMovingAlong = [["MOVING: {name}"]] };
         var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
@@ -2298,9 +2029,8 @@ public class PlayerBJMovingAlongTests
     [Fact]
     public void AdvanceToNextPlayer_BJ_MultiPlayer_EmitsMovingAlong()
     {
-        var s = MultiPlayerBJState();
-        s.WaitingForNextPlayer = true;
-        var state = s;
+        var state = MultiPlayerBJState();
+        state.WaitingForNextPlayer = true;
         var t = new NarrationTemplates { PlayerBJMovingAlong = [["MA:{name}"]], PlayerTurnStart = [["{name}"]] };
         var (_, effects) = GameEngine.Apply(state, new AdvanceToNextPlayer(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
@@ -2310,16 +2040,12 @@ public class PlayerBJMovingAlongTests
     [Fact]
     public void PlayerBJMovingAlong_TemplateVariable_Name()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.PlayerTurns,
-            DealerHand = new Hand { Cards = [7], State = HandState.Playing },
-            Players    =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
-                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }]  },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Dealer(HandState.Playing, 7)
+            .Player("Lorah", HandState.Blackjack, 1, 10)
+            .Player("Bekki", HandState.Playing, 10, 9)
+            .Build();
         var t = new NarrationTemplates { PlayerBJMovingAlong = [["BJ:{name} cards:{cards}"]] };
         var (_, effects) = GameEngine.Apply(state, new BeginPlayerTurns(), t);
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
@@ -2332,13 +2058,12 @@ public class DealSummaryOnePlayerTests
     [Fact]
     public void SkipDealSummaryOnePlayer_True_SkipsSummary()
     {
-        var state = new GameState
-        {
-            Phase                   = GamePhase.Deal,
-            SkipDealSummaryOnePlayer = true,
-            DealerHand              = new Hand { Cards = [7], State = HandState.Playing },
-            Players                 = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .SkipDealSummaryOnePlayer()
+            .Dealer(HandState.Playing, 7)
+            .Player("Lorah", HandState.Playing, 10)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 9));
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.DoesNotContain(texts, s => s.StartsWith("Deal"));
@@ -2347,13 +2072,12 @@ public class DealSummaryOnePlayerTests
     [Fact]
     public void SkipDealSummaryOnePlayer_False_EmitsSummary()
     {
-        var state = new GameState
-        {
-            Phase                   = GamePhase.Deal,
-            SkipDealSummaryOnePlayer = false,
-            DealerHand              = new Hand { Cards = [7], State = HandState.Playing },
-            Players                 = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10], State = HandState.Playing }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .SkipDealSummaryOnePlayer(false)
+            .Dealer(HandState.Playing, 7)
+            .Player("Lorah", HandState.Playing, 10)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 9));
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.Contains(texts, s => s.Contains("Deal"));
@@ -2362,17 +2086,13 @@ public class DealSummaryOnePlayerTests
     [Fact]
     public void SkipDealSummaryOnePlayer_MultiPlayer_AlwaysEmits()
     {
-        var state = new GameState
-        {
-            Phase                   = GamePhase.Deal,
-            SkipDealSummaryOnePlayer = true,
-            DealerHand              = new Hand { Cards = [7], State = HandState.Playing },
-            Players                 =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
-                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10],    State = HandState.Playing }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .SkipDealSummaryOnePlayer()
+            .Dealer(HandState.Playing, 7)
+            .Player("Lorah", HandState.Playing, 10, 8)
+            .Player("Bekki", HandState.Playing, 10)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(1, 0, 9));
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.Contains(texts, s => s.Contains("Deal"));
@@ -2384,23 +2104,17 @@ public class DealSummaryBJNarrationTests
     [Fact]
     public void DealComplete_BJ_EmitsPlayerBJAfterSummary()
     {
-        var state = new GameState
-        {
-            Phase                   = GamePhase.Deal,
-            SkipDealSummaryOnePlayer = false,
-            DealerHand              = new Hand { Cards = [7], State = HandState.Playing },
-            Players                 =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10], State = HandState.Playing }] },
-                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10, 9], State = HandState.Playing }] },
-            ],
-        };
-        // Lorah gets an ace → blackjack
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .SkipDealSummaryOnePlayer(false)
+            .Dealer(HandState.Playing, 7)
+            .Player("Lorah", HandState.Playing, 10)
+            .Player("Bekki", HandState.Playing, 10, 9)
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 1));
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.Contains(texts, s => s.Contains("Deal"));
         Assert.Contains(texts, s => s.Contains("Blackjack"));
-        // Summary comes before BJ announcement
         var summaryIdx = texts.FindIndex(s => s.Contains("Deal"));
         var bjIdx      = texts.FindIndex(s => s.Contains("Blackjack"));
         Assert.True(summaryIdx < bjIdx);
@@ -2409,19 +2123,14 @@ public class DealSummaryBJNarrationTests
     [Fact]
     public void DealComplete_MultipleBJ_EmittedInPlayerOrder()
     {
-        var state = new GameState
-        {
-            Phase                   = GamePhase.Deal,
-            SkipDealSummaryOnePlayer = false,
-            DealerHand              = new Hand { Cards = [7], State = HandState.Playing },
-            Players                 =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] },
-                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [10],    State = HandState.Playing }] },
-                new Player { Nickname = "Nolla", Hands = [new Hand { Cards = [1],     State = HandState.Playing }] },
-            ],
-        };
-        // Nolla's 2nd card → BJ; Bekki already has BJ
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .SkipDealSummaryOnePlayer(false)
+            .Dealer(HandState.Playing, 7)
+            .Player("Lorah", HandState.Blackjack, 1, 10)
+            .Player("Bekki", HandState.Playing, 10)
+            .Player("Nolla", HandState.Playing, 1)
+            .Build();
         var stateAfterBekki = GameEngine.Apply(state, new AddPlayerCard(1, 0, 1)).Item1;
         var (_, effects) = GameEngine.Apply(stateAfterBekki, new AddPlayerCard(2, 0, 10));
         var texts = effects.OfType<SendChat>().Select(e => e.Text).ToList();
@@ -2437,12 +2146,11 @@ public class DealerBJCheckTests
     [Fact]
     public void AnnounceDealerHit_AllBJ_UsesBJCheckTemplate()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [1], State = HandState.Playing },
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [1, 10], State = HandState.Blackjack }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Playing, 1)
+            .Player("Lorah", HandState.Blackjack, 1, 10)
+            .Build();
         var t = new NarrationTemplates { DealerBJCheck = [["LUCKY CHECK"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t);
         Assert.Equal("LUCKY CHECK", ((SendChat)effects[0]).Text);
@@ -2451,12 +2159,11 @@ public class DealerBJCheckTests
     [Fact]
     public void AnnounceDealerHit_NotAllBJ_UsesHitAnnounceTemplate()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [7], State = HandState.Playing },
-            Players    = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [10, 8], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Playing, 7)
+            .Player("Lorah", HandState.Stand, 10, 8)
+            .Build();
         var t = new NarrationTemplates { DealerHitAnnounce = [["HIT: {dealer}"]], DealerBJCheck = [["LUCKY CHECK"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t, dealerName: "Vera");
         Assert.Equal("HIT: Vera", ((SendChat)effects[0]).Text);
@@ -2465,13 +2172,12 @@ public class DealerBJCheckTests
     [Fact]
     public void AnnounceDealerHit_AllCharlie_LosesToDealerBJ_UsesBJCheckTemplate()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
-            DealerHand      = new Hand { Cards = [1], State = HandState.Playing },
-            Players = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.LosesToDealerBJ)
+            .Dealer(HandState.Playing, 1)
+            .Player("Lorah", "100", HandState.Charlie, 2, 3, 4, 5, 6)
+            .Build();
         var t = new NarrationTemplates { DealerBJCheck = [["LUCKY CHECK"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t);
         Assert.Equal("LUCKY CHECK", ((SendChat)effects[0]).Text);
@@ -2480,13 +2186,12 @@ public class DealerBJCheckTests
     [Fact]
     public void AnnounceDealerHit_AllCharlie_BeatsAll_UsesHitAnnounceTemplate()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.DealerTurn,
-            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
-            DealerHand      = new Hand { Cards = [1], State = HandState.Playing },
-            Players = [new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [2, 3, 4, 5, 6], State = HandState.Charlie }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Charlie(FiveCardCharlieRule.BeatsAll)
+            .Dealer(HandState.Playing, 1)
+            .Player("Lorah", "100", HandState.Charlie, 2, 3, 4, 5, 6)
+            .Build();
         var t = new NarrationTemplates { DealerHitAnnounce = [["ANNOUNCE_HIT"]], DealerBJCheck = [["LUCKY CHECK"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceDealerHit(), t);
         Assert.Equal("ANNOUNCE_HIT", ((SendChat)effects[0]).Text);
@@ -2498,16 +2203,12 @@ public class LastRoundPushersTests
     [Fact]
     public void GoToPayout_SetsPushersForPushingPlayers()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    =
-            [
-                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 7], State = HandState.Stand }] },
-                new Player { Nickname = "Bekki", Bet = "100", Hands = [new Hand { Cards = [10, 6], State = HandState.Stand }] },
-            ],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Stand, 10, 7)
+            .Player("Bekki", "100", HandState.Stand, 10, 6)
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new GoToPayout());
         Assert.Contains("Lorah", newState.LastRoundPushers);
         Assert.DoesNotContain("Bekki", newState.LastRoundPushers);
@@ -2516,12 +2217,11 @@ public class LastRoundPushersTests
     [Fact]
     public void GoToPayout_Winner_NotInPushers()
     {
-        var state = new GameState
-        {
-            Phase      = GamePhase.DealerTurn,
-            DealerHand = new Hand { Cards = [10, 7], State = HandState.Stand },
-            Players    = [new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 9], State = HandState.Stand }] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player("Lorah", "100", HandState.Stand, 10, 9)
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new GoToPayout());
         Assert.DoesNotContain("Lorah", newState.LastRoundPushers);
     }
@@ -2529,12 +2229,11 @@ public class LastRoundPushersTests
     [Fact]
     public void NewRound_PreservesLastRoundPushers()
     {
-        var state = new GameState
-        {
-            Phase            = GamePhase.Payout,
-            LastRoundPushers = ["Lorah"],
-            Players          = [new Player { Nickname = "Lorah", Hands = [new Hand()] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .LastRoundPushers("Lorah")
+            .Player("Lorah")
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new NewRound());
         Assert.Contains("Lorah", newState.LastRoundPushers);
     }
@@ -2542,14 +2241,13 @@ public class LastRoundPushersTests
 
 public class FiveCardCharlieTests
 {
-    private static GameState CharlieState(FiveCardCharlieRule rule, int[] playerCards, int[] dealerCards) => new GameState
-    {
-        Phase           = GamePhase.Payout,
-        FiveCardCharlie = rule,
-        DealerHand      = new Hand { Cards = [..dealerCards], State = HandState.Stand },
-        Players         = [new Player { Nickname = "Lorah", Bet = "100", Hands =
-            [new Hand { Cards = [..playerCards], State = HandState.Charlie }] }],
-    };
+    private static GameState CharlieState(FiveCardCharlieRule rule, int[] playerCards, int[] dealerCards) =>
+        new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .Charlie(rule)
+            .Dealer(HandState.Stand, dealerCards)
+            .Player("Lorah", "100", HandState.Charlie, playerCards)
+            .Build();
 
     [Fact]
     public void ComputeHandState_FiveCards_Disabled_IsPlaying()
@@ -2621,19 +2319,13 @@ public class FiveCardCharlieTests
     [Fact]
     public void AddPlayerCard_FifthCard_Enabled_NarratesCharlie()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.PlayerTurns,
-            FiveCardCharlie = FiveCardCharlieRule.BeatsAll,
-            ActivePlayerIndex = 0,
-            ActiveHandIndex   = 0,
-            DealerHand = new Hand { Cards = [7] },
-            Players    = [new Player
-            {
-                Nickname = "Lorah", Bet = "100",
-                Hands    = [new Hand { Cards = [2, 3, 4, 5], State = HandState.Playing }],
-            }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Charlie(FiveCardCharlieRule.BeatsAll)
+            .ActiveHand(0, 0)
+            .Dealer(7)
+            .Player("Lorah", "100", 2, 3, 4, 5)
+            .Build();
         var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 6));
         Assert.Equal(HandState.Charlie, newState.Players[0].Hands[0].State);
         Assert.Contains(effects.OfType<SendChat>(), e => e.Text.Contains("Five Card Charlie"));
@@ -2642,12 +2334,11 @@ public class FiveCardCharlieTests
     [Fact]
     public void NewRound_PreservesFiveCardCharlieRule()
     {
-        var state = new GameState
-        {
-            Phase           = GamePhase.Payout,
-            FiveCardCharlie = FiveCardCharlieRule.LosesToDealerBJ,
-            Players         = [new Player { Nickname = "Lorah", Hands = [new Hand()] }],
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .Charlie(FiveCardCharlieRule.LosesToDealerBJ)
+            .Player("Lorah")
+            .Build();
         var (newState, _) = GameEngine.Apply(state, new NewRound());
         Assert.Equal(FiveCardCharlieRule.LosesToDealerBJ, newState.FiveCardCharlie);
     }
@@ -2655,15 +2346,11 @@ public class FiveCardCharlieTests
 
 public class SittingOutTests
 {
-    private static GameState BettingWithPlayers() => new GameState
-    {
-        Phase   = GamePhase.Betting,
-        Players =
-        [
-            new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand()] },
-            new Player { Nickname = "Bekki", Bet = "100", Hands = [new Hand()] },
-        ],
-    };
+    private static GameState BettingWithPlayers() => new GameStateBuilder()
+        .Phase(GamePhase.Betting)
+        .Player("Lorah", "100")
+        .Player("Bekki", "100")
+        .Build();
 
     [Fact]
     public void ToggleSittingOut_SetsSittingOut()
@@ -2684,7 +2371,10 @@ public class SittingOutTests
     [Fact]
     public void ToggleSittingOut_IgnoredOutsideBetting()
     {
-        var state = new GameState { Phase = GamePhase.PlayerTurns, Players = [new Player { Nickname = "Lorah", Hands = [new Hand()] }] };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah")
+            .Build();
         var (ns, _) = GameEngine.Apply(state, new ToggleSittingOut(0));
         Assert.False(ns.Players[0].SittingOut);
     }
@@ -2702,50 +2392,37 @@ public class SittingOutTests
     [Fact]
     public void IsDealComplete_SittingOutPlayerExcluded()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.Deal,
-            Players =
-            [
-                new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 10] }] },
-                new Player { Nickname = "Bekki", SittingOut = true, Hands = [new Hand()] },
-            ],
-            DealerHand = new Hand { Cards = [7] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Dealer(7)
+            .Player(new Player { Nickname = "Lorah", Hands = [new Hand { Cards = [5, 10] }] })
+            .Player(new Player { Nickname = "Bekki", SittingOut = true, Hands = [new Hand()] })
+            .Build();
         Assert.True(GameEngine.IsDealComplete(state));
     }
 
     [Fact]
     public void AdvanceFrom_SkipsSittingOutPlayer()
     {
-        // Bekki sits out; only Lorah should get a turn.
-        var state = new GameState
-        {
-            Phase   = GamePhase.PlayerTurns,
-            Players =
-            [
-                new Player { Nickname = "Lorah", SittingOut = true, Hands = [new Hand()] },
-                new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [6, 10], State = HandState.Playing }] },
-            ],
-            DealerHand = new Hand { Cards = [7] },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Dealer(7)
+            .Player(new Player { Nickname = "Lorah", SittingOut = true, Hands = [new Hand()] })
+            .Player(new Player { Nickname = "Bekki", Hands = [new Hand { Cards = [6, 10], State = HandState.Playing }] })
+            .Build();
         var (ns, _) = GameEngine.Apply(state, new BeginPlayerTurns());
-        Assert.Equal(1, ns.ActivePlayerIndex); // Bekki, not Lorah
+        Assert.Equal(1, ns.ActivePlayerIndex);
     }
 
     [Fact]
     public void GoToPayout_SittingOutPlayer_NotNarrated()
     {
-        var state = new GameState
-        {
-            Phase   = GamePhase.DealerTurn,
-            Players =
-            [
-                new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] },
-                new Player { Nickname = "Bekki", SittingOut = true, Bet = "100", Hands = [new Hand()] },
-            ],
-            DealerHand = new Hand { Cards = [7, 10], State = HandState.Playing },
-        };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Playing, 7, 10)
+            .Player(new Player { Nickname = "Lorah", Bet = "100", Hands = [new Hand { Cards = [10, 8], State = HandState.Playing }] })
+            .Player(new Player { Nickname = "Bekki", SittingOut = true, Bet = "100", Hands = [new Hand()] })
+            .Build();
         var (_, effects) = GameEngine.Apply(state, new GoToPayout());
         var chat = effects.OfType<SendChat>().Select(e => e.Text).ToList();
         Assert.DoesNotContain(chat, line => line.Contains("Bekki"));
