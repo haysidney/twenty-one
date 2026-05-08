@@ -221,6 +221,18 @@ Active refactoring work is on the `refactor` branch (off `experimental`). Commit
 - Never use non-ASCII characters (icons, arrows, symbols) on buttons unless explicitly requested. Use plain text labels only.
 - To right-align a button within a cell/region: use `SameLine()` followed by `if (GetCursorPosX() < targetX) SetCursorPosX(targetX)`, where `targetX = cellRight - buttonWidth` (button width = `CalcTextSize(...).X + FramePadding.X * 2`). Do **not** pass a position directly to `SameLine(pos)` — if `pos` is behind the current cursor, ImGui will clip or hide the widget.
 
+### Record types for immutable state
+
+`GameState`, `Player`, and `Hand` are `sealed record class` types. Use `with { ... }` to
+create modified copies:
+```csharp
+state with { Phase = GamePhase.DealerTurn };
+player with { Bet = "500" };
+hand with { State = HandState.Stand };
+```
+The old `GameEngine.With(...)` optional-parameter helper has been removed.
+`WithPlayer` (list-insert utility) and `WithHand` (hand-replacement utility) remain.
+
 ## Design Decisions
 
 - Dealer hits on soft 17.
