@@ -61,7 +61,427 @@ public partial class MainWindow
         (((uint)(c.Z * 255) & 0xFF) << 16) |
         (((uint)(c.W * 255) & 0xFF) << 24);
 
+    private readonly record struct RowCtx(
+        int     LoopIndex,
+        int     Pi,
+        int     Hi,
+        Player  Player,
+        Hand    Hand,
+        bool    IsFirstHand,
+        bool    IsActiveHand,
+        bool    MultiHand,
+        bool    HasWorld,
+        bool    HasNickname);
+
+    private readonly record struct ScenarioGates(
+        bool Hit, bool Stand, bool Dbl, bool Spl,
+        bool ConfirmDbl, bool ConfirmSpl, bool AdvancePlayer);
+
     // ── Draw sub-methods ──────────────────────────────────────────────────────
+
+    private void DrawBankManageButton(int playerIndex, float cellRight, ReadOnlySpan<char> idSuffix, bool uiBusy)
+    {
+        if (uiBusy) ImGui.EndDisabled();
+        var mw = ImGui.CalcTextSize("Manage").X + ImGui.GetStyle().FramePadding.X * 2;
+        ImGui.SameLine();
+        if (ImGui.GetCursorPosX() < cellRight - mw)
+            ImGui.SetCursorPosX(cellRight - mw);
+        if (ImGui.SmallButton($"Manage##{playerIndex}{idSuffix}"))
+        {
+            bankManagePlayerIndex = bankManagePlayerIndex == playerIndex ? -1 : playerIndex;
+            bankDepositBuf        = string.Empty;
+            bankWithdrawBuf       = string.Empty;
+        }
+        if (uiBusy) ImGui.BeginDisabled();
+    }
+
+    private void DrawBankCell(int loopIdx, int actualIdx, Player player, float bankCellRight, bool uiBusy)
+    {
+        var bankKey = player.StatsKey();
+        if (!config.PlayerStatsStore.TryGetValue(bankKey, out var bankStat))
+        {
+            bankStat = new PlayerStat { DisplayName = player.DisplayName };
+            config.PlayerStatsStore[bankKey] = bankStat;
+        }
+        var bankVal         = bankStat.Bank;
+        var effectiveBetStr = betEdits.TryGetValue(loopIdx, out var bEdit) ? bEdit : player.Bet;
+        var parsedBet       = GameEngine.ParseBet(effectiveBetStr);
+        var shortfall       = parsedBet > 0 ? Math.Max(0m, parsedBet - bankVal) : 0m;
+
+        var bankDelta  = 0m;
+        var bankCredit = 0m;
+        if (Phase == GamePhase.Payout && bankVal > 0)
+            for (var bhi = 0; bhi < player.Hands.Count; bhi++)
+            {
+                var d = GameEngine.PayoutDelta(State, actualIdx, bhi);
+                if (d > 0) bankDelta += d.Value;
+                bankCredit += GameEngine.PayoutTotalOwed(State, actualIdx, bhi);
+            }
+
+        ImGui.AlignTextToFramePadding();
+        if (bankStat.IsBanking())
+        {
+            var bankLabel = GameEngine.FormatGil(bankVal);
+            if (shortfall > 0)
+                ImGui.TextColored(GameColors.WarningAmber, bankLabel);
+            else
+                ImGui.TextUnformatted(bankLabel);
+            if (ImGui.IsItemHovered())
+            {
+                var tip = new System.Text.StringBuilder();
+                if (shortfall > 0)
+                    tip.AppendLine($"Short by {GameEngine.FormatGil(shortfall)} \u2014 needs trade before deal");
+                if (Phase == GamePhase.Payout && bankCredit > 0)
+                {
+                    if (bankDelta != 0)
+                    {
+                        var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
+                        tip.AppendLine($"This round: {deltaStr}");
+                    }
+                    tip.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankCredit))}");
+                }
+                tip.Append("Click to copy");
+                ImGui.SetTooltip(tip.ToString());
+                if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                    ImGui.SetClipboardText(bankVal.ToString());
+            }
+
+            if (Phase == GamePhase.Betting && shortfall > 0)
+            {
+                var amber    = new Vector4(1f, 0.75f, 0.1f, 1f);
+                var fp       = ImGui.GetStyle().FramePadding.X;
+                var sp       = ImGui.GetStyle().ItemSpacing.X;
+                var manageW  = ImGui.CalcTextSize("Manage").X + fp * 2;
+                var shortW   = ImGui.CalcTextSize("Short").X  + fp * 2;
+                ImGui.SameLine();
+                if (ImGui.GetCursorPosX() < bankCellRight - manageW - sp - shortW)
+                    ImGui.SetCursorPosX(bankCellRight - manageW - sp - shortW);
+                var amberHov = new Vector4(1f, 0.88f, 0.3f, 1f);
+                ImGui.PushStyleColor(ImGuiCol.Button,        amber    with { W = 0.25f });
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, amberHov with { W = 0.4f  });
+                ImGui.PushStyleColor(ImGuiCol.Text,          amber);
+                if (ImGui.SmallButton($"Short##{actualIdx}short"))
+                {
+                    if (betEdits.TryGetValue(loopIdx, out var pendingBet) && pendingBet != player.Bet)
+                    {
+                        betEdits.Remove(loopIdx);
+                        Apply(new SetPlayerBet(actualIdx, pendingBet));
+                    }
+                    Apply(new AnnounceBankShortfall(actualIdx, (long)Math.Ceiling(shortfall)));
+                }
+                ImGui.PopStyleColor(3);
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip($"Short by {GameEngine.FormatGil(shortfall)}\nClick to announce shortfall");
+            }
+        }
+        else
+        {
+            ImGui.TextDisabled("\u2014");
+        }
+
+        DrawBankManageButton(actualIdx, bankCellRight, "bank", uiBusy);
+    }
+
+    private void DrawNameCell(RowCtx ctx, float cellRight)
+    {
+        var (pi, hi, p) = (ctx.Pi, ctx.Hi, ctx.Player);
+        if (ctx.IsFirstHand && !ctx.MultiHand)
+        {
+            if (renamingIndex == pi)
+            {
+                var okW = ImGui.CalcTextSize("OK").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
+                ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - okW);
+                var submitted = ImGui.InputText($"##rename{pi}", ref renamingBuffer, 64,
+                    ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll);
+                ImGui.SameLine();
+                var canConfirm = renamingBuffer.Length > 0 || p.World.Length > 0;
+                if (!canConfirm) ImGui.BeginDisabled();
+                if (ImGui.SmallButton($"OK##{pi}ok") || submitted)
+                {
+                    if (canConfirm) Apply(new RenamePlayer(pi, renamingBuffer));
+                    renamingIndex = -1;
+                }
+                if (!canConfirm) ImGui.EndDisabled();
+            }
+            else
+            {
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text(p.DisplayName);
+                if (ImGui.IsItemHovered())
+                {
+                    if (p.World.Length > 0)
+                        ImGui.SetTooltip($"{p.FullName}@{p.World}");
+                    if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                    {
+                        renamingIndex  = pi;
+                        renamingBuffer = p.Nickname;
+                    }
+                }
+
+                var winnerKey = p.FullName.Length > 0 ? p.FullName : p.Nickname;
+                var isWinner  = config.GameState.LastRoundWinners.Contains(winnerKey);
+                var isPusher  = !isWinner && config.GameState.LastRoundPushers.Contains(winnerKey);
+                var sp      = ImGui.GetStyle().ItemSpacing.X;
+                var fp      = ImGui.GetStyle().FramePadding.X;
+                float BW(string s) => ImGui.CalcTextSize(s).X + fp * 2;
+                var clearW  = ctx.HasWorld && ctx.HasNickname ? BW("C") + sp : 0;
+                var targetW = ctx.HasWorld                   ? BW("@") + sp : 0;
+                var renameW = BW("R");
+                var spadeW  = (isWinner || isPusher) ? ImGui.CalcTextSize("\u2660").X + sp : 0;
+                ImGui.SameLine();
+                ImGui.SetCursorPosX(cellRight - spadeW - targetW - renameW - clearW);
+
+                if (isWinner)
+                {
+                    ImGui.TextColored(new Vector4(0.2f, 0.8f, 0.2f, 1f), "\u2660");
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Won last round"u8);
+                    ImGui.SameLine();
+                }
+                else if (isPusher)
+                {
+                    ImGui.TextColored(new Vector4(1f, 1f, 1f, 1f), "\u2660");
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Pushed last round"u8);
+                    ImGui.SameLine();
+                }
+
+                if (ctx.HasWorld)
+                {
+                    if (ImGui.SmallButton($"@##{pi}target"))
+                        Plugin.TargetPlayer(p.FullName, p.World);
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Target {p.FullName}@{p.World}");
+                    ImGui.SameLine();
+                }
+
+                if (ImGui.SmallButton($"R##{pi}rename"))
+                {
+                    renamingIndex  = pi;
+                    renamingBuffer = p.Nickname;
+                }
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Rename"u8);
+
+                if (ctx.HasWorld && ctx.HasNickname)
+                {
+                    ImGui.SameLine();
+                    if (ImGui.SmallButton($"C##{pi}clear"))
+                        Apply(new RenamePlayer(pi, ""));
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Clear nickname"u8);
+                }
+            }
+        }
+        else
+        {
+            ImGui.AlignTextToFramePadding();
+            ImGui.TextDisabled($"--> Hand {hi + 1}");
+        }
+    }
+
+    private void DrawActionsCell(RowCtx ctx, ScenarioGates gates, float cellRight, ref int removePlayerIndex)
+    {
+        var (pi, hi, p, hand) = (ctx.Pi, ctx.Hi, ctx.Player, ctx.Hand);
+        var hasAnyPending = pendingDouble.HasValue || pendingSplit.HasValue;
+        var isPendingDouble = pendingDouble.HasValue && pendingDouble.Value == (pi, hi);
+        var isPendingSplit  = pendingSplit.HasValue  && pendingSplit.Value  == (pi, hi);
+        var asp = ImGui.GetStyle().ItemSpacing.X;
+        float ABW(string s) => ImGui.CalcTextSize(s).X + ImGui.GetStyle().FramePadding.X * 2;
+
+        if (Phase == GamePhase.PlayerTurns && State.WaitingForNextPlayer
+            && pi == ActivePlayerIndex && hi == ActiveHandIndex)
+        {
+            var moreHands = p.Hands.Skip(hi + 1).Any(h => h.State == HandState.Playing);
+            var advLabel  = moreHands ? "Next Hand \u2193" : "Next Player \u2193";
+            ImGui.SetCursorPosX(cellRight - ABW(advLabel));
+#if DEBUG
+            if (!gates.AdvancePlayer) ImGui.BeginDisabled();
+#endif
+            if (ImGui.SmallButton($"{advLabel}##{pi}_{hi}"))
+            {
+#if DEBUG
+                Scenario.Advance();
+#endif
+                Apply(new AdvanceToNextPlayer());
+            }
+#if DEBUG
+            if (!gates.AdvancePlayer) ImGui.EndDisabled();
+#endif
+        }
+        else if (isPendingDouble)
+        {
+            ImGui.SetCursorPosX(cellRight - ABW("Confirm Dbl") - asp - ABW("Cancel"));
+#if DEBUG
+            if (!gates.ConfirmDbl) ImGui.BeginDisabled();
+#endif
+            if (ImGui.SmallButton($"Confirm Dbl##{pi}_{hi}"))
+            {
+#if DEBUG
+                Scenario.Advance();
+#endif
+                Apply(new AnnounceDoubleConfirm(pi, hi));
+                Apply(new DoubleDown(pi, hi));
+                var dblKey2    = p.StatsKey();
+                var dblAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
+                if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0 && dblStat2.IsBanking())
+                {
+                    var before2 = dblStat2.Bank;
+                    ApplyBank(dblStat2, new BankDoubleDown(dblAmt2));
+                    config.NarrationLog.Add($"[Bank] {p.DisplayName}: doubled \u2014 {dblAmt2:N0} deducted (was {before2:N0} \u2192 {dblStat2.Bank:N0})");
+                    config.Save();
+                }
+                pendingDouble = null;
+                QueueHitRoll(isDealer: false, pi, hi);
+            }
+#if DEBUG
+            if (!gates.ConfirmDbl) ImGui.EndDisabled();
+#endif
+            ImGui.SameLine();
+            if (ImGui.SmallButton($"Cancel##{pi}_{hi}dblcancel")) pendingDouble = null;
+        }
+        else if (isPendingSplit)
+        {
+            ImGui.SetCursorPosX(cellRight - ABW("Confirm Spl") - asp - ABW("Cancel"));
+#if DEBUG
+            if (!gates.ConfirmSpl) ImGui.BeginDisabled();
+#endif
+            if (ImGui.SmallButton($"Confirm Spl##{pi}_{hi}"))
+            {
+#if DEBUG
+                Scenario.Advance();
+#endif
+                var splKey2    = p.StatsKey();
+                var splAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
+                if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0 && splStat2.IsBanking())
+                {
+                    var before2 = splStat2.Bank;
+                    ApplyBank(splStat2, new BankSplit(splAmt2));
+                    config.NarrationLog.Add($"[Bank] {p.DisplayName}: split \u2014 {splAmt2:N0} deducted (was {before2:N0} \u2192 {splStat2.Bank:N0})");
+                    config.Save();
+                }
+                Apply(new SplitHand(pi, hi));
+                pendingSplit = null;
+            }
+#if DEBUG
+            if (!gates.ConfirmSpl) ImGui.EndDisabled();
+#endif
+            ImGui.SameLine();
+            if (ImGui.SmallButton($"Cancel##{pi}_{hi}splcancel")) pendingSplit = null;
+        }
+        else if (Phase == GamePhase.Deal && PlayerHitActive(pi, hi))
+        {
+            ImGui.SetCursorPosX(cellRight - ABW("Draw"));
+            if (ImGui.SmallButton($"Draw##{pi}_{hi}"))
+                QueueHitRoll(isDealer: false, pi, hi);
+        }
+        else
+        {
+            var total = ABW("Stand") + asp + ABW("Hit") + asp + ABW("Dbl") + asp + ABW("Spl")
+                      + (ctx.IsFirstHand && !ctx.MultiHand ? asp + ABW("X") : 0);
+            ImGui.SetCursorPosX(cellRight - total);
+
+            var canStand = !hasAnyPending && Phase == GamePhase.PlayerTurns
+                        && pi == ActivePlayerIndex && hi == ActiveHandIndex
+                        && GameEngine.CanHit(hand);
+            if (!canStand) ImGui.BeginDisabled();
+#if DEBUG
+            if (!gates.Stand) ImGui.BeginDisabled();
+#endif
+            if (ImGui.SmallButton($"Stand##{pi}_{hi}"))
+            {
+#if DEBUG
+                Scenario.Advance();
+#endif
+                Apply(new StandPlayer(pi, hi));
+            }
+#if DEBUG
+            if (!gates.Stand) ImGui.EndDisabled();
+#endif
+            if (!canStand) ImGui.EndDisabled();
+
+            ImGui.SameLine();
+            var hitActive = PlayerHitActive(pi, hi);
+            if (!hitActive) ImGui.BeginDisabled();
+#if DEBUG
+            if (!gates.Hit) ImGui.BeginDisabled();
+#endif
+            if (ImGui.SmallButton($"Hit##{pi}_{hi}"))
+            {
+#if DEBUG
+                Scenario.Advance();
+#endif
+                Apply(new AnnouncePlayerHit(pi, hi));
+                QueueHitRoll(isDealer: false, pi, hi);
+            }
+#if DEBUG
+            if (!gates.Hit) ImGui.EndDisabled();
+#endif
+            if (!hitActive) ImGui.EndDisabled();
+
+            ImGui.SameLine();
+            var canDouble = !hasAnyPending && ctx.IsActiveHand
+                         && GameEngine.CanDouble(hand, p.Bet);
+            if (!canDouble) ImGui.BeginDisabled();
+#if DEBUG
+            if (!gates.Dbl) ImGui.BeginDisabled();
+#endif
+            if (ImGui.SmallButton($"Dbl##{pi}_{hi}"))
+            {
+#if DEBUG
+                Scenario.Advance();
+#endif
+                var dblBet     = GameEngine.GetEffectiveBet(p, hand);
+                var dblBank    = p.BankBalance(config);
+                var dblRounded = (long)Math.Ceiling(dblBet);
+                var fromBank   = dblBank >= dblRounded;
+                var bankAfter  = fromBank ? dblBank - dblRounded : dblRounded - dblBank;
+                pendingDouble  = (pi, hi);
+                Apply(new AnnounceDouble(pi, hi, fromBank, bankAfter));
+                if (!fromBank && ctx.HasWorld && config.AutoTradeEnabled)
+                    QueueTrade(p.FullName, p.World);
+            }
+#if DEBUG
+            if (!gates.Dbl) ImGui.EndDisabled();
+#endif
+            if (!canDouble) ImGui.EndDisabled();
+
+            ImGui.SameLine();
+            var canSplit = !hasAnyPending && ctx.IsActiveHand
+                        && GameEngine.CanSplit(hand);
+            if (!canSplit) ImGui.BeginDisabled();
+#if DEBUG
+            if (!gates.Spl) ImGui.BeginDisabled();
+#endif
+            if (ImGui.SmallButton($"Spl##{pi}_{hi}"))
+            {
+#if DEBUG
+                Scenario.Advance();
+#endif
+                var splBet     = GameEngine.GetEffectiveBet(p, hand);
+                var splBank    = p.BankBalance(config);
+                var splRounded = (long)Math.Ceiling(splBet);
+                var fromBank   = splBank >= splRounded;
+                var bankAfter  = fromBank ? splBank - splRounded : splRounded - splBank;
+                pendingSplit   = (pi, hi);
+                Apply(new AnnounceSplit(pi, hi, fromBank, bankAfter));
+                if (!fromBank && ctx.HasWorld && config.AutoTradeEnabled)
+                    QueueTrade(p.FullName, p.World);
+            }
+#if DEBUG
+            if (!gates.Spl) ImGui.EndDisabled();
+#endif
+            if (!canSplit) ImGui.EndDisabled();
+
+            if (ctx.IsFirstHand && !ctx.MultiHand)
+            {
+                ImGui.SameLine();
+                var canRemove = Phase == GamePhase.Betting;
+                if (!canRemove) ImGui.BeginDisabled();
+                ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.7f, 0.15f, 0.15f, 1f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.25f, 0.25f, 1f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.5f, 0.05f, 0.05f, 1f));
+                if (ImGui.SmallButton($"X##{pi}")) removePlayerIndex = pi;
+                ImGui.PopStyleColor(3);
+                if (!canRemove) ImGui.EndDisabled();
+            }
+        }
+    }
 
     private void DrawBankManageWindow(bool uiBusy)
     {
@@ -506,22 +926,6 @@ public partial class MainWindow
 
         var uiBusy = chatQueue.Count > 0 || pendingHit != null || deferredRoll.HasValue;
 
-        void DrawBankManageButton(int playerIndex, float cellRight, ReadOnlySpan<char> idSuffix)
-        {
-            if (uiBusy) ImGui.EndDisabled();
-            var mw = ImGui.CalcTextSize("Manage").X + ImGui.GetStyle().FramePadding.X * 2;
-            ImGui.SameLine();
-            if (ImGui.GetCursorPosX() < cellRight - mw)
-                ImGui.SetCursorPosX(cellRight - mw);
-            if (ImGui.SmallButton($"Manage##{playerIndex}{idSuffix}"))
-            {
-                bankManagePlayerIndex = bankManagePlayerIndex == playerIndex ? -1 : playerIndex;
-                bankDepositBuf        = string.Empty;
-                bankWithdrawBuf       = string.Empty;
-            }
-            if (uiBusy) ImGui.BeginDisabled();
-        }
-
         DrawBankManageWindow(uiBusy);
         DrawTradeBetPromptModal();
         DrawBetOrBankPromptModal();
@@ -630,93 +1034,6 @@ public partial class MainWindow
             reorderIndices = [];
         }
         ImGui.Separator();
-
-        void DrawBankCell(int loopIdx, int actualIdx, Player player, float bankCellRight)
-        {
-            var bankKey = player.StatsKey();
-            if (!config.PlayerStatsStore.TryGetValue(bankKey, out var bankStat))
-            {
-                bankStat = new PlayerStat { DisplayName = player.DisplayName };
-                config.PlayerStatsStore[bankKey] = bankStat;
-            }
-            var bankVal         = bankStat.Bank;
-            var effectiveBetStr = betEdits.TryGetValue(loopIdx, out var bEdit) ? bEdit : player.Bet;
-            var parsedBet       = GameEngine.ParseBet(effectiveBetStr);
-            var shortfall       = parsedBet > 0 ? Math.Max(0m, parsedBet - bankVal) : 0m;
-
-            var bankDelta  = 0m;
-            var bankCredit = 0m;
-            if (Phase == GamePhase.Payout && bankVal > 0)
-                for (var bhi = 0; bhi < player.Hands.Count; bhi++)
-                {
-                    var d = GameEngine.PayoutDelta(State, actualIdx, bhi);
-                    if (d > 0) bankDelta += d.Value;
-                    bankCredit += GameEngine.PayoutTotalOwed(State, actualIdx, bhi);
-                }
-
-            ImGui.AlignTextToFramePadding();
-            if (bankStat.IsBanking())
-            {
-                var bankLabel = GameEngine.FormatGil(bankVal);
-                if (shortfall > 0)
-                    ImGui.TextColored(GameColors.WarningAmber, bankLabel);
-                else
-                    ImGui.TextUnformatted(bankLabel);
-                if (ImGui.IsItemHovered())
-                {
-                    var tip = new System.Text.StringBuilder();
-                    if (shortfall > 0)
-                        tip.AppendLine($"Short by {GameEngine.FormatGil(shortfall)} — needs trade before deal");
-                    if (Phase == GamePhase.Payout && bankCredit > 0)
-                    {
-                        if (bankDelta != 0)
-                        {
-                            var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
-                            tip.AppendLine($"This round: {deltaStr}");
-                        }
-                        tip.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankCredit))}");
-                    }
-                    tip.Append("Click to copy");
-                    ImGui.SetTooltip(tip.ToString());
-                    if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                        ImGui.SetClipboardText(bankVal.ToString());
-                }
-
-                if (Phase == GamePhase.Betting && shortfall > 0)
-                {
-                    var amber    = new Vector4(1f, 0.75f, 0.1f, 1f);
-                    var fp       = ImGui.GetStyle().FramePadding.X;
-                    var sp       = ImGui.GetStyle().ItemSpacing.X;
-                    var manageW  = ImGui.CalcTextSize("Manage").X + fp * 2;
-                    var shortW   = ImGui.CalcTextSize("Short").X  + fp * 2;
-                    ImGui.SameLine();
-                    if (ImGui.GetCursorPosX() < bankCellRight - manageW - sp - shortW)
-                        ImGui.SetCursorPosX(bankCellRight - manageW - sp - shortW);
-                    var amberHov = new Vector4(1f, 0.88f, 0.3f, 1f);
-                    ImGui.PushStyleColor(ImGuiCol.Button,        amber    with { W = 0.25f });
-                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, amberHov with { W = 0.4f  });
-                    ImGui.PushStyleColor(ImGuiCol.Text,          amber);
-                    if (ImGui.SmallButton($"Short##{actualIdx}short"))
-                    {
-                        if (betEdits.TryGetValue(loopIdx, out var pendingBet) && pendingBet != player.Bet)
-                        {
-                            betEdits.Remove(loopIdx);
-                            Apply(new SetPlayerBet(actualIdx, pendingBet));
-                        }
-                        Apply(new AnnounceBankShortfall(actualIdx, (long)Math.Ceiling(shortfall)));
-                    }
-                    ImGui.PopStyleColor(3);
-                    if (ImGui.IsItemHovered())
-                        ImGui.SetTooltip($"Short by {GameEngine.FormatGil(shortfall)}\nClick to announce shortfall");
-                }
-            }
-            else
-            {
-                ImGui.TextDisabled("—");
-            }
-
-            DrawBankManageButton(actualIdx, bankCellRight, "bank");
-        }
 
         var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
                          ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
@@ -858,7 +1175,7 @@ public partial class MainWindow
 
                     // Bank
                     ImGui.TableSetColumnIndex(2);
-                    DrawBankCell(pi, displayPi, p, ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X);
+                    DrawBankCell(pi, displayPi, p, ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X, uiBusy);
 
                     // Status (net payout summary or blank)
                     ImGui.TableSetColumnIndex(5);
@@ -917,6 +1234,17 @@ public partial class MainWindow
                     var isFirstHand = hi == 0;
                     var isActiveHand = Phase == GamePhase.PlayerTurns
                                     && pi == ActivePlayerIndex && hi == ActiveHandIndex;
+                    var ctx = new RowCtx(
+                        LoopIndex:    pi,
+                        Pi:           pi,
+                        Hi:           hi,
+                        Player:       p,
+                        Hand:         hand,
+                        IsFirstHand:  isFirstHand,
+                        IsActiveHand: isActiveHand,
+                        MultiHand:    multiHand,
+                        HasWorld:     hasWorld,
+                        HasNickname:  hasNickname);
 
                     ImGui.TableNextRow();
                     if (isActiveHand)
@@ -929,103 +1257,19 @@ public partial class MainWindow
                     if (isReorderMode && isFirstHand && !multiHand)
                     {
                         if (pi == 0) ImGui.BeginDisabled();
-                        if (ImGui.SmallButton($"↑##{pi}reorderUp")) reorderSwap = (pi, pi - 1);
+                        if (ImGui.SmallButton($"\u2191##{pi}reorderUp")) reorderSwap = (pi, pi - 1);
                         if (pi == 0) ImGui.EndDisabled();
                         ImGui.SameLine();
                         if (pi == State.Players.Count - 1) ImGui.BeginDisabled();
-                        if (ImGui.SmallButton($"↓##{pi}reorderDown")) reorderSwap = (pi, pi + 1);
+                        if (ImGui.SmallButton($"\u2193##{pi}reorderDown")) reorderSwap = (pi, pi + 1);
                         if (pi == State.Players.Count - 1) ImGui.EndDisabled();
                         ImGui.SameLine();
                         ImGui.AlignTextToFramePadding();
                         ImGui.TextUnformatted(p.DisplayName);
                     }
-                    else if (isFirstHand && !multiHand)
-                    {
-                        if (renamingIndex == pi)
-                        {
-                            var okW = ImGui.CalcTextSize("OK").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
-                            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - okW);
-                            var submitted = ImGui.InputText($"##rename{pi}", ref renamingBuffer, 64,
-                                ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll);
-                            ImGui.SameLine();
-                            var canConfirm = renamingBuffer.Length > 0 || p.World.Length > 0;
-                            if (!canConfirm) ImGui.BeginDisabled();
-                            if (ImGui.SmallButton($"OK##{pi}ok") || submitted)
-                            {
-                                if (canConfirm) Apply(new RenamePlayer(pi, renamingBuffer));
-                                renamingIndex = -1;
-                            }
-                            if (!canConfirm) ImGui.EndDisabled();
-                        }
-                        else
-                        {
-                            ImGui.AlignTextToFramePadding();
-                            ImGui.Text(p.DisplayName);
-                            if (ImGui.IsItemHovered())
-                            {
-                                if (p.World.Length > 0)
-                                    ImGui.SetTooltip($"{p.FullName}@{p.World}");
-                                if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
-                                {
-                                    renamingIndex  = pi;
-                                    renamingBuffer = p.Nickname;
-                                }
-                            }
-
-                            var winnerKey = p.FullName.Length > 0 ? p.FullName : p.Nickname;
-                            var isWinner  = config.GameState.LastRoundWinners.Contains(winnerKey);
-                            var isPusher  = !isWinner && config.GameState.LastRoundPushers.Contains(winnerKey);
-                            var sp      = ImGui.GetStyle().ItemSpacing.X;
-                            var fp      = ImGui.GetStyle().FramePadding.X;
-                            float BW(string s) => ImGui.CalcTextSize(s).X + fp * 2;
-                            var clearW  = hasWorld && hasNickname ? BW("C") + sp : 0;
-                            var targetW = hasWorld               ? BW("@") + sp : 0;
-                            var renameW = BW("R");
-                            var spadeW  = (isWinner || isPusher) ? ImGui.CalcTextSize("\u2660").X + sp : 0;
-                            ImGui.SameLine();
-                            ImGui.SetCursorPosX(nameCellRight - spadeW - targetW - renameW - clearW);
-
-                            if (isWinner)
-                            {
-                                ImGui.TextColored(new System.Numerics.Vector4(0.2f, 0.8f, 0.2f, 1f), "\u2660");
-                                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Won last round"u8);
-                                ImGui.SameLine();
-                            }
-                            else if (isPusher)
-                            {
-                                ImGui.TextColored(new System.Numerics.Vector4(1f, 1f, 1f, 1f), "\u2660");
-                                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Pushed last round"u8);
-                                ImGui.SameLine();
-                            }
-
-                            if (hasWorld)
-                            {
-                                if (ImGui.SmallButton($"@##{pi}target"))
-                                    Plugin.TargetPlayer(p.FullName, p.World);
-                                if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Target {p.FullName}@{p.World}");
-                                ImGui.SameLine();
-                            }
-
-                            if (ImGui.SmallButton($"R##{pi}rename"))
-                            {
-                                renamingIndex  = pi;
-                                renamingBuffer = p.Nickname;
-                            }
-                            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Rename"u8);
-
-                            if (hasWorld && hasNickname)
-                            {
-                                ImGui.SameLine();
-                                if (ImGui.SmallButton($"C##{pi}clear"))
-                                    Apply(new RenamePlayer(pi, ""));
-                                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Clear nickname"u8);
-                            }
-                        }
-                    }
                     else
                     {
-                        ImGui.AlignTextToFramePadding();
-                        ImGui.TextDisabled($"--> Hand {hi + 1}");
+                        DrawNameCell(ctx, nameCellRight);
                     }
 
                     // ── Bet column ────────────────────────────────────────────
@@ -1125,7 +1369,7 @@ public partial class MainWindow
                     // ── Bank column ───────────────────────────────────────────
                     ImGui.TableSetColumnIndex(2);
                     if (isFirstHand && !multiHand)
-                        DrawBankCell(pi, displayPi, p, ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X);
+                        DrawBankCell(pi, displayPi, p, ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X, uiBusy);
 
                     // ── Cards column ──────────────────────────────────────────
                     ImGui.TableSetColumnIndex(3);
@@ -1216,219 +1460,19 @@ public partial class MainWindow
                     // ── Actions column ────────────────────────────────────────
                     ImGui.TableSetColumnIndex(6);
                     var actionsCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                    var hasAnyPending = pendingDouble.HasValue || pendingSplit.HasValue;
-                    var isPendingDouble = pendingDouble.HasValue && pendingDouble.Value == (pi, hi);
-                    var isPendingSplit  = pendingSplit.HasValue  && pendingSplit.Value  == (pi, hi);
-                    var asp = ImGui.GetStyle().ItemSpacing.X;
-                    float ABW(string s) => ImGui.CalcTextSize(s).X + ImGui.GetStyle().FramePadding.X * 2;
 #if DEBUG
-                    var _scenHit        = Scenario.IsStep($"Hit:{pi}:{hi}");
-                    var _scenStand      = Scenario.IsStep($"Stand:{pi}:{hi}");
-                    var _scenDbl        = Scenario.IsStep($"Dbl:{pi}:{hi}");
-                    var _scenSpl        = Scenario.IsStep($"Spl:{pi}:{hi}");
-                    var _scenConfirmDbl = Scenario.IsStep($"ConfirmDbl:{pi}:{hi}");
-                    var _scenConfirmSpl = Scenario.IsStep($"ConfirmSpl:{pi}:{hi}");
-                    var _scenAdvPlayer  = Scenario.IsStep("AdvancePlayer");
+                    var gates = new ScenarioGates(
+                        Hit: Scenario.IsStep($"Hit:{pi}:{hi}"),
+                        Stand: Scenario.IsStep($"Stand:{pi}:{hi}"),
+                        Dbl: Scenario.IsStep($"Dbl:{pi}:{hi}"),
+                        Spl: Scenario.IsStep($"Spl:{pi}:{hi}"),
+                        ConfirmDbl: Scenario.IsStep($"ConfirmDbl:{pi}:{hi}"),
+                        ConfirmSpl: Scenario.IsStep($"ConfirmSpl:{pi}:{hi}"),
+                        AdvancePlayer: Scenario.IsStep("AdvancePlayer"));
+#else
+                    var gates = default(ScenarioGates);
 #endif
-
-                    if (Phase == GamePhase.PlayerTurns && State.WaitingForNextPlayer
-                        && pi == ActivePlayerIndex && hi == ActiveHandIndex)
-                    {
-                        var moreHands = p.Hands.Skip(hi + 1).Any(h => h.State == HandState.Playing);
-                        var advLabel  = moreHands ? "Next Hand ↓" : "Next Player ↓";
-                        ImGui.SetCursorPosX(actionsCellRight - ABW(advLabel));
-#if DEBUG
-                        if (!_scenAdvPlayer) ImGui.BeginDisabled();
-#endif
-                        if (ImGui.SmallButton($"{advLabel}##{pi}_{hi}"))
-                        {
-#if DEBUG
-                            Scenario.Advance();
-#endif
-                            Apply(new AdvanceToNextPlayer());
-                        }
-#if DEBUG
-                        if (!_scenAdvPlayer) ImGui.EndDisabled();
-#endif
-                    }
-                    else if (isPendingDouble)
-                    {
-                        ImGui.SetCursorPosX(actionsCellRight - ABW("Confirm Dbl") - asp - ABW("Cancel"));
-#if DEBUG
-                        if (!_scenConfirmDbl) ImGui.BeginDisabled();
-#endif
-                        if (ImGui.SmallButton($"Confirm Dbl##{pi}_{hi}"))
-                        {
-#if DEBUG
-                            Scenario.Advance();
-#endif
-                            Apply(new AnnounceDoubleConfirm(pi, hi));
-                            Apply(new DoubleDown(pi, hi));
-                            var dblKey2    = p.StatsKey();
-                            var dblAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-                            if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0 && dblStat2.IsBanking())
-                            {
-                                var before2 = dblStat2.Bank;
-                                ApplyBank(dblStat2, new BankDoubleDown(dblAmt2));
-                                config.NarrationLog.Add($"[Bank] {p.DisplayName}: doubled — {dblAmt2:N0} deducted (was {before2:N0} → {dblStat2.Bank:N0})");
-                                config.Save();
-                            }
-                            pendingDouble = null;
-                            QueueHitRoll(isDealer: false, pi, hi);
-                        }
-#if DEBUG
-                        if (!_scenConfirmDbl) ImGui.EndDisabled();
-#endif
-                        ImGui.SameLine();
-                        if (ImGui.SmallButton($"Cancel##{pi}_{hi}dblcancel")) pendingDouble = null;
-                    }
-                    else if (isPendingSplit)
-                    {
-                        ImGui.SetCursorPosX(actionsCellRight - ABW("Confirm Spl") - asp - ABW("Cancel"));
-#if DEBUG
-                        if (!_scenConfirmSpl) ImGui.BeginDisabled();
-#endif
-                        if (ImGui.SmallButton($"Confirm Spl##{pi}_{hi}"))
-                        {
-#if DEBUG
-                            Scenario.Advance();
-#endif
-                            var splKey2    = p.StatsKey();
-                            var splAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-                            if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0 && splStat2.IsBanking())
-                            {
-                                var before2 = splStat2.Bank;
-                                ApplyBank(splStat2, new BankSplit(splAmt2));
-                                config.NarrationLog.Add($"[Bank] {p.DisplayName}: split — {splAmt2:N0} deducted (was {before2:N0} → {splStat2.Bank:N0})");
-                                config.Save();
-                            }
-                            Apply(new SplitHand(pi, hi));
-                            pendingSplit = null;
-                            // The 1-card split hands are auto-hit in Draw()
-                        }
-#if DEBUG
-                        if (!_scenConfirmSpl) ImGui.EndDisabled();
-#endif
-                        ImGui.SameLine();
-                        if (ImGui.SmallButton($"Cancel##{pi}_{hi}splcancel")) pendingSplit = null;
-                    }
-                    else if (Phase == GamePhase.Deal && PlayerHitActive(pi, hi))
-                    {
-                        ImGui.SetCursorPosX(actionsCellRight - ABW("Draw"));
-                        if (ImGui.SmallButton($"Draw##{pi}_{hi}"))
-                            QueueHitRoll(isDealer: false, pi, hi);
-                    }
-                    else
-                    {
-                        var total = ABW("Stand") + asp + ABW("Hit") + asp + ABW("Dbl") + asp + ABW("Spl")
-                                  + (isFirstHand && !multiHand ? asp + ABW("X") : 0);
-                        ImGui.SetCursorPosX(actionsCellRight - total);
-
-                        var canStand = !hasAnyPending && Phase == GamePhase.PlayerTurns
-                                    && pi == ActivePlayerIndex && hi == ActiveHandIndex
-                                    && GameEngine.CanHit(hand);
-                        if (!canStand) ImGui.BeginDisabled();
-#if DEBUG
-                        if (!_scenStand) ImGui.BeginDisabled();
-#endif
-                        if (ImGui.SmallButton($"Stand##{pi}_{hi}"))
-                        {
-#if DEBUG
-                            Scenario.Advance();
-#endif
-                            Apply(new StandPlayer(pi, hi));
-                        }
-#if DEBUG
-                        if (!_scenStand) ImGui.EndDisabled();
-#endif
-                        if (!canStand) ImGui.EndDisabled();
-
-                        ImGui.SameLine();
-                        var hitActive = PlayerHitActive(pi, hi);
-                        if (!hitActive) ImGui.BeginDisabled();
-#if DEBUG
-                        if (!_scenHit) ImGui.BeginDisabled();
-#endif
-                        if (ImGui.SmallButton($"Hit##{pi}_{hi}"))
-                        {
-#if DEBUG
-                            Scenario.Advance();
-#endif
-                            Apply(new AnnouncePlayerHit(pi, hi));
-                            QueueHitRoll(isDealer: false, pi, hi);
-                        }
-#if DEBUG
-                        if (!_scenHit) ImGui.EndDisabled();
-#endif
-                        if (!hitActive) ImGui.EndDisabled();
-
-                        ImGui.SameLine();
-                        var canDouble = !hasAnyPending && isActiveHand
-                                     && GameEngine.CanDouble(hand, p.Bet);
-                        if (!canDouble) ImGui.BeginDisabled();
-#if DEBUG
-                        if (!_scenDbl) ImGui.BeginDisabled();
-#endif
-                        if (ImGui.SmallButton($"Dbl##{pi}_{hi}"))
-                        {
-#if DEBUG
-                            Scenario.Advance();
-#endif
-                            var dblBet     = GameEngine.GetEffectiveBet(p, hand);
-                            var dblBank    = p.BankBalance(config);
-                            var dblRounded = (long)Math.Ceiling(dblBet);
-                            var fromBank   = dblBank >= dblRounded;
-                            var bankAfter  = fromBank ? dblBank - dblRounded : dblRounded - dblBank;
-                            pendingDouble = (pi, hi);
-                            Apply(new AnnounceDouble(pi, hi, fromBank, bankAfter));
-                            if (!fromBank && hasWorld && config.AutoTradeEnabled)
-                                QueueTrade(p.FullName, p.World);
-                        }
-#if DEBUG
-                        if (!_scenDbl) ImGui.EndDisabled();
-#endif
-                        if (!canDouble) ImGui.EndDisabled();
-
-                        ImGui.SameLine();
-                        var canSplit = !hasAnyPending && isActiveHand
-                                    && GameEngine.CanSplit(hand);
-                        if (!canSplit) ImGui.BeginDisabled();
-#if DEBUG
-                        if (!_scenSpl) ImGui.BeginDisabled();
-#endif
-                        if (ImGui.SmallButton($"Spl##{pi}_{hi}"))
-                        {
-#if DEBUG
-                            Scenario.Advance();
-#endif
-                            var splBet     = GameEngine.GetEffectiveBet(p, hand);
-                            var splBank    = p.BankBalance(config);
-                            var splRounded = (long)Math.Ceiling(splBet);
-                            var fromBank   = splBank >= splRounded;
-                            var bankAfter  = fromBank ? splBank - splRounded : splRounded - splBank;
-                            pendingSplit = (pi, hi);
-                            Apply(new AnnounceSplit(pi, hi, fromBank, bankAfter));
-                            if (!fromBank && hasWorld && config.AutoTradeEnabled)
-                                QueueTrade(p.FullName, p.World);
-                        }
-#if DEBUG
-                        if (!_scenSpl) ImGui.EndDisabled();
-#endif
-                        if (!canSplit) ImGui.EndDisabled();
-
-                        if (isFirstHand && !multiHand)
-                        {
-                            ImGui.SameLine();
-                            var canRemove = Phase == GamePhase.Betting;
-                            if (!canRemove) ImGui.BeginDisabled();
-                            ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.7f, 0.15f, 0.15f, 1f));
-                            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.25f, 0.25f, 1f));
-                            ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.5f, 0.05f, 0.05f, 1f));
-                            if (ImGui.SmallButton($"X##{pi}")) removeAt = pi;
-                            ImGui.PopStyleColor(3);
-                            if (!canRemove) ImGui.EndDisabled();
-                        }
-                    }
+                    DrawActionsCell(ctx, gates, actionsCellRight, ref removeAt);
                 }
 
             }
@@ -1485,7 +1529,7 @@ public partial class MainWindow
                         {
                             ImGui.TextDisabled("—");
                         }
-                        DrawBankManageButton(spi, sitBankCellRight, "sitbank");
+                        DrawBankManageButton(spi, sitBankCellRight, "sitbank", uiBusy);
                     }
 
                     // Status: Resume button
