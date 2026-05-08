@@ -33,7 +33,7 @@ public enum PayoutResult { None, Win, BjWin, CharlieWin, Lose, Push }
 public enum FiveCardCharlieRule { Disabled, BeatsAll, LosesToDealerBJ }
 
 [Serializable]
-public class Hand
+public sealed record class Hand
 {
     public List<int> Cards { get; set; } = [];
     public HandState State { get; set; } = HandState.Playing;
@@ -46,7 +46,7 @@ public class Hand
 }
 
 [Serializable]
-public class Player
+public sealed record class Player
 {
     // For manual players: their name. For FFXIV players: their nickname (may be empty).
     public string Nickname { get; set; } = string.Empty;
@@ -66,7 +66,7 @@ public class Player
 }
 
 [Serializable]
-public class GameState
+public sealed record class GameState
 {
     public List<Player> Players { get; set; } = [];
     public Hand DealerHand { get; set; } = new();
