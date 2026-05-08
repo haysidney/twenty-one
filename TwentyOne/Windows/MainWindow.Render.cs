@@ -184,7 +184,7 @@ public partial class MainWindow
 
     private void DrawBetCell(RowCtx ctx, float cellRight)
     {
-        var (pi, hi, p, hand) = (ctx.Pi, ctx.Hi, ctx.Player, ctx.Hand);
+        var (pi, _, p, hand) = (ctx.Pi, ctx.Hi, ctx.Player, ctx.Hand);
         if (ctx.IsFirstHand && !ctx.MultiHand)
         {
             var confirmButtonW = Phase == GamePhase.Betting
@@ -1380,7 +1380,6 @@ public partial class MainWindow
 
         var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
                          ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
-        var tableAvailWidth = ImGui.GetContentRegionAvail().X;
         int removeAt = -1;
         if (ImGui.BeginTable("##players"u8, 7, tableFlags))
         {

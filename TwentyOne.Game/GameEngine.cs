@@ -322,7 +322,7 @@ public static class GameEngine
     private sealed record NarrationContext(
         NarrationTemplates Templates,
         string             DealerName,
-        List<SideEffect>   Effects)
+        List<ISideEffect>   Effects)
     {
         public void Narrate(List<List<string>> variants, params (string Key, string Value)[] vars)
         {
@@ -396,11 +396,11 @@ public static class GameEngine
 
     // ── Apply ─────────────────────────────────────────────────────────────────
 
-    public static (GameState State, IReadOnlyList<SideEffect> Effects) Apply(
+    public static (GameState State, IReadOnlyList<ISideEffect> Effects) Apply(
         GameState state, GameAction action, NarrationTemplates? templates = null, string dealerName = "Dealer")
     {
         var t       = templates ?? new NarrationTemplates();
-        var effects = new List<SideEffect>();
+        var effects = new List<ISideEffect>();
         var ctx = new NarrationContext(t, dealerName, effects);
 
         var newState = action switch
@@ -408,7 +408,7 @@ public static class GameEngine
             AddDealerCard a          => HandleAddDealerCard(state, a, ctx),
             AddPlayerCard a          => HandleAddPlayerCard(state, a, ctx),
             StandPlayer a            => HandleStandPlayer(state, a, ctx),
-            DoubleDown a             => HandleDoubleDown(state, a, ctx),
+            DoubleDown a             => HandleDoubleDown(state, a),
             SplitHand a              => HandleSplitHand(state, a, ctx),
             AnnounceDealerHit        => HandleAnnounceDealerHit(state, ctx),
             AnnouncePlayerHit a      => HandleAnnouncePlayerHit(state, a, ctx),
@@ -645,7 +645,7 @@ public static class GameEngine
         };
     }
 
-    private static GameState HandleDoubleDown(GameState state, DoubleDown a, NarrationContext ctx)
+    private static GameState HandleDoubleDown(GameState state, DoubleDown a)
     {
         var pi     = a.PlayerIndex;
         var hi     = a.HandIndex;

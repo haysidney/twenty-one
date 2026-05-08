@@ -59,7 +59,7 @@ public sealed class Plugin : IDalamudPlugin
         return $"{districtTerritory}:{ward + 1}:{plot + 1}";
     }
 
-    private void OnTerritoryChanged(uint territory)
+    private static void OnTerritoryChanged(uint territory)
     {
         if (OutdoorHousingTerritories.Contains(territory))
             LastOutdoorHousingTerritoryId = territory;
@@ -85,7 +85,7 @@ public sealed class Plugin : IDalamudPlugin
         SessionLedgerWindow   = new SessionLedgerWindow(Configuration);
         NarrationEditorWindow = new NarrationEditorWindow(Configuration);
         ConfigWindow          = new ConfigWindow(Configuration, SessionLedgerWindow, NarrationEditorWindow);
-        MainWindow            = new MainWindow(Configuration, ConfigWindow, SessionLedgerWindow, ChatGui, ObjectTable, TargetManager, ClientState);
+        MainWindow            = new MainWindow(Configuration, ConfigWindow, SessionLedgerWindow, ChatGui, ObjectTable, ClientState);
         HistoryWindow       = new HistoryWindow(Configuration, MainWindow);
         MainWindow.SetHistoryWindow(HistoryWindow);
         SessionLedgerWindow.SetHistoryWindow(HistoryWindow);

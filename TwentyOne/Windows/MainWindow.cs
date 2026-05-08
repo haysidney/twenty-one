@@ -33,7 +33,6 @@ public partial class MainWindow : Window, IDisposable
     private bool             isHistoryView => savedCurrentState != null;
     private readonly IChatGui       chatGui;
     private readonly IObjectTable   objectTable;
-    private readonly ITargetManager targetManager;
     private readonly IClientState   clientState;
 
     // Venue memory suggestion banner state.
@@ -227,7 +226,7 @@ public partial class MainWindow : Window, IDisposable
     // ── Constructor / Dispose ─────────────────────────────────────────────────
 
     public MainWindow(Configuration config, ConfigWindow configWindow, SessionLedgerWindow sessionLedgerWindow,
-                      IChatGui chatGui, IObjectTable objectTable, ITargetManager targetManager,
+                      IChatGui chatGui, IObjectTable objectTable,
                       IClientState clientState)
         : base("Twenty One##TwentyOneMain")
     {
@@ -236,7 +235,6 @@ public partial class MainWindow : Window, IDisposable
         this.sessionLedgerWindow = sessionLedgerWindow;
         this.chatGui           = chatGui;
         this.objectTable       = objectTable;
-        this.targetManager     = targetManager;
         this.clientState       = clientState;
         SizeConstraints   = new WindowSizeConstraints
         {
@@ -367,7 +365,7 @@ public partial class MainWindow : Window, IDisposable
         config.Save();
     }
 
-    private static void ApplyBank(PlayerStat stat, BankTransaction tx)
+    private static void ApplyBank(PlayerStat stat, IBankTransaction tx)
     {
         var (newBalance, entry) = BankLedger.Apply(stat.Bank, tx, DateTime.Now);
         stat.Bank = newBalance;

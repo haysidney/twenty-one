@@ -142,7 +142,7 @@ public class DebugWindow : Window
             _fileDialog.OpenFileDialog("Load Scenario", "JSON{.json}", (ok, path) =>
             {
                 if (!ok) return;
-                try { LoadScenario(path); } catch { }
+                try { LoadScenario(path); } catch { /* Swallow load failures silently */ }
             });
         }
         if (ImGui.IsItemHovered())
@@ -202,7 +202,7 @@ public class DebugWindow : Window
                     config.RedoStack.Clear();
                     config.Save();
                 }
-                catch { }
+                catch { /* Swallow deserialization failures silently */ }
             });
         }
         if (ImGui.IsItemHovered())

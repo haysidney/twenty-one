@@ -76,9 +76,9 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         // Gil inputs
         ImGui.Text("Starting Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);
-        if (ImGui.InputText("##gilstart", ref gilStartBuf, 20))
+        if (ImGui.InputText("##gilstart", ref gilStartBuf, 20) && long.TryParse(gilStartBuf, out var v))
         {
-            if (long.TryParse(gilStartBuf, out var v)) { config.GilStart = v; config.Save(); }
+            config.GilStart = v; config.Save();
         }
         ImGui.SameLine();
         if (ImGui.SmallButton("Current##start"))
@@ -91,9 +91,9 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
         ImGui.Text("Ending Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);
-        if (ImGui.InputText("##gilend", ref gilEndBuf, 20))
+        if (ImGui.InputText("##gilend", ref gilEndBuf, 20) && long.TryParse(gilEndBuf, out var v2))
         {
-            if (long.TryParse(gilEndBuf, out var v)) { config.GilEnd = v; config.Save(); }
+            config.GilEnd = v2; config.Save();
         }
         ImGui.SameLine();
         if (ImGui.SmallButton("Current##end"))
@@ -139,14 +139,11 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         var addTip = ImGui.InputText("##tipinput", ref tipBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         addTip |= ImGui.Button("Add Tip");
-        if (addTip)
+        if (addTip && long.TryParse(tipBuf, out var tip) && tip != 0)
         {
-            if (long.TryParse(tipBuf, out var tip) && tip != 0)
-            {
-                config.Tips.Add(tip);
-                config.Save();
-                tipBuf = string.Empty;
-            }
+            config.Tips.Add(tip);
+            config.Save();
+            tipBuf = string.Empty;
         }
 
         ImGui.Separator();
@@ -195,10 +192,9 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         ImGui.Spacing();
 
         // Player stats controls
-        if (ImGui.Button("History"))
+        if (ImGui.Button("History") && _historyWindow != null)
         {
-            if (_historyWindow != null)
-                _historyWindow.IsOpen = !_historyWindow.IsOpen;
+            _historyWindow.IsOpen = !_historyWindow.IsOpen;
         }
         ImGui.SameLine();
         if (ImGui.Button("Reset Stats"))

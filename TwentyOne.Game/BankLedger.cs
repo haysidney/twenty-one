@@ -14,13 +14,14 @@ public class BankTransactionEntry
 }
 
 // Discriminated union — one type per bank event
-public abstract record BankTransaction;
-public record BankDeposit(long Amount)    : BankTransaction;
-public record BankWithdrawal(long Amount) : BankTransaction;
-public record BankBet(long Amount)        : BankTransaction;
-public record BankWin(long Amount)        : BankTransaction;
-public record BankDoubleDown(long Amount) : BankTransaction;
-public record BankSplit(long Amount)      : BankTransaction;
+public interface IBankTransaction;
+
+public record BankDeposit(long Amount)    : IBankTransaction;
+public record BankWithdrawal(long Amount) : IBankTransaction;
+public record BankBet(long Amount)        : IBankTransaction;
+public record BankWin(long Amount)        : IBankTransaction;
+public record BankDoubleDown(long Amount) : IBankTransaction;
+public record BankSplit(long Amount)      : IBankTransaction;
 
 public static class BankLedger
 {
@@ -29,7 +30,7 @@ public static class BankLedger
     /// The timestamp is supplied by the caller so the core stays free of <c>DateTime.Now</c>.
     /// </summary>
     public static (long NewBalance, BankTransactionEntry Entry) Apply(
-        long balance, BankTransaction tx, DateTime timestamp)
+        long balance, IBankTransaction tx, DateTime timestamp)
     {
         var (newBalance, kind, amount) = tx switch
         {

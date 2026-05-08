@@ -2,6 +2,6 @@
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors>S125</WarningsAsErrors>
-    <NoWarn>S108;S138;S1172;S1199;S1481;S1541;S2094;S2325;S2486;S3267;S3358;S3881;S4487;S1066</NoWarn>
+    <NoWarn>S138;S1199;S1541;S3267;S3358;S3881</NoWarn>
   </PropertyGroup>
 </Project>

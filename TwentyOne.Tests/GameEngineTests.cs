@@ -2431,7 +2431,7 @@ public class SittingOutTests
 
 public class BankLedgerTests
 {
-    private static (long NewBalance, BankTransactionEntry Entry) Apply(long balance, BankTransaction tx)
+    private static (long NewBalance, BankTransactionEntry Entry) Apply(long balance, IBankTransaction tx)
         => BankLedger.Apply(balance, tx, default);
 
     // ── Credits ───────────────────────────────────────────────────────────────

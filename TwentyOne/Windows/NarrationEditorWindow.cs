@@ -107,7 +107,7 @@ public class NarrationEditorWindow : Window
                                 var imported = JsonSerializer.Deserialize<NarrationTemplates>(text);
                                 if (imported != null) { config.NarrationTemplates = imported; _narrationDirty = false; config.Save(); }
                             }
-                            catch { }
+                            catch { /* Swallow import deserialization failures silently */ }
                         };
                     });
             }
@@ -121,7 +121,7 @@ public class NarrationEditorWindow : Window
                         var imported = JsonSerializer.Deserialize<NarrationTemplates>(json);
                         if (imported != null) { config.NarrationTemplates = imported; _narrationDirty = false; config.Save(); }
                     }
-                    catch { }
+                    catch { /* Swallow import deserialization failures silently */ }
                 };
                 ImGui.OpenPopup("Confirm Import##ntImportConfirm");
             }
