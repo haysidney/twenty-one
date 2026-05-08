@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace TwentyOne.Game;
 
@@ -35,7 +36,7 @@ public enum FiveCardCharlieRule { Disabled, BeatsAll, LosesToDealerBJ }
 [Serializable]
 public sealed record class Hand
 {
-    public List<int> Cards { get; set; } = [];
+    public ImmutableArray<int> Cards { get; set; } = [];
     public HandState State { get; set; } = HandState.Playing;
     // True after player doubles; Bet holds the new (doubled) amount.
     public bool Doubled { get; set; } = false;
@@ -54,7 +55,7 @@ public sealed record class Player
     public string FullName { get; set; } = string.Empty;
     public string World { get; set; } = string.Empty;
     public string Bet { get; set; } = string.Empty;
-    public List<Hand> Hands { get; set; } = [];
+    public ImmutableArray<Hand> Hands { get; set; } = [];
     public bool SittingOut { get; set; } = false;
 
     // Nickname if set; else first name from FullName; else Nickname (empty for edge cases).
@@ -68,7 +69,7 @@ public sealed record class Player
 [Serializable]
 public sealed record class GameState
 {
-    public List<Player> Players { get; set; } = [];
+    public ImmutableArray<Player> Players { get; set; } = [];
     public Hand DealerHand { get; set; } = new();
     public GamePhase Phase { get; set; } = GamePhase.Betting;
     public int ActivePlayerIndex { get; set; } = -1;

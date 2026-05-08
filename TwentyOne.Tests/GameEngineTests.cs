@@ -143,7 +143,7 @@ public class ApplyAddDealerCardTests
         var (newState, effects) = GameEngine.Apply(DealerTurnState(), new AddDealerCard(4));
         Assert.Single(effects);
         Assert.Contains("Dealer draws 4", ((SendChat)effects[0]).Text);
-        Assert.Equal(2, newState.DealerHand.Cards.Count);
+        Assert.Equal(2, newState.DealerHand.Cards.Length);
     }
 
     [Fact]
@@ -169,9 +169,9 @@ public class ApplyAddDealerCardTests
     public void AddDealerCard_DoesNotMutateInput()
     {
         var state      = DealerTurnState();
-        var origCount  = state.DealerHand.Cards.Count;
+        var origCount  = state.DealerHand.Cards.Length;
         GameEngine.Apply(state, new AddDealerCard(7));
-        Assert.Equal(origCount, state.DealerHand.Cards.Count);
+        Assert.Equal(origCount, state.DealerHand.Cards.Length);
     }
 }
 
@@ -965,11 +965,11 @@ public class ImmutabilityTests
             .Phase(GamePhase.PlayerTurns)
             .Player("Lorah", 5, 6)
             .Build();
-        var originalCardCount = state.Players[0].Hands[0].Cards.Count;
+        var originalCardCount = state.Players[0].Hands[0].Cards.Length;
 
         GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
 
-        Assert.Equal(originalCardCount, state.Players[0].Hands[0].Cards.Count);
+        Assert.Equal(originalCardCount, state.Players[0].Hands[0].Cards.Length);
         Assert.Equal(GamePhase.PlayerTurns, state.Phase);
     }
 }
@@ -1403,7 +1403,7 @@ public class SplitHandTests
     public void SplitHand_CreatesTwoOneCardHands()
     {
         var (ns, _) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0));
-        Assert.Equal(2, ns.Players[0].Hands.Count);
+        Assert.Equal(2, ns.Players[0].Hands.Length);
         Assert.Equal([8], ns.Players[0].Hands[0].Cards.ToArray());
         Assert.Equal([8], ns.Players[0].Hands[1].Cards.ToArray());
     }
@@ -1607,7 +1607,7 @@ public class SplitHandTests
             })
             .Build();
         var (ns, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 5));
-        Assert.Equal(2, ns.Players[0].Hands[0].Cards.Count);
+        Assert.Equal(2, ns.Players[0].Hands[0].Cards.Length);
         Assert.Equal(HandState.Playing, ns.Players[0].Hands[0].State);
         Assert.Equal(0, ns.ActiveHandIndex);
         Assert.DoesNotContain(effects, e => e is AutoHit);

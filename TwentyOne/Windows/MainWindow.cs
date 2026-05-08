@@ -100,7 +100,7 @@ public partial class MainWindow : Window, IDisposable
                     if (!p.TryGetBankingStat(config, out var betStat)) continue;
                     ApplyBank(betStat, new BankBet(betAmt));
                 }
-                for (var i = 0; i < State.Players.Count; i++)
+                for (var i = 0; i < State.Players.Length; i++)
                 {
                     if (State.Players[i].SittingOut) continue;
                     autoDealQueue.Enqueue((false, i, 0, true));
@@ -135,8 +135,8 @@ public partial class MainWindow : Window, IDisposable
                 var parts = step.Split(':');
                 if (parts.Length < 3 || !int.TryParse(parts[1], out var pi) || !int.TryParse(parts[2], out var hi))
                     break;
-                var p    = pi < State.Players.Count ? State.Players[pi] : null;
-                var hand = p != null && hi < p.Hands.Count ? p.Hands[hi] : null;
+                var p    = pi < State.Players.Length ? State.Players[pi] : null;
+                var hand = p != null && hi < p.Hands.Length ? p.Hands[hi] : null;
                 if (p == null || hand == null) break;
                 switch (parts[0])
                 {
@@ -326,7 +326,7 @@ public partial class MainWindow : Window, IDisposable
             && action is BeginPlayerTurns or AdvanceToNextPlayer
             && newState.Phase == GamePhase.PlayerTurns
             && newState.ActivePlayerIndex >= 0
-            && newState.ActivePlayerIndex < newState.Players.Count)
+            && newState.ActivePlayerIndex < newState.Players.Length)
         {
             var ap = newState.Players[newState.ActivePlayerIndex];
             Plugin.TargetPlayer(ap.FullName, ap.World);
@@ -382,7 +382,7 @@ public partial class MainWindow : Window, IDisposable
         var state   = config.GameState;
         var bankNet = 0m;
 
-        for (var pi = 0; pi < state.Players.Count; pi++)
+        for (var pi = 0; pi < state.Players.Length; pi++)
         {
             var p   = state.Players[pi];
             if (p.SittingOut) continue;
@@ -395,7 +395,7 @@ public partial class MainWindow : Window, IDisposable
             stat.DisplayName = p.DisplayName; // refresh in case nickname changed
 
             var net = 0m;
-            for (var hi = 0; hi < p.Hands.Count; hi++)
+            for (var hi = 0; hi < p.Hands.Length; hi++)
                 net += GameEngine.PayoutDelta(state, pi, hi) ?? 0m;
 
             stat.GamesPlayed++;
@@ -405,7 +405,7 @@ public partial class MainWindow : Window, IDisposable
             stat.TotalWon += (long)net;
             if (p.Hands.Any(h => h.State == HandState.Blackjack))
                 stat.Blackjacks++;
-            for (var chi = 0; chi < p.Hands.Count; chi++)
+            for (var chi = 0; chi < p.Hands.Length; chi++)
                 if (GameEngine.GetPayoutResult(state, pi, chi) == PayoutResult.CharlieWin)
                     stat.Charlies++;
 
@@ -414,7 +414,7 @@ public partial class MainWindow : Window, IDisposable
 
         // Auto-settle player banks and snapshot balances after settlement
         var playerBanksSnapshot = new Dictionary<string, long>();
-        for (var pi2 = 0; pi2 < state.Players.Count; pi2++)
+        for (var pi2 = 0; pi2 < state.Players.Length; pi2++)
         {
             var p2  = state.Players[pi2];
             if (p2.SittingOut) continue;
@@ -423,7 +423,7 @@ public partial class MainWindow : Window, IDisposable
             if (stat2.Bank <= 0 && stat2.BankLog.Count == 0) continue;
 
             var net2 = 0m;
-            for (var hi2 = 0; hi2 < p2.Hands.Count; hi2++)
+            for (var hi2 = 0; hi2 < p2.Hands.Length; hi2++)
                 net2 += GameEngine.PayoutTotalOwed(state, pi2, hi2);
             var winAmt2 = (long)Math.Round(net2);
             if (winAmt2 > 0)
@@ -455,11 +455,11 @@ public partial class MainWindow : Window, IDisposable
     private static bool IsTransientSplitState(GameState s)
     {
         if (s.Phase != GamePhase.PlayerTurns || s.WaitingForNextPlayer) return false;
-        if (s.ActivePlayerIndex < 0 || s.ActivePlayerIndex >= s.Players.Count) return false;
+        if (s.ActivePlayerIndex < 0 || s.ActivePlayerIndex >= s.Players.Length) return false;
         var p = s.Players[s.ActivePlayerIndex];
-        if (s.ActiveHandIndex < 0 || s.ActiveHandIndex >= p.Hands.Count) return false;
+        if (s.ActiveHandIndex < 0 || s.ActiveHandIndex >= p.Hands.Length) return false;
         var h = p.Hands[s.ActiveHandIndex];
-        return h.IsFromSplit && h.Cards.Count == 1 && h.State == HandState.Playing;
+        return h.IsFromSplit && h.Cards.Length == 1 && h.State == HandState.Playing;
     }
 
     // A Doubled Playing hand with 2 cards is transient: the next hit always force-stands it.
@@ -467,11 +467,11 @@ public partial class MainWindow : Window, IDisposable
     private static bool IsTransientDoubleState(GameState s)
     {
         if (s.Phase != GamePhase.PlayerTurns || s.WaitingForNextPlayer) return false;
-        if (s.ActivePlayerIndex < 0 || s.ActivePlayerIndex >= s.Players.Count) return false;
+        if (s.ActivePlayerIndex < 0 || s.ActivePlayerIndex >= s.Players.Length) return false;
         var p = s.Players[s.ActivePlayerIndex];
-        if (s.ActiveHandIndex < 0 || s.ActiveHandIndex >= p.Hands.Count) return false;
+        if (s.ActiveHandIndex < 0 || s.ActiveHandIndex >= p.Hands.Length) return false;
         var h = p.Hands[s.ActiveHandIndex];
-        return h.Doubled && h.State == HandState.Playing && h.Cards.Count == 2;
+        return h.Doubled && h.State == HandState.Playing && h.Cards.Length == 2;
     }
 
     // ── Chat / roll ───────────────────────────────────────────────────────────
@@ -598,7 +598,7 @@ public partial class MainWindow : Window, IDisposable
         var hand = State.Players[pi].Hands[hi];
         return Phase switch
         {
-            GamePhase.Deal        => hand.State == HandState.Playing && hand.Cards.Count < 2,
+            GamePhase.Deal        => hand.State == HandState.Playing && hand.Cards.Length < 2,
             GamePhase.PlayerTurns => pi == ActivePlayerIndex && hi == ActiveHandIndex
                                   && GameEngine.CanHit(hand)
                                   && !pendingDouble.HasValue && !pendingSplit.HasValue

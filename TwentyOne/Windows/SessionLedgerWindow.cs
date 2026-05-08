@@ -306,10 +306,10 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             var winners = new List<string>();
             var losers  = new List<string>();
             var pushes  = new List<string>();
-            for (var pi = 0; pi < state.Players.Count; pi++)
+            for (var pi = 0; pi < state.Players.Length; pi++)
             {
                 var p       = state.Players[pi];
-                var results = Enumerable.Range(0, p.Hands.Count)
+                var results = Enumerable.Range(0, p.Hands.Length)
                     .Select(hi => GameEngine.GetPayoutResult(state, pi, hi))
                     .ToList();
                 var anyWin  = results.Any(r2 => r2 is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin);

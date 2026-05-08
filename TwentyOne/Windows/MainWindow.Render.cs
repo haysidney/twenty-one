@@ -23,7 +23,7 @@ public partial class MainWindow
             case HandState.Stand:
                 ImGui.TextColored(GameColors.StandGrey, "Stand"); break;
             case HandState.Playing:
-                if (hand.Cards.Count > 0)
+                if (hand.Cards.Length > 0)
                     ImGui.TextColored(GameColors.PlayingGreen, "Playing");
                 break;
         }
@@ -111,7 +111,7 @@ public partial class MainWindow
         var bankDelta  = 0m;
         var bankCredit = 0m;
         if (Phase == GamePhase.Payout && bankVal > 0)
-            for (var bhi = 0; bhi < player.Hands.Count; bhi++)
+            for (var bhi = 0; bhi < player.Hands.Length; bhi++)
             {
                 var d = GameEngine.PayoutDelta(State, actualIdx, bhi);
                 if (d > 0) bankDelta += d.Value;
@@ -291,7 +291,7 @@ public partial class MainWindow
                     ImGui.SetTooltip(amt.Length > 0 ? $"{lbl} {amt}" : lbl);
                 }
             }
-            if (p.Hands.Count == 1)
+            if (p.Hands.Length == 1)
             {
                 var totalOwed = 0m;
                 var result    = GameEngine.GetPayoutResult(State, pi, 0);
@@ -346,7 +346,7 @@ public partial class MainWindow
 
     private static void DrawCardsCell(Hand hand)
     {
-        if (hand.Cards.Count > 0)
+        if (hand.Cards.Length > 0)
         {
             ImGui.AlignTextToFramePadding();
             ImGui.Text(GameEngine.HandString(hand.Cards));
@@ -481,7 +481,7 @@ public partial class MainWindow
             var grey  = GameColors.StandGrey;
             var sumTotalOwed = 0m;
             var sumNetDelta  = 0m;
-            for (var hh = 0; hh < p.Hands.Count; hh++)
+            for (var hh = 0; hh < p.Hands.Length; hh++)
             {
                 var result = GameEngine.GetPayoutResult(State, pi, hh);
                 var eb     = GameEngine.GetEffectiveBet(p, p.Hands[hh]);
@@ -826,7 +826,7 @@ public partial class MainWindow
 
     private void DrawBankManageWindow(bool uiBusy)
     {
-        if (bankManagePlayerIndex < 0 || bankManagePlayerIndex >= State.Players.Count) return;
+        if (bankManagePlayerIndex < 0 || bankManagePlayerIndex >= State.Players.Length) return;
 
         var bankWinOpen = true;
         var bmp         = State.Players[bankManagePlayerIndex];
@@ -1292,7 +1292,7 @@ public partial class MainWindow
         ImGui.Text("-- Dealer --");
         ImGui.Separator();
 
-        if (State.DealerHand.Cards.Count > 0)
+        if (State.DealerHand.Cards.Length > 0)
         {
             ImGui.AlignTextToFramePadding();
             ImGui.Text(GameEngine.HandString(State.DealerHand.Cards));
@@ -1302,7 +1302,7 @@ public partial class MainWindow
             var scoreStr = GameEngine.ScoreString(State.DealerHand.Cards);
             if (val > 21)
                 ImGui.TextColored(GameColors.BustRed, $"= {scoreStr}  BUST");
-            else if (val == 21 && State.DealerHand.Cards.Count == 2)
+            else if (val == 21 && State.DealerHand.Cards.Length == 2)
                 ImGui.TextColored(GameColors.BlackjackGold, $"= {scoreStr}  Blackjack");
             else
             {
@@ -1322,7 +1322,7 @@ public partial class MainWindow
 
         if (dealerHitActive)
         {
-            if (State.DealerHand.Cards.Count > 0) ImGui.SameLine();
+            if (State.DealerHand.Cards.Length > 0) ImGui.SameLine();
 #if DEBUG
             var _scenDHit = Scenario.IsStep("DealerHit");
             if (!_scenDHit) ImGui.BeginDisabled();
@@ -1367,7 +1367,7 @@ public partial class MainWindow
                             Apply(new SetPlayerBet(idx, val));
                     }
                     isReorderMode  = true;
-                    reorderIndices = Enumerable.Range(0, State.Players.Count).ToList();
+                    reorderIndices = Enumerable.Range(0, State.Players.Length).ToList();
                 }
             }
         }
@@ -1394,20 +1394,20 @@ public partial class MainWindow
             ImGui.TableHeadersRow();
 
             (int A, int B)? reorderSwap = null;
-            for (var pi = 0; pi < State.Players.Count; pi++)
+            for (var pi = 0; pi < State.Players.Length; pi++)
             {
                 var displayPi = isReorderMode ? reorderIndices[pi] : pi;
                 var p         = State.Players[displayPi];
                 if (p.SittingOut) continue;
                 var hasWorld    = p.World.Length > 0;
                 var hasNickname = p.Nickname.Length > 0;
-                var multiHand = p.Hands.Count > 1;
+                var multiHand = p.Hands.Length > 1;
 
                 // ── Summary row for split players ─────────────────────────────
                 if (multiHand)
                     DrawSummaryRow(pi, p, displayPi, hasWorld, hasNickname, uiBusy);
 
-                for (var hi = 0; hi < p.Hands.Count; hi++)
+                for (var hi = 0; hi < p.Hands.Length; hi++)
                 {
                     var hand        = p.Hands[hi];
                     var isFirstHand = hi == 0;
@@ -1439,9 +1439,9 @@ public partial class MainWindow
                         if (ImGui.SmallButton($"\u2191##{pi}reorderUp")) reorderSwap = (pi, pi - 1);
                         if (pi == 0) ImGui.EndDisabled();
                         ImGui.SameLine();
-                        if (pi == State.Players.Count - 1) ImGui.BeginDisabled();
+                        if (pi == State.Players.Length - 1) ImGui.BeginDisabled();
                         if (ImGui.SmallButton($"\u2193##{pi}reorderDown")) reorderSwap = (pi, pi + 1);
-                        if (pi == State.Players.Count - 1) ImGui.EndDisabled();
+                        if (pi == State.Players.Length - 1) ImGui.EndDisabled();
                         ImGui.SameLine();
                         ImGui.AlignTextToFramePadding();
                         ImGui.TextUnformatted(p.DisplayName);
@@ -1617,18 +1617,18 @@ public partial class MainWindow
         ImGui.Spacing();
 
         var dealProgress = Phase == GamePhase.Deal
-            ? $"  (dealer: {State.DealerHand.Cards.Count}/1  players: " +
-              $"{(State.Players.Count > 0 ? State.Players.Min(p => p.Hands[0].Cards.Count) : 0)}-" +
-              $"{(State.Players.Count > 0 ? State.Players.Max(p => p.Hands[0].Cards.Count) : 0)}/2)"
+            ? $"  (dealer: {State.DealerHand.Cards.Length}/1  players: " +
+              $"{(State.Players.Length > 0 ? State.Players.Min(p => p.Hands[0].Cards.Length) : 0)}-" +
+              $"{(State.Players.Length > 0 ? State.Players.Max(p => p.Hands[0].Cards.Length) : 0)}/2)"
             : string.Empty;
         string phaseLabel;
         if (Phase == GamePhase.PlayerTurns
-            && ActivePlayerIndex >= 0 && ActivePlayerIndex < State.Players.Count
+            && ActivePlayerIndex >= 0 && ActivePlayerIndex < State.Players.Length
             && ActiveHandIndex >= 0)
         {
             var ap   = State.Players[ActivePlayerIndex];
-            var ah   = ActiveHandIndex < ap.Hands.Count ? ap.Hands[ActiveHandIndex] : null;
-            var name = ap.Hands.Count > 1 ? $"{ap.DisplayName} (Hand {ActiveHandIndex + 1})" : ap.DisplayName;
+            var ah   = ActiveHandIndex < ap.Hands.Length ? ap.Hands[ActiveHandIndex] : null;
+            var name = ap.Hands.Length > 1 ? $"{ap.DisplayName} (Hand {ActiveHandIndex + 1})" : ap.DisplayName;
             var acts = ah != null
                 ? GameEngine.ValidActionsString(ah, GameEngine.CanDouble(ah, ap.Bet), GameEngine.CanSplit(ah))
                 : string.Empty;
@@ -1669,7 +1669,7 @@ public partial class MainWindow
                     })
                     .Select(x => x.p.DisplayName)
                     .ToList();
-                var canDeal = State.Players.Count > 0
+                var canDeal = State.Players.Length > 0
                            && State.Players.Any(p => !p.SittingOut)
                            && State.Players.Select((p, i) => p.SittingOut || !string.IsNullOrWhiteSpace(effectiveBets[i])).All(x => x)
                            && shortfallPlayers.Count == 0
@@ -1702,7 +1702,7 @@ public partial class MainWindow
                         ApplyBank(betStat, new BankBet(betAmt));
                     }
                     // Queue initial cards: dealer first, then each active player gets both cards in a pair
-                    for (var i = 0; i < State.Players.Count; i++)
+                    for (var i = 0; i < State.Players.Length; i++)
                     {
                         if (State.Players[i].SittingOut) continue;
                         autoDealQueue.Enqueue((false, i, 0, true));   // first card — announce
@@ -1716,7 +1716,7 @@ public partial class MainWindow
 #endif
                 if (!canDeal) ImGui.EndDisabled();
                 if (!canDeal && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                    ImGui.SetTooltip(State.Players.Count == 0
+                    ImGui.SetTooltip(State.Players.Length == 0
                         ? "Add at least one player first."
                         : shortfallPlayers.Count > 0
                             ? $"Bank shortfall — resolve before dealing:\n{string.Join("\n", shortfallPlayers)}"

@@ -84,9 +84,11 @@ internal sealed partial class TradeMonitor
         if (text != "Trade complete." || pendingPartner is null) return new Outcome.None();
 
         var (fullName, world) = pendingPartner.Value;
-        var pi = state.Players.FindIndex(p =>
-            string.Equals(p.FullName, fullName, StringComparison.OrdinalIgnoreCase) &&
-            (world.Length == 0 || string.Equals(p.World, world, StringComparison.OrdinalIgnoreCase)));
+        var pi = Enumerable.Range(0, state.Players.Length)
+            .FirstOrDefault(i =>
+                string.Equals(state.Players[i].FullName, fullName, StringComparison.OrdinalIgnoreCase) &&
+                (world.Length == 0 || string.Equals(state.Players[i].World, world, StringComparison.OrdinalIgnoreCase)),
+            -1);
         var snapTrade = pendingTradeGil;
         var snapGave  = pendingGaveGil;
         Reset();

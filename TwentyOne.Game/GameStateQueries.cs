@@ -27,6 +27,6 @@ public static class GameStateQueries
     /// false for an empty roster — there is no round to evaluate.
     /// </summary>
     public static bool IsAllBust(this GameState s) =>
-        s.Players.Count > 0
+        s.Players.Length > 0
         && s.Players.All(p => p.SittingOut || p.Hands.All(h => h.State == HandState.Bust));
 }

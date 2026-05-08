@@ -234,7 +234,7 @@ public class DebugWindow : Window
         foreach (var sp in file.Players ?? [])
         {
             (state, _) = GameEngine.Apply(state, new AddPlayer(sp.Name));
-            var pi = state.Players.Count - 1;
+            var pi = state.Players.Length - 1;
             if (sp.SittingOut)
                 (state, _) = GameEngine.Apply(state, new ToggleSittingOut(pi));
             else

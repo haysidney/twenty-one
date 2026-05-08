@@ -136,7 +136,7 @@ internal sealed class GameStateBuilder
         {
             Phase                    = _phase,
             DealerHand               = new Hand { Cards = [.._dealerCards], State = _dealerState },
-            Players                  = _players,
+            Players                  = [.._players],
             ActivePlayerIndex        = _activePlayerIndex,
             ActiveHandIndex          = _activeHandIndex,
             FiveCardCharlie          = _fiveCardCharlie,

@@ -103,10 +103,10 @@ public class HistoryWindow : Window
             var losers  = new List<string>();
             var pushes  = new List<string>();
 
-            for (var pi = 0; pi < state.Players.Count; pi++)
+            for (var pi = 0; pi < state.Players.Length; pi++)
             {
                 var p       = state.Players[pi];
-                var results = Enumerable.Range(0, p.Hands.Count)
+                var results = Enumerable.Range(0, p.Hands.Length)
                     .Select(hi => GameEngine.GetPayoutResult(state, pi, hi))
                     .ToList();
 
@@ -177,7 +177,7 @@ public class HistoryWindow : Window
                     var delta    = pbal - prevBal;
                     var deltaStr = delta >= 0 ? $"+{GameEngine.FormatGil(delta)}" : GameEngine.FormatGil(delta);
                     var name     = entry.Snapshot.Players
-                        .Find(pl => (pl.FullName.Length > 0 ? $"{pl.FullName}@{pl.World}" : pl.Nickname) == pkey)
+                        .FirstOrDefault(pl => (pl.FullName.Length > 0 ? $"{pl.FullName}@{pl.World}" : pl.Nickname) == pkey)
                         ?.DisplayName ?? pkey;
                     tip.AppendLine($"  {name}: {GameEngine.FormatGil(pbal)} ({deltaStr})");
                 }
