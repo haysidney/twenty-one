@@ -68,12 +68,13 @@ public sealed class Plugin : IDalamudPlugin
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("TwentyOne");
-    private MainWindow        MainWindow        { get; init; }
-    private ConfigWindow      ConfigWindow      { get; init; }
-    private SessionLedgerWindow SessionLedgerWindow { get; init; }
-    private HistoryWindow     HistoryWindow     { get; init; }
+    private MainWindow             MainWindow             { get; init; }
+    private ConfigWindow           ConfigWindow           { get; init; }
+    private SessionLedgerWindow    SessionLedgerWindow    { get; init; }
+    private HistoryWindow          HistoryWindow          { get; init; }
+    private NarrationEditorWindow  NarrationEditorWindow  { get; init; }
 #if DEBUG
-    private DebugWindow       DebugWindow       { get; init; }
+    private DebugWindow            DebugWindow            { get; init; }
 #endif
 
     public Plugin()
@@ -81,9 +82,10 @@ public sealed class Plugin : IDalamudPlugin
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.EnsureVenues();
 
-        SessionLedgerWindow = new SessionLedgerWindow(Configuration);
-        ConfigWindow        = new ConfigWindow(Configuration, SessionLedgerWindow);
-        MainWindow          = new MainWindow(Configuration, ConfigWindow, SessionLedgerWindow, ChatGui, ObjectTable, TargetManager, ClientState);
+        SessionLedgerWindow   = new SessionLedgerWindow(Configuration);
+        NarrationEditorWindow = new NarrationEditorWindow(Configuration);
+        ConfigWindow          = new ConfigWindow(Configuration, SessionLedgerWindow, NarrationEditorWindow);
+        MainWindow            = new MainWindow(Configuration, ConfigWindow, SessionLedgerWindow, ChatGui, ObjectTable, TargetManager, ClientState);
         HistoryWindow       = new HistoryWindow(Configuration, MainWindow);
         MainWindow.SetHistoryWindow(HistoryWindow);
         SessionLedgerWindow.SetHistoryWindow(HistoryWindow);
@@ -96,6 +98,7 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(SessionLedgerWindow);
         WindowSystem.AddWindow(HistoryWindow);
+        WindowSystem.AddWindow(NarrationEditorWindow);
 #if DEBUG
         WindowSystem.AddWindow(DebugWindow);
 #endif
