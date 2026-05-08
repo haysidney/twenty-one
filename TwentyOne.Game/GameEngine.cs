@@ -363,40 +363,41 @@ public static class GameEngine
         return (-1, -1, allBust ? GamePhase.Payout : GamePhase.DealerTurn);
     }
 
-    // ── Apply ─────────────────────────────────────────────────────────────────
+    // ── Narration context ─────────────────────────────────────────────────────
 
-    public static (GameState State, IReadOnlyList<SideEffect> Effects) Apply(
-        GameState state, GameAction action, NarrationTemplates? templates = null, string dealerName = "Dealer")
+    private sealed record NarrationContext(
+        NarrationTemplates Templates,
+        string             DealerName,
+        List<SideEffect>   Effects)
     {
-        var t       = templates ?? new NarrationTemplates();
-        var effects = new List<SideEffect>();
-        void Narrate(List<List<string>> variants, params (string Key, string Value)[] vars)
+        public void Narrate(List<List<string>> variants, params (string Key, string Value)[] vars)
         {
             if (variants.Count == 0) return;
             var lines = variants[Random.Shared.Next(variants.Count)];
             foreach (var line in lines)
             {
                 var resolved = vars.Length > 0 ? NarrationTemplates.Fmt(line, vars) : line;
-                if (!string.IsNullOrWhiteSpace(resolved)) effects.Add(new SendChat(resolved));
+                if (!string.IsNullOrWhiteSpace(resolved)) Effects.Add(new SendChat(resolved));
             }
         }
-        void NarrateStr(string text)
+
+        public void NarrateStr(string text)
         {
-            if (!string.IsNullOrWhiteSpace(text)) effects.Add(new SendChat(text));
+            if (!string.IsNullOrWhiteSpace(text)) Effects.Add(new SendChat(text));
         }
 
-        void NarratePlayerTurn(int pi, int hi, List<Player> players, Hand dealerHand)
+        public void NarratePlayerTurn(int pi, int hi, List<Player> players, Hand dealerHand)
         {
             if (pi < 0 || pi >= players.Count) return;
             var player = players[pi];
             if (hi < 0 || hi >= player.Hands.Count) return;
             var hand = player.Hands[hi];
-            if (hand.Cards.Count < 2) return; // 1-card split hand — wait for mandatory hit
+            if (hand.Cards.Count < 2) return;
             var cd = CanDouble(hand, player.Bet);
             var cs = CanSplit(hand);
             var actions = ValidActionsString(hand, cd, cs);
             var name = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
-            Narrate(t.PlayerTurnStart,
+            Narrate(Templates.PlayerTurnStart,
                 ("name",        name),
                 ("cards",       HandString(hand.Cards)),
                 ("score",       ScoreString(hand.Cards)),
@@ -405,12 +406,12 @@ public static class GameEngine
                 ("actions",     actions));
         }
 
-        void NarrateDealSummary(GameState s)
+        public void NarrateDealSummary(GameState s)
         {
             var activePlayers = s.ActivePlayers().ToList();
             if (!(s.SkipDealSummaryOnePlayer && activePlayers.Count == 1))
             {
-                var sb = new StringBuilder(t.DealSummaryPrefix);
+                var sb = new StringBuilder(Templates.DealSummaryPrefix);
                 var first = true;
                 for (var i = 0; i < s.Players.Count; i++)
                 {
@@ -419,666 +420,704 @@ public static class GameEngine
                     if (!first) sb.Append(", ");
                     first = false;
                     var hand = p.Hands[0];
-                    sb.Append(NarrationTemplates.Fmt(t.DealSummaryPlayer,
+                    sb.Append(NarrationTemplates.Fmt(Templates.DealSummaryPlayer,
                         ("name",  p.DisplayName),
                         ("cards", HandString(hand.Cards)),
                         ("score", ScoreString(hand.Cards)),
                         ("bj",    hand.State == HandState.Blackjack ? " BJ!" : string.Empty)));
                 }
-                sb.Append(NarrationTemplates.Fmt(t.DealSummaryDealer,
-                    ("dealer", dealerName), ("cards", HandString(s.DealerHand.Cards))));
+                sb.Append(NarrationTemplates.Fmt(Templates.DealSummaryDealer,
+                    ("dealer", DealerName), ("cards", HandString(s.DealerHand.Cards))));
                 NarrateStr(sb.ToString());
             }
-            // Announce natural blackjacks immediately after the deal summary, in player order.
             foreach (var p in s.Players)
             {
                 if (p.SittingOut || p.Hands.Count == 0) continue;
                 var hand = p.Hands[0];
                 if (hand.State == HandState.Blackjack)
-                    Narrate(t.PlayerBJ, ("name", p.DisplayName), ("cards", HandString(hand.Cards)));
+                    Narrate(Templates.PlayerBJ, ("name", p.DisplayName), ("cards", HandString(hand.Cards)));
             }
         }
+    }
 
-        switch (action)
+    // ── Apply ─────────────────────────────────────────────────────────────────
+
+    public static (GameState State, IReadOnlyList<SideEffect> Effects) Apply(
+        GameState state, GameAction action, NarrationTemplates? templates = null, string dealerName = "Dealer")
+    {
+        var t       = templates ?? new NarrationTemplates();
+        var effects = new List<SideEffect>();
+        var ctx = new NarrationContext(t, dealerName, effects);
+
+        var newState = action switch
         {
-            // ── AddDealerCard ────────────────────────────────────────────────
-            case AddDealerCard a:
+            AddDealerCard a          => HandleAddDealerCard(state, a, ctx),
+            AddPlayerCard a          => HandleAddPlayerCard(state, a, ctx),
+            StandPlayer a            => HandleStandPlayer(state, a, ctx),
+            DoubleDown a             => HandleDoubleDown(state, a, ctx),
+            SplitHand a              => HandleSplitHand(state, a, ctx),
+            AnnounceDealerHit        => HandleAnnounceDealerHit(state, ctx),
+            AnnouncePlayerHit a      => HandleAnnouncePlayerHit(state, a, ctx),
+            AnnouncePlayerTurn a     => HandleAnnouncePlayerTurn(state, a, ctx),
+            AnnounceDouble a         => HandleAnnounceDouble(state, a, ctx),
+            AnnounceDoubleConfirm a  => HandleAnnounceDoubleConfirm(state, a, ctx),
+            AnnounceSplit a          => HandleAnnounceSplit(state, a, ctx),
+            AnnounceBettingOpen      => HandleAnnounceBettingOpen(state, ctx),
+            AnnounceBetRequest a     => HandleAnnounceBetRequest(state, a, ctx),
+            AnnounceBetConfirm a     => HandleAnnounceBetConfirm(state, a, ctx),
+            AnnounceBankRemind a     => HandleAnnounceBankRemind(state, a, ctx),
+            AnnounceBankShortfall a  => HandleAnnounceBankShortfall(state, a, ctx),
+            AnnounceBankDeposit a    => HandleAnnounceBankDeposit(state, a, ctx),
+            AnnounceBankWithdraw a   => HandleAnnounceBankWithdraw(state, a, ctx),
+            AnnounceDealerDeal       => HandleAnnounceDealerDeal(state, ctx),
+            AnnouncePlayerDeal a     => HandleAnnouncePlayerDeal(state, a, ctx),
+            StartDeal                => HandleStartDeal(state),
+            BeginPlayerTurns         => HandleBeginPlayerTurns(state, ctx),
+            AdvanceToNextPlayer      => HandleAdvanceToNextPlayer(state, ctx),
+            BeginDealerTurn          => HandleBeginDealerTurn(state, ctx),
+            GoToPayout               => HandleGoToPayout(state, ctx),
+            NewRound                 => HandleNewRound(state),
+            AddPlayer a              => HandleAddPlayer(state, a),
+            RemovePlayer a           => HandleRemovePlayer(state, a),
+            SetPlayerBet a           => HandleSetPlayerBet(state, a),
+            RenamePlayer a           => HandleRenamePlayer(state, a),
+            ToggleSittingOut a       => HandleToggleSittingOut(state, a),
+            ReorderPlayers a         => HandleReorderPlayers(state, a),
+            _                        => state,
+        };
+        return (newState, effects);
+    }
+
+    private static GameState HandleAddDealerCard(GameState state, AddDealerCard a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var dealerName = ctx.DealerName;
+        var newHand = AddCardToHand(state.DealerHand, a.Card);
+        if (state.Phase == GamePhase.DealerTurn)
+        {
+            var cards   = HandString(newHand.Cards);
+            var score   = ScoreString(newHand.Cards);
+            var val     = HandValue(newHand.Cards);
+            var cardLbl = CardLabel(a.Card);
+            if (val > 21)
+                ctx.Narrate(t.DealerBust,
+                    ("dealer", dealerName), ("card", cardLbl), ("cards", cards), ("score", score));
+            else if (newHand.Cards.Count == 2 && val == 21)
+                ctx.Narrate(t.DealerBJ,
+                    ("dealer", dealerName), ("card", cardLbl), ("cards", cards));
+            else
             {
-                var newHand = AddCardToHand(state.DealerHand, a.Card);
-                if (state.Phase == GamePhase.DealerTurn)
-                {
-                    var cards   = HandString(newHand.Cards);
-                    var score   = ScoreString(newHand.Cards);
-                    var val     = HandValue(newHand.Cards);
-                    var cardLbl = CardLabel(a.Card);
-                    if (val > 21)
-                        Narrate(t.DealerBust,
-                            ("dealer", dealerName), ("card", cardLbl), ("cards", cards), ("score", score));
-                    else if (newHand.Cards.Count == 2 && val == 21)
-                        Narrate(t.DealerBJ,
-                            ("dealer", dealerName), ("card", cardLbl), ("cards", cards));
-                    else
-                    {
-                        Narrate(t.DealerHit,
-                            ("dealer", dealerName), ("card", cardLbl), ("cards", cards), ("score", score));
-                        if (DealerRecommendation(newHand) == "STAND")
-                            Narrate(t.DealerStand,
-                                ("dealer", dealerName), ("cards", cards), ("score", score));
-                    }
-                }
-                var newStateD = With(state, dealerHand: newHand);
-                if (state.Phase == GamePhase.Deal && IsDealComplete(newStateD))
-                    NarrateDealSummary(newStateD);
-                return (newStateD, effects);
+                ctx.Narrate(t.DealerHit,
+                    ("dealer", dealerName), ("card", cardLbl), ("cards", cards), ("score", score));
+                if (DealerRecommendation(newHand) == "STAND")
+                    ctx.Narrate(t.DealerStand,
+                        ("dealer", dealerName), ("cards", cards), ("score", score));
             }
-
-            // ── AddPlayerCard ────────────────────────────────────────────────
-            case AddPlayerCard a:
-            {
-                var pi            = a.PlayerIndex;
-                var hi            = a.HandIndex;
-                if (state.Players[pi].SittingOut) return (state, effects);
-                var prevCardCount   = state.Players[pi].Hands[hi].Cards.Count;
-                var fiveCardCharlie = state.FiveCardCharlie != FiveCardCharlieRule.Disabled;
-                var newHand         = AddCardToHand(state.Players[pi].Hands[hi], a.Card, fiveCardCharlie);
-
-                // Forced stand: doubled hand gets exactly one card then stands.
-                // Forced stand: split aces get exactly one card then stand (per standard rules).
-                if (newHand.State == HandState.Playing)
-                {
-                    if (newHand.Doubled)
-                        newHand = SetHandState(newHand, HandState.Stand);
-                    else if (newHand.IsFromSplit && newHand.Cards.Count == 2
-                             && newHand.Cards[0] == 1) // split ace
-                        newHand = SetHandState(newHand, HandState.Stand);
-                }
-
-                var newPlayers = WithPlayer(state.Players, pi, WithHand(state.Players[pi], hi, newHand));
-                var newPhase               = state.Phase;
-                var newActivePi            = state.ActivePlayerIndex;
-                var newActiveHi            = state.ActiveHandIndex;
-                var newWaitingForNextPlayer = false;
-                var newWaitingForDealer     = false;
-
-                if (state.Phase == GamePhase.Deal)
-                {
-                    var newStateP = With(state, players: newPlayers);
-                    if (IsDealComplete(newStateP))
-                        NarrateDealSummary(newStateP);
-                }
-                else if (state.Phase == GamePhase.PlayerTurns)
-                {
-                    var multiHand   = state.Players[pi].Hands.Count > 1;
-                    var displayName = multiHand
-                        ? $"{state.Players[pi].DisplayName} (Hand {hi + 1})"
-                        : state.Players[pi].DisplayName;
-                    var cards   = HandString(newHand.Cards);
-                    var score   = ScoreString(newHand.Cards);
-                    var cardLbl = CardLabel(a.Card);
-
-                    // Narrate the card
-                    if (prevCardCount == 1)
-                    {
-                        // Mandatory 2nd card on a split hand. Only narrate if forced-stood (split ace).
-                        if (newHand.State == HandState.Stand)
-                            Narrate(t.PlayerSplitAce,
-                                ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
-                        // If still Playing, NarratePlayerTurn below serves as the announcement.
-                    }
-                    else if (newHand.State == HandState.Bust)
-                        Narrate(t.PlayerBust,
-                            ("name", displayName), ("cards", cards), ("score", score));
-                    else if (newHand.State == HandState.Blackjack)
-                        Narrate(t.PlayerBJ,
-                            ("name", displayName), ("cards", cards));
-                    else if (newHand.State == HandState.Charlie)
-                        Narrate(t.PlayerCharlie,
-                            ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
-                    else if (newHand.Doubled && newHand.State == HandState.Stand)
-                        Narrate(t.PlayerDouble,
-                            ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
-                    else
-                    {
-                        Narrate(t.PlayerHit,
-                            ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
-                        if (newHand.State == HandState.Playing && pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
-                        {
-                            var cd2 = CanDouble(newHand, state.Players[pi].Bet);
-                            var cs2 = CanSplit(newHand);
-                            Narrate(t.PlayerAfterHit,
-                                ("name",    displayName),
-                                ("cards",   cards),
-                                ("score",   score),
-                                ("actions", ValidActionsString(newHand, cd2, cs2)));
-                        }
-                    }
-
-                    if (pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
-                    {
-                        if (newHand.State != HandState.Playing)
-                        {
-                            var (peekPi, peekHi, peekPhase) = AdvanceFrom(pi, hi, newPlayers);
-                            if (peekPhase is GamePhase.DealerTurn or GamePhase.Payout)
-                            {
-                                newPhase = GamePhase.DealerTurn;
-                                var provisional = With(state, phase: GamePhase.DealerTurn, players: newPlayers);
-                                newWaitingForDealer = !CanGoToPayout(provisional);
-                            }
-                            else if (peekPhase != GamePhase.PlayerTurns)
-                            {
-                                (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
-                            }
-                            else
-                            {
-                                newWaitingForNextPlayer = true;
-                            }
-                        }
-                        else if (prevCardCount == 1)
-                        {
-                            // Split hand now has 2 cards and is Playing — announce the turn.
-                            NarratePlayerTurn(pi, hi, newPlayers, state.DealerHand);
-                        }
-                    }
-                }
-
-                return (With(state, players: newPlayers, phase: newPhase,
-                    activePlayerIndex: newActivePi, activeHandIndex: newActiveHi,
-                    waitingForNextPlayer: newWaitingForNextPlayer,
-                    waitingForDealer: newWaitingForDealer), effects);
-            }
-
-            // ── StandPlayer ──────────────────────────────────────────────────
-            case StandPlayer a:
-            {
-                var pi   = a.PlayerIndex;
-                var hi   = a.HandIndex;
-                var hand = state.Players[pi].Hands[hi];
-                if (hand.State != HandState.Playing) return (state, effects);
-
-                var newHand    = SetHandState(hand, HandState.Stand);
-                var newPlayers = WithPlayer(state.Players, pi, WithHand(state.Players[pi], hi, newHand));
-                var newPhase               = state.Phase;
-                var newActivePi            = state.ActivePlayerIndex;
-                var newActiveHi            = state.ActiveHandIndex;
-                var newWaitingForNextPlayer = false;
-                var newWaitingForDealer     = false;
-
-                if (state.Phase == GamePhase.PlayerTurns)
-                {
-                    var multiHand   = state.Players[pi].Hands.Count > 1;
-                    var displayName = multiHand
-                        ? $"{state.Players[pi].DisplayName} (Hand {hi + 1})"
-                        : state.Players[pi].DisplayName;
-                    Narrate(t.PlayerStand,
-                        ("name",  displayName),
-                        ("cards", HandString(hand.Cards)),
-                        ("score", HandValue(hand.Cards).ToString()));
-
-                    if (pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
-                    {
-                        var (peekPi, peekHi, peekPhase) = AdvanceFrom(pi, hi, newPlayers);
-                        if (peekPhase == GamePhase.DealerTurn)
-                        {
-                            newPhase = GamePhase.DealerTurn;
-                            newWaitingForDealer = true;
-                        }
-                        else if (peekPhase != GamePhase.PlayerTurns)
-                        {
-                            (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
-                        }
-                        else
-                        {
-                            newWaitingForNextPlayer = true;
-                        }
-                    }
-                }
-
-                return (With(state, players: newPlayers, phase: newPhase,
-                    activePlayerIndex: newActivePi, activeHandIndex: newActiveHi,
-                    waitingForNextPlayer: newWaitingForNextPlayer,
-                    waitingForDealer: newWaitingForDealer), effects);
-            }
-
-            // ── DoubleDown ───────────────────────────────────────────────────
-            case DoubleDown a:
-            {
-                var pi     = a.PlayerIndex;
-                var hi     = a.HandIndex;
-                var player = state.Players[pi];
-                var hand   = player.Hands[hi];
-                var bet    = GetEffectiveBet(player, hand);
-                var newBet = (bet * 2).ToString("0.##");
-                var newHand = new Hand
-                {
-                    Cards       = [..hand.Cards],
-                    State       = hand.State,
-                    Doubled     = true,
-                    Bet         = newBet,
-                    IsFromSplit = hand.IsFromSplit,
-                };
-                var newPlayers = WithPlayer(state.Players, pi, WithHand(player, hi, newHand));
-                return (With(state, players: newPlayers), effects);
-            }
-
-            // ── SplitHand ────────────────────────────────────────────────────
-            case SplitHand a:
-            {
-                var pi     = a.PlayerIndex;
-                var hi     = a.HandIndex;
-                var player = state.Players[pi];
-                var hand   = player.Hands[hi];
-                var hand0  = new Hand { Cards = [hand.Cards[0]], State = HandState.Playing, IsFromSplit = true };
-                var hand1  = new Hand { Cards = [hand.Cards[1]], State = HandState.Playing, IsFromSplit = true };
-                var newHands = player.Hands.ToList();
-                newHands[hi] = hand0;
-                newHands.Insert(hi + 1, hand1);
-                var newPlayer  = new Player { Nickname = player.Nickname, FullName = player.FullName, World = player.World, Bet = player.Bet, Hands = newHands, SittingOut = player.SittingOut };
-                var newPlayers = WithPlayer(state.Players, pi, newPlayer);
-                var name       = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
-                Narrate(t.PlayerSplit, ("name", name));
-                var rollName   = $"{player.DisplayName} (Hand {hi + 1})";
-                Narrate(t.PlayerSplitRoll, ("name", rollName));
-                effects.Add(new AutoHit(pi, hi));
-                return (With(state, players: newPlayers, activePlayerIndex: pi, activeHandIndex: hi), effects);
-            }
-
-            // ── AnnounceDealerHit / AnnouncePlayerHit ───────────────────────
-            case AnnounceDealerHit:
-            {
-                var allBJ = state.Players.Count > 0
-                         && state.Players.All(p => p.Hands.All(h => h.State == HandState.Blackjack));
-                var allCharlie = state.Players.Count > 0
-                              && state.Players.All(p => p.Hands.All(h => h.State == HandState.Charlie));
-                var checkBJ = allBJ || (allCharlie && state.FiveCardCharlie == FiveCardCharlieRule.LosesToDealerBJ);
-                Narrate(checkBJ ? t.DealerBJCheck : t.DealerHitAnnounce, ("dealer", dealerName));
-                return (state, effects);
-            }
-
-            case AnnouncePlayerHit a:
-            {
-                var player = state.Players[a.PlayerIndex];
-                var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
-                Narrate(t.PlayerHitAnnounce, ("name", name));
-                return (state, effects);
-            }
-
-            case AnnouncePlayerTurn a:
-            {
-                NarratePlayerTurn(a.PlayerIndex, a.HandIndex, state.Players, state.DealerHand);
-                return (state, effects);
-            }
-
-            // ── AnnounceDouble / AnnounceSplit ───────────────────────────────
-            case AnnounceDouble a:
-            {
-                var player = state.Players[a.PlayerIndex];
-                var hand   = player.Hands[a.HandIndex];
-                var bet    = GetEffectiveBet(player, hand);
-                var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
-                if (a.FromBank)
-                    Narrate(t.PlayerDoubleRequestBank, ("name", name), ("amount", FormatGil(bet)), ("bank", FormatGil(a.BankAfter)));
-                else
-                    // BankAfter holds the shortfall (amount player needs to trade) when !FromBank
-                    Narrate(t.PlayerDoubleRequest, ("name", name), ("amount", $"{a.BankAfter}"));
-                return (state, effects);
-            }
-
-            case AnnounceDoubleConfirm a:
-            {
-                var player = state.Players[a.PlayerIndex];
-                var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
-                Narrate(t.PlayerDoubleConfirm, ("name", name));
-                return (state, effects);
-            }
-
-            case AnnounceSplit a:
-            {
-                var player = state.Players[a.PlayerIndex];
-                var hand   = player.Hands[a.HandIndex];
-                var bet    = GetEffectiveBet(player, hand);
-                var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
-                if (a.FromBank)
-                    Narrate(t.PlayerSplitRequestBank, ("name", name), ("amount", FormatGil(bet)), ("bank", FormatGil(a.BankAfter)));
-                else
-                    // BankAfter holds the shortfall (amount player needs to trade) when !FromBank
-                    Narrate(t.PlayerSplitRequest, ("name", name), ("amount", $"{a.BankAfter}"));
-                return (state, effects);
-            }
-
-            // ── AnnounceBettingOpen ──────────────────────────────────────────
-            case AnnounceBettingOpen:
-                Narrate(t.BettingOpen);
-                return (state, effects);
-
-            // ── AnnounceBetRequest ───────────────────────────────────────────
-            case AnnounceBetRequest a:
-            {
-                var player = state.Players[a.PlayerIndex];
-                Narrate(t.PlayerBetRequest, ("name", player.DisplayName));
-                return (state, effects);
-            }
-
-            // ── AnnounceBetConfirm ───────────────────────────────────────────
-            case AnnounceBetConfirm a:
-            {
-                var player = state.Players[a.PlayerIndex];
-                var betAmt = ParseBet(player.Bet);
-                if (a.Bank > 0)
-                {
-                    var bankAfterBet = Math.Max(0, a.Bank - (long)Math.Ceiling(betAmt));
-                    Narrate(t.PlayerBetConfirmBank,
-                        ("name", player.DisplayName),
-                        ("amount", FormatGil(betAmt)),
-                        ("bank", FormatGil(a.Bank)),
-                        ("bank-after-bet", FormatGil(bankAfterBet)));
-                }
-                else
-                {
-                    Narrate(t.PlayerBetConfirm, ("name", player.DisplayName), ("amount", FormatGil(betAmt)));
-                }
-                return (state, effects);
-            }
-
-            // ── AnnounceBankRemind ───────────────────────────────────────────
-            case AnnounceBankRemind a:
-            {
-                var player = state.Players[a.PlayerIndex];
-                Narrate(t.PlayerBankRemind,
-                    ("name",   player.DisplayName),
-                    ("amount", FormatGil(ParseBet(player.Bet))),
-                    ("bank",   FormatGil(a.Bank)));
-                return (state, effects);
-            }
-
-            // ── AnnounceBankShortfall ────────────────────────────────────────
-            case AnnounceBankShortfall a:
-            {
-                var player = state.Players[a.PlayerIndex];
-                Narrate(t.PlayerBankShortfall,
-                    ("name",   player.DisplayName),
-                    ("amount", $"{a.ShortfallAmount}"));
-                return (state, effects);
-            }
-
-            // ── AnnounceBankDeposit / AnnounceBankWithdraw ───────────────────
-            case AnnounceBankDeposit a:
-            {
-                var player = state.Players[a.PlayerIndex];
-                Narrate(t.PlayerBankDeposit,
-                    ("name",   player.DisplayName),
-                    ("amount", FormatGil(a.Amount)),
-                    ("bank",   FormatGil(a.NewBalance)));
-                return (state, effects);
-            }
-
-            case AnnounceBankWithdraw a:
-            {
-                var player = state.Players[a.PlayerIndex];
-                Narrate(t.PlayerBankWithdraw,
-                    ("name",   player.DisplayName),
-                    ("amount", FormatGil(a.Amount)),
-                    ("bank",   FormatGil(a.NewBalance)));
-                return (state, effects);
-            }
-
-            // ── AnnounceDealerDeal / AnnouncePlayerDeal ──────────────────────
-            case AnnounceDealerDeal:
-                Narrate(t.DealDealerCard, ("dealer", dealerName));
-                return (state, effects);
-
-            case AnnouncePlayerDeal a:
-                Narrate(t.DealPlayerHand, ("name", state.Players[a.PlayerIndex].DisplayName));
-                return (state, effects);
-
-            // ── StartDeal ────────────────────────────────────────────────────
-            case StartDeal:
-                return (With(state, phase: GamePhase.Deal), effects);
-
-            // ── BeginPlayerTurns ─────────────────────────────────────────────
-            case BeginPlayerTurns:
-            {
-                var (nextPi, nextHi, nextPhase) = AdvanceFrom(-1, -1, state.Players);
-
-                if (nextPhase == GamePhase.PlayerTurns
-                    && state.Players[nextPi].Hands[nextHi].State == HandState.Blackjack)
-                {
-                    var (scanPi, scanHi, scanPhase) = AdvanceFrom(nextPi, nextHi, state.Players);
-                    while (scanPhase == GamePhase.PlayerTurns
-                           && state.Players[scanPi].Hands[scanHi].State == HandState.Blackjack)
-                    {
-                        (scanPi, scanHi, scanPhase) = AdvanceFrom(scanPi, scanHi, state.Players);
-                    }
-
-                    if (scanPhase == GamePhase.DealerTurn || scanPhase == GamePhase.Payout)
-                    {
-                        var provDealer = With(state, phase: GamePhase.DealerTurn);
-                        var nwWait = scanPhase == GamePhase.DealerTurn && !CanGoToPayout(provDealer);
-                        return (With(state, phase: scanPhase, activePlayerIndex: scanPi, activeHandIndex: scanHi,
-                            waitingForDealer: nwWait, waitingForNextPlayer: false), effects);
-                    }
-
-                    var hand = state.Players[nextPi].Hands[nextHi];
-                    var name = state.Players[nextPi].Hands.Count > 1
-                        ? $"{state.Players[nextPi].DisplayName} (Hand {nextHi + 1})"
-                        : state.Players[nextPi].DisplayName;
-                    if (state.Players.Count > 1)
-                        Narrate(t.PlayerBJMovingAlong, ("name", name), ("cards", HandString(hand.Cards)));
-                    return (With(state, phase: GamePhase.PlayerTurns, activePlayerIndex: nextPi, activeHandIndex: nextHi,
-                        waitingForDealer: false, waitingForNextPlayer: true), effects);
-                }
-
-                var provisionalDealer = With(state, phase: GamePhase.DealerTurn);
-                var waitDealer = nextPhase == GamePhase.DealerTurn && !CanGoToPayout(provisionalDealer);
-                var waitNext   = false;
-                if (nextPhase == GamePhase.PlayerTurns)
-                    NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
-                if (waitDealer) nextPhase = GamePhase.DealerTurn;
-                return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
-                    waitingForDealer: waitDealer, waitingForNextPlayer: waitNext), effects);
-            }
-
-            // ── AdvanceToNextPlayer ──────────────────────────────────────────
-            case AdvanceToNextPlayer:
-            {
-                if (!state.WaitingForNextPlayer) return (state, effects);
-                var (nextPi, nextHi, nextPhase) = AdvanceFrom(
-                    state.ActivePlayerIndex, state.ActiveHandIndex, state.Players);
-                if (nextPhase == GamePhase.PlayerTurns)
-                {
-                    var nextHand = state.Players[nextPi].Hands[nextHi];
-                    if (nextHand.Cards.Count == 1)
-                    {
-                        var advPlayer  = state.Players[nextPi];
-                        var advName    = $"{advPlayer.DisplayName} (Hand {nextHi + 1})";
-                        Narrate(t.PlayerSplitRoll, ("name", advName));
-                        effects.Add(new AutoHit(nextPi, nextHi));
-                    }
-                    else if (nextHand.State == HandState.Blackjack)
-                    {
-                        var name = state.Players[nextPi].Hands.Count > 1
-                            ? $"{state.Players[nextPi].DisplayName} (Hand {nextHi + 1})"
-                            : state.Players[nextPi].DisplayName;
-                        if (state.Players.Count > 1)
-                            Narrate(t.PlayerBJMovingAlong, ("name", name), ("cards", HandString(nextHand.Cards)));
-                        return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
-                            waitingForNextPlayer: true), effects);
-                    }
-                    else
-                        NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
-                }
-                else if (nextPhase == GamePhase.DealerTurn)
-                {
-                    var provisional = With(state, phase: GamePhase.DealerTurn);
-                    var needWait    = !CanGoToPayout(provisional);
-                    return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
-                        waitingForNextPlayer: false, waitingForDealer: needWait), effects);
-                }
-                return (With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
-                    waitingForNextPlayer: false), effects);
-            }
-
-            // ── BeginDealerTurn ──────────────────────────────────────────────
-            case BeginDealerTurn:
-            {
-                if (!state.WaitingForDealer) return (state, effects);
-                Narrate(t.DealerTurnStart,
-                    ("dealer", dealerName),
-                    ("cards", HandString(state.DealerHand.Cards)),
-                    ("score", ScoreString(state.DealerHand.Cards)));
-                return (With(state, waitingForDealer: false), effects);
-            }
-
-            // ── GoToPayout ───────────────────────────────────────────────────
-            case GoToPayout:
-            {
-                Narrate(t.PayoutHeader);
-                var dealerScore = HandValue(state.DealerHand.Cards);
-                var dealerBust  = state.DealerHand.Cards.Count > 0 && dealerScore > 21;
-                Narrate(dealerBust ? t.PayoutDealerBust : t.PayoutDealerStands,
-                    ("dealer", dealerName), ("score", dealerBust ? dealerScore.ToString() : ScoreString(state.DealerHand.Cards)));
-
-                for (var pi = 0; pi < state.Players.Count; pi++)
-                {
-                    var p         = state.Players[pi];
-                    if (p.SittingOut) continue;
-                    var multiHand = p.Hands.Count > 1;
-
-                    // For split hands where every hand wins, emit one combined line.
-                    var allWin = multiHand && p.Hands
-                        .Select((_, hi) => GetPayoutResult(state, pi, hi))
-                        .All(r => r == PayoutResult.Win || r == PayoutResult.BjWin || r == PayoutResult.CharlieWin);
-                    if (allWin)
-                    {
-                        var total = 0m;
-                        for (var hi = 0; hi < p.Hands.Count; hi++)
-                        {
-                            var eb = GetEffectiveBet(p, p.Hands[hi]);
-                            total += GetPayoutResult(state, pi, hi) switch
-                            {
-                                PayoutResult.BjWin      => Math.Ceiling(eb * BjMultiplier(state.BjPayout)),
-                                PayoutResult.CharlieWin => Math.Ceiling(eb * CharlieMultiplier(state.CharliePayout)),
-                                _                       => eb,
-                            };
-                        }
-                        var amtStr = total > 0 ? $"+{total:0.##}" : string.Empty;
-                        Narrate(t.PayoutSplitCombined,
-                            ("name",   p.DisplayName),
-                            ("amount", amtStr));
-                        continue;
-                    }
-
-                    for (var hi = 0; hi < p.Hands.Count; hi++)
-                    {
-                        var result = GetPayoutResult(state, pi, hi);
-                        var template = result switch
-                        {
-                            PayoutResult.Win        => t.PayoutWin,
-                            PayoutResult.BjWin      => t.PayoutBjWin,
-                            PayoutResult.CharlieWin => t.PayoutCharlieWin,
-                            PayoutResult.Lose       => t.PayoutLose,
-                            PayoutResult.Push       => t.PayoutPush,
-                            _                       => null,
-                        };
-                        if (template == null) continue;
-
-                        var effectiveBet = GetEffectiveBet(p, p.Hands[hi]);
-                        var amount       = PayoutAmountString(state, pi, hi);
-                        var betStr       = effectiveBet > 0
-                            ? FormatGil(effectiveBet)
-                            : string.Empty;
-                        var amountStr    = amount;
-                        var name         = multiHand ? $"{p.DisplayName} (Hand {hi + 1})" : p.DisplayName;
-                        Narrate(template,
-                            ("name",   name),
-                            ("bet",    betStr),
-                            ("amount", amountStr));
-                    }
-                }
-
-                var winners = new HashSet<string>(
-                    state.Players
-                         .Where((p, pi) => p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
-                                            .Any(r => r is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin))
-                         .Select(p => p.FullName.Length > 0 ? p.FullName : p.Nickname));
-                var pushers = new HashSet<string>(
-                    state.Players
-                         .Where((p, pi) => p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
-                                            .Any(r => r == PayoutResult.Push)
-                                        && !p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
-                                            .Any(r => r is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin))
-                         .Select(p => p.FullName.Length > 0 ? p.FullName : p.Nickname));
-                return (With(state, phase: GamePhase.Payout, lastRoundWinners: winners, lastRoundPushers: pushers), effects);
-            }
-
-            // ── NewRound ─────────────────────────────────────────────────────
-            case NewRound:
-                return (new GameState
-                {
-                    Players = state.Players.Select(p => new Player
-                    {
-                        Nickname   = p.Nickname,
-                        FullName   = p.FullName,
-                        World      = p.World,
-                        Bet        = p.Bet,
-                        SittingOut = p.SittingOut,
-                        Hands      = [new Hand()],
-                    }).ToList(),
-                    DealerHand        = new Hand(),
-                    Phase             = GamePhase.Betting,
-                    ActivePlayerIndex = -1,
-                    ActiveHandIndex   = -1,
-                    BjPayout                 = state.BjPayout,
-                    FiveCardCharlie          = state.FiveCardCharlie,
-                    LastRoundWinners         = state.LastRoundWinners,
-                    LastRoundPushers         = state.LastRoundPushers,
-                    SkipDealSummaryOnePlayer = state.SkipDealSummaryOnePlayer,
-                }, effects);
-
-            // ── Roster management ────────────────────────────────────────────
-            case AddPlayer a:
-                return (With(state, players:
-                    [..state.Players, new Player { Nickname = a.Nickname, FullName = a.FullName, World = a.World, Hands = [new Hand()] }]), effects);
-
-            case RemovePlayer a:
-            {
-                var newPlayers = state.Players.Where((_, i) => i != a.Index).ToList();
-                var newActive  = state.ActivePlayerIndex >= newPlayers.Count
-                                     ? newPlayers.Count - 1
-                                     : state.ActivePlayerIndex;
-                return (With(state, players: newPlayers, activePlayerIndex: newActive), effects);
-            }
-
-            case SetPlayerBet a:
-            {
-                var p = state.Players[a.PlayerIndex];
-                return (With(state, players: WithPlayer(state.Players, a.PlayerIndex,
-                    new Player { Nickname = p.Nickname, FullName = p.FullName, World = p.World, Bet = a.Bet, Hands = p.Hands, SittingOut = p.SittingOut })), effects);
-            }
-
-            case RenamePlayer a:
-            {
-                var p = state.Players[a.PlayerIndex];
-                return (With(state, players: WithPlayer(state.Players, a.PlayerIndex,
-                    new Player { Nickname = a.Nickname, FullName = p.FullName, World = p.World, Bet = p.Bet, Hands = p.Hands, SittingOut = p.SittingOut })), effects);
-            }
-
-            case ToggleSittingOut a:
-            {
-                if (state.Phase != GamePhase.Betting) return (state, effects);
-                var p = state.Players[a.PlayerIndex];
-                return (With(state, players: WithPlayer(state.Players, a.PlayerIndex,
-                    new Player { Nickname = p.Nickname, FullName = p.FullName, World = p.World, Bet = p.Bet, Hands = p.Hands, SittingOut = !p.SittingOut })), effects);
-            }
-
-            case ReorderPlayers a:
-            {
-                if (state.Phase != GamePhase.Betting) return (state, effects);
-                var newPlayers = a.NewOrder.Select(i => state.Players[i]).ToList();
-                return (With(state, players: newPlayers), effects);
-            }
-
-            default:
-                return (state, effects);
         }
+        var newStateD = With(state, dealerHand: newHand);
+        if (state.Phase == GamePhase.Deal && IsDealComplete(newStateD))
+            ctx.NarrateDealSummary(newStateD);
+        return newStateD;
+    }
+
+    private static GameState HandleAddPlayerCard(GameState state, AddPlayerCard a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var pi            = a.PlayerIndex;
+        var hi            = a.HandIndex;
+        if (state.Players[pi].SittingOut) return state;
+        var prevCardCount   = state.Players[pi].Hands[hi].Cards.Count;
+        var fiveCardCharlie = state.FiveCardCharlie != FiveCardCharlieRule.Disabled;
+        var newHand         = AddCardToHand(state.Players[pi].Hands[hi], a.Card, fiveCardCharlie);
+
+        if (newHand.State == HandState.Playing)
+        {
+            if (newHand.Doubled)
+                newHand = SetHandState(newHand, HandState.Stand);
+            else if (newHand.IsFromSplit && newHand.Cards.Count == 2
+                     && newHand.Cards[0] == 1)
+                newHand = SetHandState(newHand, HandState.Stand);
+        }
+
+        var newPlayers = WithPlayer(state.Players, pi, WithHand(state.Players[pi], hi, newHand));
+        var newPhase               = state.Phase;
+        var newActivePi            = state.ActivePlayerIndex;
+        var newActiveHi            = state.ActiveHandIndex;
+        var newWaitingForNextPlayer = false;
+        var newWaitingForDealer     = false;
+
+        if (state.Phase == GamePhase.Deal)
+        {
+            var newStateP = With(state, players: newPlayers);
+            if (IsDealComplete(newStateP))
+                ctx.NarrateDealSummary(newStateP);
+        }
+        else if (state.Phase == GamePhase.PlayerTurns)
+        {
+            var multiHand   = state.Players[pi].Hands.Count > 1;
+            var displayName = multiHand
+                ? $"{state.Players[pi].DisplayName} (Hand {hi + 1})"
+                : state.Players[pi].DisplayName;
+            var cards   = HandString(newHand.Cards);
+            var score   = ScoreString(newHand.Cards);
+            var cardLbl = CardLabel(a.Card);
+
+            if (prevCardCount == 1)
+            {
+                if (newHand.State == HandState.Stand)
+                    ctx.Narrate(t.PlayerSplitAce,
+                        ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
+            }
+            else if (newHand.State == HandState.Bust)
+                ctx.Narrate(t.PlayerBust,
+                    ("name", displayName), ("cards", cards), ("score", score));
+            else if (newHand.State == HandState.Blackjack)
+                ctx.Narrate(t.PlayerBJ,
+                    ("name", displayName), ("cards", cards));
+            else if (newHand.State == HandState.Charlie)
+                ctx.Narrate(t.PlayerCharlie,
+                    ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
+            else if (newHand.Doubled && newHand.State == HandState.Stand)
+                ctx.Narrate(t.PlayerDouble,
+                    ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
+            else
+            {
+                ctx.Narrate(t.PlayerHit,
+                    ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
+                if (newHand.State == HandState.Playing && pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
+                {
+                    var cd2 = CanDouble(newHand, state.Players[pi].Bet);
+                    var cs2 = CanSplit(newHand);
+                    ctx.Narrate(t.PlayerAfterHit,
+                        ("name",    displayName),
+                        ("cards",   cards),
+                        ("score",   score),
+                        ("actions", ValidActionsString(newHand, cd2, cs2)));
+                }
+            }
+
+            if (pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
+            {
+                if (newHand.State != HandState.Playing)
+                {
+                    var (peekPi, peekHi, peekPhase) = AdvanceFrom(pi, hi, newPlayers);
+                    if (peekPhase is GamePhase.DealerTurn or GamePhase.Payout)
+                    {
+                        newPhase = GamePhase.DealerTurn;
+                        var provisional = With(state, phase: GamePhase.DealerTurn, players: newPlayers);
+                        newWaitingForDealer = !CanGoToPayout(provisional);
+                    }
+                    else if (peekPhase != GamePhase.PlayerTurns)
+                    {
+                        (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
+                    }
+                    else
+                    {
+                        newWaitingForNextPlayer = true;
+                    }
+                }
+                else if (prevCardCount == 1)
+                {
+                    ctx.NarratePlayerTurn(pi, hi, newPlayers, state.DealerHand);
+                }
+            }
+        }
+
+        return With(state, players: newPlayers, phase: newPhase,
+            activePlayerIndex: newActivePi, activeHandIndex: newActiveHi,
+            waitingForNextPlayer: newWaitingForNextPlayer,
+            waitingForDealer: newWaitingForDealer);
+    }
+
+    private static GameState HandleStandPlayer(GameState state, StandPlayer a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var pi   = a.PlayerIndex;
+        var hi   = a.HandIndex;
+        var hand = state.Players[pi].Hands[hi];
+        if (hand.State != HandState.Playing) return state;
+
+        var newHand    = SetHandState(hand, HandState.Stand);
+        var newPlayers = WithPlayer(state.Players, pi, WithHand(state.Players[pi], hi, newHand));
+        var newPhase               = state.Phase;
+        var newActivePi            = state.ActivePlayerIndex;
+        var newActiveHi            = state.ActiveHandIndex;
+        var newWaitingForNextPlayer = false;
+        var newWaitingForDealer     = false;
+
+        if (state.Phase == GamePhase.PlayerTurns)
+        {
+            var multiHand   = state.Players[pi].Hands.Count > 1;
+            var displayName = multiHand
+                ? $"{state.Players[pi].DisplayName} (Hand {hi + 1})"
+                : state.Players[pi].DisplayName;
+            ctx.Narrate(t.PlayerStand,
+                ("name",  displayName),
+                ("cards", HandString(hand.Cards)),
+                ("score", HandValue(hand.Cards).ToString()));
+
+            if (pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
+            {
+                var (peekPi, peekHi, peekPhase) = AdvanceFrom(pi, hi, newPlayers);
+                if (peekPhase == GamePhase.DealerTurn)
+                {
+                    newPhase = GamePhase.DealerTurn;
+                    newWaitingForDealer = true;
+                }
+                else if (peekPhase != GamePhase.PlayerTurns)
+                {
+                    (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
+                }
+                else
+                {
+                    newWaitingForNextPlayer = true;
+                }
+            }
+        }
+
+        return With(state, players: newPlayers, phase: newPhase,
+            activePlayerIndex: newActivePi, activeHandIndex: newActiveHi,
+            waitingForNextPlayer: newWaitingForNextPlayer,
+            waitingForDealer: newWaitingForDealer);
+    }
+
+    private static GameState HandleDoubleDown(GameState state, DoubleDown a, NarrationContext ctx)
+    {
+        var pi     = a.PlayerIndex;
+        var hi     = a.HandIndex;
+        var player = state.Players[pi];
+        var hand   = player.Hands[hi];
+        var bet    = GetEffectiveBet(player, hand);
+        var newBet = (bet * 2).ToString("0.##");
+        var newHand = new Hand
+        {
+            Cards       = [..hand.Cards],
+            State       = hand.State,
+            Doubled     = true,
+            Bet         = newBet,
+            IsFromSplit = hand.IsFromSplit,
+        };
+        var newPlayers = WithPlayer(state.Players, pi, WithHand(player, hi, newHand));
+        return With(state, players: newPlayers);
+    }
+
+    private static GameState HandleSplitHand(GameState state, SplitHand a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var pi     = a.PlayerIndex;
+        var hi     = a.HandIndex;
+        var player = state.Players[pi];
+        var hand   = player.Hands[hi];
+        var hand0  = new Hand { Cards = [hand.Cards[0]], State = HandState.Playing, IsFromSplit = true };
+        var hand1  = new Hand { Cards = [hand.Cards[1]], State = HandState.Playing, IsFromSplit = true };
+        var newHands = player.Hands.ToList();
+        newHands[hi] = hand0;
+        newHands.Insert(hi + 1, hand1);
+        var newPlayer  = new Player { Nickname = player.Nickname, FullName = player.FullName, World = player.World, Bet = player.Bet, Hands = newHands, SittingOut = player.SittingOut };
+        var newPlayers = WithPlayer(state.Players, pi, newPlayer);
+        var name       = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
+        ctx.Narrate(t.PlayerSplit, ("name", name));
+        var rollName   = $"{player.DisplayName} (Hand {hi + 1})";
+        ctx.Narrate(t.PlayerSplitRoll, ("name", rollName));
+        ctx.Effects.Add(new AutoHit(pi, hi));
+        return With(state, players: newPlayers, activePlayerIndex: pi, activeHandIndex: hi);
+    }
+
+    private static GameState HandleAnnounceDealerHit(GameState state, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var allBJ = state.Players.Count > 0
+                 && state.Players.All(p => p.Hands.All(h => h.State == HandState.Blackjack));
+        var allCharlie = state.Players.Count > 0
+                      && state.Players.All(p => p.Hands.All(h => h.State == HandState.Charlie));
+        var checkBJ = allBJ || (allCharlie && state.FiveCardCharlie == FiveCardCharlieRule.LosesToDealerBJ);
+        ctx.Narrate(checkBJ ? t.DealerBJCheck : t.DealerHitAnnounce, ("dealer", ctx.DealerName));
+        return state;
+    }
+
+    private static GameState HandleAnnouncePlayerHit(GameState state, AnnouncePlayerHit a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
+        ctx.Narrate(t.PlayerHitAnnounce, ("name", name));
+        return state;
+    }
+
+    private static GameState HandleAnnouncePlayerTurn(GameState state, AnnouncePlayerTurn a, NarrationContext ctx)
+    {
+        ctx.NarratePlayerTurn(a.PlayerIndex, a.HandIndex, state.Players, state.DealerHand);
+        return state;
+    }
+
+    private static GameState HandleAnnounceDouble(GameState state, AnnounceDouble a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        var hand   = player.Hands[a.HandIndex];
+        var bet    = GetEffectiveBet(player, hand);
+        var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
+        if (a.FromBank)
+            ctx.Narrate(t.PlayerDoubleRequestBank, ("name", name), ("amount", FormatGil(bet)), ("bank", FormatGil(a.BankAfter)));
+        else
+            ctx.Narrate(t.PlayerDoubleRequest, ("name", name), ("amount", $"{a.BankAfter}"));
+        return state;
+    }
+
+    private static GameState HandleAnnounceDoubleConfirm(GameState state, AnnounceDoubleConfirm a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
+        ctx.Narrate(t.PlayerDoubleConfirm, ("name", name));
+        return state;
+    }
+
+    private static GameState HandleAnnounceSplit(GameState state, AnnounceSplit a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        var hand   = player.Hands[a.HandIndex];
+        var bet    = GetEffectiveBet(player, hand);
+        var name   = player.Hands.Count > 1 ? $"{player.DisplayName} (Hand {a.HandIndex + 1})" : player.DisplayName;
+        if (a.FromBank)
+            ctx.Narrate(t.PlayerSplitRequestBank, ("name", name), ("amount", FormatGil(bet)), ("bank", FormatGil(a.BankAfter)));
+        else
+            ctx.Narrate(t.PlayerSplitRequest, ("name", name), ("amount", $"{a.BankAfter}"));
+        return state;
+    }
+
+    private static GameState HandleAnnounceBettingOpen(GameState state, NarrationContext ctx)
+    {
+        ctx.Narrate(ctx.Templates.BettingOpen);
+        return state;
+    }
+
+    private static GameState HandleAnnounceBetRequest(GameState state, AnnounceBetRequest a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        ctx.Narrate(t.PlayerBetRequest, ("name", player.DisplayName));
+        return state;
+    }
+
+    private static GameState HandleAnnounceBetConfirm(GameState state, AnnounceBetConfirm a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        var betAmt = ParseBet(player.Bet);
+        if (a.Bank > 0)
+        {
+            var bankAfterBet = Math.Max(0, a.Bank - (long)Math.Ceiling(betAmt));
+            ctx.Narrate(t.PlayerBetConfirmBank,
+                ("name", player.DisplayName),
+                ("amount", FormatGil(betAmt)),
+                ("bank", FormatGil(a.Bank)),
+                ("bank-after-bet", FormatGil(bankAfterBet)));
+        }
+        else
+        {
+            ctx.Narrate(t.PlayerBetConfirm, ("name", player.DisplayName), ("amount", FormatGil(betAmt)));
+        }
+        return state;
+    }
+
+    private static GameState HandleAnnounceBankRemind(GameState state, AnnounceBankRemind a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        ctx.Narrate(t.PlayerBankRemind,
+            ("name",   player.DisplayName),
+            ("amount", FormatGil(ParseBet(player.Bet))),
+            ("bank",   FormatGil(a.Bank)));
+        return state;
+    }
+
+    private static GameState HandleAnnounceBankShortfall(GameState state, AnnounceBankShortfall a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        ctx.Narrate(t.PlayerBankShortfall,
+            ("name",   player.DisplayName),
+            ("amount", $"{a.ShortfallAmount}"));
+        return state;
+    }
+
+    private static GameState HandleAnnounceBankDeposit(GameState state, AnnounceBankDeposit a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        ctx.Narrate(t.PlayerBankDeposit,
+            ("name",   player.DisplayName),
+            ("amount", FormatGil(a.Amount)),
+            ("bank",   FormatGil(a.NewBalance)));
+        return state;
+    }
+
+    private static GameState HandleAnnounceBankWithdraw(GameState state, AnnounceBankWithdraw a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        ctx.Narrate(t.PlayerBankWithdraw,
+            ("name",   player.DisplayName),
+            ("amount", FormatGil(a.Amount)),
+            ("bank",   FormatGil(a.NewBalance)));
+        return state;
+    }
+
+    private static GameState HandleAnnounceDealerDeal(GameState state, NarrationContext ctx)
+    {
+        ctx.Narrate(ctx.Templates.DealDealerCard, ("dealer", ctx.DealerName));
+        return state;
+    }
+
+    private static GameState HandleAnnouncePlayerDeal(GameState state, AnnouncePlayerDeal a, NarrationContext ctx)
+    {
+        ctx.Narrate(ctx.Templates.DealPlayerHand, ("name", state.Players[a.PlayerIndex].DisplayName));
+        return state;
+    }
+
+    private static GameState HandleStartDeal(GameState state) =>
+        With(state, phase: GamePhase.Deal);
+
+    private static GameState HandleBeginPlayerTurns(GameState state, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var (nextPi, nextHi, nextPhase) = AdvanceFrom(-1, -1, state.Players);
+
+        if (nextPhase == GamePhase.PlayerTurns
+            && state.Players[nextPi].Hands[nextHi].State == HandState.Blackjack)
+        {
+            var (scanPi, scanHi, scanPhase) = AdvanceFrom(nextPi, nextHi, state.Players);
+            while (scanPhase == GamePhase.PlayerTurns
+                   && state.Players[scanPi].Hands[scanHi].State == HandState.Blackjack)
+            {
+                (scanPi, scanHi, scanPhase) = AdvanceFrom(scanPi, scanHi, state.Players);
+            }
+
+            if (scanPhase == GamePhase.DealerTurn || scanPhase == GamePhase.Payout)
+            {
+                var provDealer = With(state, phase: GamePhase.DealerTurn);
+                var nwWait = scanPhase == GamePhase.DealerTurn && !CanGoToPayout(provDealer);
+                return With(state, phase: scanPhase, activePlayerIndex: scanPi, activeHandIndex: scanHi,
+                    waitingForDealer: nwWait, waitingForNextPlayer: false);
+            }
+
+            var hand = state.Players[nextPi].Hands[nextHi];
+            var name = state.Players[nextPi].Hands.Count > 1
+                ? $"{state.Players[nextPi].DisplayName} (Hand {nextHi + 1})"
+                : state.Players[nextPi].DisplayName;
+            if (state.Players.Count > 1)
+                ctx.Narrate(t.PlayerBJMovingAlong, ("name", name), ("cards", HandString(hand.Cards)));
+            return With(state, phase: GamePhase.PlayerTurns, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+                waitingForDealer: false, waitingForNextPlayer: true);
+        }
+
+        var provisionalDealer = With(state, phase: GamePhase.DealerTurn);
+        var waitDealer = nextPhase == GamePhase.DealerTurn && !CanGoToPayout(provisionalDealer);
+        var waitNext   = false;
+        if (nextPhase == GamePhase.PlayerTurns)
+            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
+        if (waitDealer) nextPhase = GamePhase.DealerTurn;
+        return With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+            waitingForDealer: waitDealer, waitingForNextPlayer: waitNext);
+    }
+
+    private static GameState HandleAdvanceToNextPlayer(GameState state, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        if (!state.WaitingForNextPlayer) return state;
+        var (nextPi, nextHi, nextPhase) = AdvanceFrom(
+            state.ActivePlayerIndex, state.ActiveHandIndex, state.Players);
+        if (nextPhase == GamePhase.PlayerTurns)
+        {
+            var nextHand = state.Players[nextPi].Hands[nextHi];
+            if (nextHand.Cards.Count == 1)
+            {
+                var advPlayer  = state.Players[nextPi];
+                var advName    = $"{advPlayer.DisplayName} (Hand {nextHi + 1})";
+                ctx.Narrate(t.PlayerSplitRoll, ("name", advName));
+                ctx.Effects.Add(new AutoHit(nextPi, nextHi));
+            }
+            else if (nextHand.State == HandState.Blackjack)
+            {
+                var name = state.Players[nextPi].Hands.Count > 1
+                    ? $"{state.Players[nextPi].DisplayName} (Hand {nextHi + 1})"
+                    : state.Players[nextPi].DisplayName;
+                if (state.Players.Count > 1)
+                    ctx.Narrate(t.PlayerBJMovingAlong, ("name", name), ("cards", HandString(nextHand.Cards)));
+                return With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+                    waitingForNextPlayer: true);
+            }
+            else
+                ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
+        }
+        else if (nextPhase == GamePhase.DealerTurn)
+        {
+            var provisional = With(state, phase: GamePhase.DealerTurn);
+            var needWait    = !CanGoToPayout(provisional);
+            return With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+                waitingForNextPlayer: false, waitingForDealer: needWait);
+        }
+        return With(state, phase: nextPhase, activePlayerIndex: nextPi, activeHandIndex: nextHi,
+            waitingForNextPlayer: false);
+    }
+
+    private static GameState HandleBeginDealerTurn(GameState state, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        if (!state.WaitingForDealer) return state;
+        ctx.Narrate(t.DealerTurnStart,
+            ("dealer", ctx.DealerName),
+            ("cards", HandString(state.DealerHand.Cards)),
+            ("score", ScoreString(state.DealerHand.Cards)));
+        return With(state, waitingForDealer: false);
+    }
+
+    private static GameState HandleGoToPayout(GameState state, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var dealerName = ctx.DealerName;
+        ctx.Narrate(t.PayoutHeader);
+        var dealerScore = HandValue(state.DealerHand.Cards);
+        var dealerBust  = state.DealerHand.Cards.Count > 0 && dealerScore > 21;
+        ctx.Narrate(dealerBust ? t.PayoutDealerBust : t.PayoutDealerStands,
+            ("dealer", dealerName), ("score", dealerBust ? dealerScore.ToString() : ScoreString(state.DealerHand.Cards)));
+
+        for (var pi = 0; pi < state.Players.Count; pi++)
+        {
+            var p         = state.Players[pi];
+            if (p.SittingOut) continue;
+            var multiHand = p.Hands.Count > 1;
+
+            var allWin = multiHand && p.Hands
+                .Select((_, hi) => GetPayoutResult(state, pi, hi))
+                .All(r => r == PayoutResult.Win || r == PayoutResult.BjWin || r == PayoutResult.CharlieWin);
+            if (allWin)
+            {
+                var total = 0m;
+                for (var hi = 0; hi < p.Hands.Count; hi++)
+                {
+                    var eb = GetEffectiveBet(p, p.Hands[hi]);
+                    total += GetPayoutResult(state, pi, hi) switch
+                    {
+                        PayoutResult.BjWin      => Math.Ceiling(eb * BjMultiplier(state.BjPayout)),
+                        PayoutResult.CharlieWin => Math.Ceiling(eb * CharlieMultiplier(state.CharliePayout)),
+                        _                       => eb,
+                    };
+                }
+                var amtStr = total > 0 ? $"+{total:0.##}" : string.Empty;
+                ctx.Narrate(t.PayoutSplitCombined,
+                    ("name",   p.DisplayName),
+                    ("amount", amtStr));
+                continue;
+            }
+
+            for (var hi = 0; hi < p.Hands.Count; hi++)
+            {
+                var result = GetPayoutResult(state, pi, hi);
+                var template = result switch
+                {
+                    PayoutResult.Win        => t.PayoutWin,
+                    PayoutResult.BjWin      => t.PayoutBjWin,
+                    PayoutResult.CharlieWin => t.PayoutCharlieWin,
+                    PayoutResult.Lose       => t.PayoutLose,
+                    PayoutResult.Push       => t.PayoutPush,
+                    _                       => null,
+                };
+                if (template == null) continue;
+
+                var effectiveBet = GetEffectiveBet(p, p.Hands[hi]);
+                var amount       = PayoutAmountString(state, pi, hi);
+                var betStr       = effectiveBet > 0
+                    ? FormatGil(effectiveBet)
+                    : string.Empty;
+                var amountStr    = amount;
+                var name         = multiHand ? $"{p.DisplayName} (Hand {hi + 1})" : p.DisplayName;
+                ctx.Narrate(template,
+                    ("name",   name),
+                    ("bet",    betStr),
+                    ("amount", amountStr));
+            }
+        }
+
+        var winners = new HashSet<string>(
+            state.Players
+                 .Where((p, pi) => p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
+                                     .Any(r => r is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin))
+                 .Select(p => p.FullName.Length > 0 ? p.FullName : p.Nickname));
+        var pushers = new HashSet<string>(
+            state.Players
+                 .Where((p, pi) => p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
+                                     .Any(r => r == PayoutResult.Push)
+                                 && !p.Hands.Select((_, hi) => GetPayoutResult(state, pi, hi))
+                                     .Any(r => r is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin))
+                 .Select(p => p.FullName.Length > 0 ? p.FullName : p.Nickname));
+        return With(state, phase: GamePhase.Payout, lastRoundWinners: winners, lastRoundPushers: pushers);
+    }
+
+    private static GameState HandleNewRound(GameState state) =>
+        new GameState
+        {
+            Players = state.Players.Select(p => new Player
+            {
+                Nickname   = p.Nickname,
+                FullName   = p.FullName,
+                World      = p.World,
+                Bet        = p.Bet,
+                SittingOut = p.SittingOut,
+                Hands      = [new Hand()],
+            }).ToList(),
+            DealerHand        = new Hand(),
+            Phase             = GamePhase.Betting,
+            ActivePlayerIndex = -1,
+            ActiveHandIndex   = -1,
+            BjPayout                 = state.BjPayout,
+            FiveCardCharlie          = state.FiveCardCharlie,
+            LastRoundWinners         = state.LastRoundWinners,
+            LastRoundPushers         = state.LastRoundPushers,
+            SkipDealSummaryOnePlayer = state.SkipDealSummaryOnePlayer,
+        };
+
+    private static GameState HandleAddPlayer(GameState state, AddPlayer a) =>
+        With(state, players:
+            [..state.Players, new Player { Nickname = a.Nickname, FullName = a.FullName, World = a.World, Hands = [new Hand()] }]);
+
+    private static GameState HandleRemovePlayer(GameState state, RemovePlayer a)
+    {
+        var newPlayers = state.Players.Where((_, i) => i != a.Index).ToList();
+        var newActive  = state.ActivePlayerIndex >= newPlayers.Count
+                             ? newPlayers.Count - 1
+                             : state.ActivePlayerIndex;
+        return With(state, players: newPlayers, activePlayerIndex: newActive);
+    }
+
+    private static GameState HandleSetPlayerBet(GameState state, SetPlayerBet a)
+    {
+        var p = state.Players[a.PlayerIndex];
+        return With(state, players: WithPlayer(state.Players, a.PlayerIndex,
+            new Player { Nickname = p.Nickname, FullName = p.FullName, World = p.World, Bet = a.Bet, Hands = p.Hands, SittingOut = p.SittingOut }));
+    }
+
+    private static GameState HandleRenamePlayer(GameState state, RenamePlayer a)
+    {
+        var p = state.Players[a.PlayerIndex];
+        return With(state, players: WithPlayer(state.Players, a.PlayerIndex,
+            new Player { Nickname = a.Nickname, FullName = p.FullName, World = p.World, Bet = p.Bet, Hands = p.Hands, SittingOut = p.SittingOut }));
+    }
+
+    private static GameState HandleToggleSittingOut(GameState state, ToggleSittingOut a)
+    {
+        if (state.Phase != GamePhase.Betting) return state;
+        var p = state.Players[a.PlayerIndex];
+        return With(state, players: WithPlayer(state.Players, a.PlayerIndex,
+            new Player { Nickname = p.Nickname, FullName = p.FullName, World = p.World, Bet = p.Bet, Hands = p.Hands, SittingOut = !p.SittingOut }));
+    }
+
+    private static GameState HandleReorderPlayers(GameState state, ReorderPlayers a)
+    {
+        if (state.Phase != GamePhase.Betting) return state;
+        var newPlayers = a.NewOrder.Select(i => state.Players[i]).ToList();
+        return With(state, players: newPlayers);
     }
 }
