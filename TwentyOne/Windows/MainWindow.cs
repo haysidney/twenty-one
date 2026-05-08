@@ -259,7 +259,16 @@ public partial class MainWindow : Window, IDisposable
 
     public void Dispose()
     {
-        chatGui.ChatMessage -= OnChatMessage;
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            chatGui.ChatMessage -= OnChatMessage;
+        }
     }
 
     public void RestoreHistoricalRound(GameState snapshot)

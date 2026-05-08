@@ -397,11 +397,13 @@ public class HistoryWindow : Window
 
     private static void DrawNetCell(long net)
     {
-        var col = net > 0
-            ? GameColors.ProfitGreen
-            : net < 0
-                ? GameColors.BustRed
-                : GameColors.PushGrey;
+        Vector4 col;
+        if (net > 0)
+            col = GameColors.ProfitGreen;
+        else if (net < 0)
+            col = GameColors.BustRed;
+        else
+            col = GameColors.PushGrey;
         var str = net > 0 ? $"+{GameEngine.FormatGil(net)}" : GameEngine.FormatGil(net);
         ImGui.TextColored(col, str);
     }

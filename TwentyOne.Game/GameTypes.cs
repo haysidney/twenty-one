@@ -59,11 +59,15 @@ public sealed record class Player
     public bool SittingOut { get; set; } = false;
 
     // Nickname if set; else first name from FullName; else Nickname (empty for edge cases).
-    public string DisplayName => Nickname.Length > 0
-        ? Nickname
-        : FullName.Length > 0
-            ? FullName.Split(' ')[0]
-            : Nickname;
+    public string DisplayName
+    {
+        get
+        {
+            if (Nickname.Length > 0) return Nickname;
+            if (FullName.Length > 0) return FullName.Split(' ')[0];
+            return Nickname;
+        }
+    }
 }
 
 [Serializable]

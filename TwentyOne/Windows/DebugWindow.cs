@@ -251,9 +251,8 @@ public class DebugWindow : Window
         // Enqueue rolls
         var queue = mainWindow.Scenario.RollQueue;
         queue.Clear();
-        foreach (var r in file.Rolls ?? [])
-            if (r >= 1 && r <= 13)
-                queue.Enqueue(r);
+        foreach (var r in (file.Rolls ?? []).Where(r => r >= 1 && r <= 13))
+            queue.Enqueue(r);
 
         // Set active scenario
         mainWindow.Scenario.ActiveScenario = new ActiveScenario(

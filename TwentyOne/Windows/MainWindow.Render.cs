@@ -73,9 +73,11 @@ public partial class MainWindow
         bool    HasWorld,
         bool    HasNickname);
 
+#if DEBUG
     private readonly record struct ScenarioGates(
         bool Hit, bool Stand, bool Dbl, bool Spl,
         bool ConfirmDbl, bool ConfirmSpl, bool AdvancePlayer);
+#endif
 
     // ── Draw sub-methods ──────────────────────────────────────────────────────
 
@@ -272,7 +274,14 @@ public partial class MainWindow
         {
             var eb = GameEngine.GetEffectiveBet(p, hand);
             ImGui.AlignTextToFramePadding();
-            ImGui.TextDisabled(eb > 0 ? GameEngine.FormatGil(eb) : (GameEngine.ParseBet(p.Bet) > 0 ? GameEngine.FormatGil(GameEngine.ParseBet(p.Bet)) : p.Bet));
+            string betDisplay;
+            if (eb > 0)
+                betDisplay = GameEngine.FormatGil(eb);
+            else if (GameEngine.ParseBet(p.Bet) > 0)
+                betDisplay = GameEngine.FormatGil(GameEngine.ParseBet(p.Bet));
+            else
+                betDisplay = p.Bet;
+            ImGui.TextDisabled(betDisplay);
         }
     }
 
@@ -616,7 +625,11 @@ public partial class MainWindow
         }
     }
 
-    private void DrawActionsCell(RowCtx ctx, ScenarioGates gates, float cellRight, ref int removePlayerIndex)
+    private void DrawActionsCell(RowCtx ctx,
+#if DEBUG
+        ScenarioGates gates,
+#endif
+        float cellRight, ref int removePlayerIndex)
     {
         var (pi, hi, p, hand) = (ctx.Pi, ctx.Hi, ctx.Player, ctx.Hand);
         var hasAnyPending = pendingDouble.HasValue || pendingSplit.HasValue;
@@ -1485,10 +1498,12 @@ public partial class MainWindow
                         ConfirmDbl: Scenario.IsStep($"ConfirmDbl:{pi}:{hi}"),
                         ConfirmSpl: Scenario.IsStep($"ConfirmSpl:{pi}:{hi}"),
                         AdvancePlayer: Scenario.IsStep("AdvancePlayer"));
-#else
-                    var gates = default(ScenarioGates);
 #endif
-                    DrawActionsCell(ctx, gates, actionsCellRight, ref removeAt);
+                    DrawActionsCell(ctx,
+#if DEBUG
+                        gates,
+#endif
+                        actionsCellRight, ref removeAt);
                 }
 
             }
@@ -1527,26 +1542,24 @@ public partial class MainWindow
 
                     // Bank
                     ImGui.TableSetColumnIndex(2);
+                    var sitBankVal = sp.BankBalance(config);
+                    var sitBankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                    ImGui.AlignTextToFramePadding();
+                    if (sitBankVal > 0)
                     {
-                        var sitBankVal = sp.BankBalance(config);
-                        var sitBankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                        ImGui.AlignTextToFramePadding();
-                        if (sitBankVal > 0)
+                        ImGui.TextDisabled(GameEngine.FormatGil(sitBankVal));
+                        if (ImGui.IsItemHovered())
                         {
-                            ImGui.TextDisabled(GameEngine.FormatGil(sitBankVal));
-                            if (ImGui.IsItemHovered())
-                            {
-                                ImGui.SetTooltip("Click to copy");
-                                if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                                    ImGui.SetClipboardText(sitBankVal.ToString());
-                            }
+                            ImGui.SetTooltip("Click to copy");
+                            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                                ImGui.SetClipboardText(sitBankVal.ToString());
                         }
-                        else
-                        {
-                            ImGui.TextDisabled("—");
-                        }
-                        DrawBankManageButton(spi, sitBankCellRight, "sitbank", uiBusy);
                     }
+                    else
+                    {
+                        ImGui.TextDisabled("—");
+                    }
+                    DrawBankManageButton(spi, sitBankCellRight, "sitbank", uiBusy);
 
                     // Status: Resume button
                     ImGui.TableSetColumnIndex(5);
@@ -1615,11 +1628,13 @@ public partial class MainWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        var dealProgress = Phase == GamePhase.Deal
-            ? $"  (dealer: {State.DealerHand.Cards.Length}/1  players: " +
-              $"{(State.Players.Length > 0 ? State.Players.Min(p => p.Hands[0].Cards.Length) : 0)}-" +
-              $"{(State.Players.Length > 0 ? State.Players.Max(p => p.Hands[0].Cards.Length) : 0)}/2)"
-            : string.Empty;
+        var dealProgress = string.Empty;
+        if (Phase == GamePhase.Deal)
+        {
+            var minCards = State.Players.Length > 0 ? State.Players.Min(p => p.Hands[0].Cards.Length) : 0;
+            var maxCards = State.Players.Length > 0 ? State.Players.Max(p => p.Hands[0].Cards.Length) : 0;
+            dealProgress = $"  (dealer: {State.DealerHand.Cards.Length}/1  players: {minCards}-{maxCards}/2)";
+        }
         string phaseLabel;
         if (Phase == GamePhase.PlayerTurns
             && ActivePlayerIndex >= 0 && ActivePlayerIndex < State.Players.Length
@@ -1715,11 +1730,16 @@ public partial class MainWindow
 #endif
                 if (!canDeal) ImGui.EndDisabled();
                 if (!canDeal && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                    ImGui.SetTooltip(State.Players.Length == 0
-                        ? "Add at least one player first."
-                        : shortfallPlayers.Count > 0
-                            ? $"Bank shortfall — resolve before dealing:\n{string.Join("\n", shortfallPlayers)}"
-                            : "All players need a bet before dealing.");
+                {
+                    string tooltip;
+                    if (State.Players.Length == 0)
+                        tooltip = "Add at least one player first.";
+                    else if (shortfallPlayers.Count > 0)
+                        tooltip = $"Bank shortfall — resolve before dealing:\n{string.Join("\n", shortfallPlayers)}";
+                    else
+                        tooltip = "All players need a bet before dealing.";
+                    ImGui.SetTooltip(tooltip);
+                }
                 break;
 
             case GamePhase.Deal:
@@ -1834,8 +1854,7 @@ public partial class MainWindow
 
         ImGui.Text("Chat Narration");
         ImGui.Separator();
-        {
-            var narUseCmd = config.NarrationUseChannelCommand;
+        var narUseCmd = config.NarrationUseChannelCommand;
             if (ImGui.Checkbox("Add channel command", ref narUseCmd))
             {
                 config.NarrationUseChannelCommand = narUseCmd;
@@ -1880,6 +1899,5 @@ public partial class MainWindow
                     ImGui.SetScrollHereY(1.0f);
             }
             ImGui.EndChild();
-        }
     }
 }

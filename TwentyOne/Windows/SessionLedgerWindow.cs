@@ -43,7 +43,15 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         gilEndBuf   = config.GilEnd.ToString();
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+    }
 
     public override void Draw()
     {
@@ -279,11 +287,13 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
                 ImGui.TableSetColumnIndex(8);
                 ImGui.AlignTextToFramePadding();
-                var netColor = stat.TotalWon > 0
-                    ? GameColors.ProfitGreen
-                    : stat.TotalWon < 0
-                        ? GameColors.BustRed
-                        : GameColors.PushGrey;
+                Vector4 netColor;
+                if (stat.TotalWon > 0)
+                    netColor = GameColors.ProfitGreen;
+                else if (stat.TotalWon < 0)
+                    netColor = GameColors.BustRed;
+                else
+                    netColor = GameColors.PushGrey;
                 var netStr = stat.TotalWon > 0 ? $"+{GameEngine.FormatGil(stat.TotalWon)}" : GameEngine.FormatGil(stat.TotalWon);
                 ImGui.TextColored(netColor, netStr);
             }
@@ -376,11 +386,13 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
     private static void ColoredGilText(long value)
     {
-        var color = value > 0
-            ? GameColors.ProfitGreen
-            : value < 0
-                ? GameColors.BustRed
-                : GameColors.PushGrey;
+        Vector4 color;
+        if (value > 0)
+            color = GameColors.ProfitGreen;
+        else if (value < 0)
+            color = GameColors.BustRed;
+        else
+            color = GameColors.PushGrey;
         var text = value > 0 ? $"+{GameEngine.FormatGil(value)}" : GameEngine.FormatGil(value);
         ImGui.TextColored(color, text);
     }

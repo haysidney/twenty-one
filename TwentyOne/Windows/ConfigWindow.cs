@@ -25,7 +25,15 @@ public class ConfigWindow : Window, IDisposable
         Flags = ImGuiWindowFlags.NoCollapse;
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+    }
 
     private string _renameBuffer     = string.Empty;
     private bool   _renamePending    = false;
