@@ -403,8 +403,11 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         if (gs.Phase == GamePhase.Betting) return 0;
         long total = 0;
         foreach (var player in gs.Players)
+        {
+            if (player.SittingOut) continue;
             foreach (var hand in player.Hands)
                 total += (long)GameEngine.GetEffectiveBet(player, hand);
+        }
         return total;
     }
 
