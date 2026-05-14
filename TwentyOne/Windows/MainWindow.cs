@@ -48,6 +48,10 @@ public partial class MainWindow : Window, IDisposable
     private List<int> reorderIndices = [];
     // In-progress bet edits (player index → typed string); committed to game state on Enter only.
     private readonly Dictionary<int, string> betEdits = [];
+    // Deal-phase bet adjustment: which player's bet is being edited, and the buffer.
+    // -1 = none. Cleared on NewRound and when leaving Deal phase.
+    private int    adjustBetIndex = -1;
+    private string adjustBetBuf   = string.Empty;
     // bank management modal
     private int    bankManagePlayerIndex = -1;
     private string bankDepositBuf        = string.Empty;
@@ -306,9 +310,17 @@ public partial class MainWindow : Window, IDisposable
         {
             config.UndoStack.Clear();
             autoDealQueue.Clear();
-            pendingHit    = null;
-            pendingDouble = null;
-            pendingSplit  = null;
+            pendingHit     = null;
+            pendingDouble  = null;
+            pendingSplit   = null;
+            adjustBetIndex = -1;
+            adjustBetBuf   = string.Empty;
+        }
+        else if (action is BeginPlayerTurns)
+        {
+            // Leaving the Deal phase: cancel any in-progress bet-adjust editor.
+            adjustBetIndex = -1;
+            adjustBetBuf   = string.Empty;
         }
         else if (action is AdvanceToNextPlayer)
         {
@@ -379,6 +391,54 @@ public partial class MainWindow : Window, IDisposable
         var (newBalance, entry) = BankLedger.Apply(stat.Bank, tx, DateTime.Now);
         stat.Bank = newBalance;
         stat.BankLog.Add(entry);
+    }
+
+    // Adjust a player's bet during the Deal phase, reconciling their bank in lockstep.
+    // Returns (success, message). On shortfall, no state or bank change is made.
+    // The bank delta is recorded as a single BankBetAdjust entry (signed: positive = additional
+    // deduction, negative = refund) so the audit log clearly attributes the change.
+    private (bool Ok, string Message) TryAdjustBet(int pi, string newBetStr)
+    {
+        if (Phase != GamePhase.Deal) return (false, "Bet adjustments are only allowed during the Deal phase.");
+        if (pi < 0 || pi >= State.Players.Length) return (false, "Invalid player.");
+        var player = State.Players[pi];
+        if (player.SittingOut) return (false, "Player is sitting out.");
+
+        var parsedNew = GameEngine.ParseBet(newBetStr);
+        if (parsedNew <= 0) return (false, "Bet must be a positive number.");
+        var parsedOld = GameEngine.ParseBet(player.Bet);
+        var newAmt    = (long)Math.Ceiling(parsedNew);
+        var oldAmt    = (long)Math.Ceiling(parsedOld);
+        var delta     = newAmt - oldAmt;
+
+        if (delta == 0)
+        {
+            // Normalize the stored string (e.g., "  500 " → "500") without touching the bank.
+            Apply(new AdjustBet(pi, newAmt.ToString()));
+            return (true, $"Bet unchanged ({newAmt:N0}).");
+        }
+
+        if (player.TryGetBankingStat(config, out var stat))
+        {
+            if (delta > 0 && stat.Bank < delta)
+            {
+                var shortBy = delta - stat.Bank;
+                return (false, $"Bank short by {shortBy:N0} gil — trade more before increasing the bet.");
+            }
+            var beforeBank = stat.Bank;
+            ApplyBank(stat, new BankBetAdjust(delta));
+            config.NarrationLog.Add(
+                $"[Bank] {player.DisplayName}: bet adjusted {oldAmt:N0} → {newAmt:N0} " +
+                $"(bank {beforeBank:N0} → {stat.Bank:N0})");
+        }
+        else
+        {
+            config.NarrationLog.Add(
+                $"[Bet] {player.DisplayName}: bet adjusted {oldAmt:N0} → {newAmt:N0} (no bank)");
+        }
+
+        Apply(new AdjustBet(pi, newAmt.ToString()));
+        return (true, $"Bet adjusted to {newAmt:N0}.");
     }
 
     // Called immediately after Apply(new GoToPayout()) to record round results.

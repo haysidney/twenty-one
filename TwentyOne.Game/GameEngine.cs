@@ -440,6 +440,7 @@ public static class GameEngine
         [typeof(AddPlayer)]            = (s, a, _) => HandleAddPlayer(s, (AddPlayer)a),
         [typeof(RemovePlayer)]         = (s, a, _) => HandleRemovePlayer(s, (RemovePlayer)a),
         [typeof(SetPlayerBet)]         = (s, a, _) => HandleSetPlayerBet(s, (SetPlayerBet)a),
+        [typeof(AdjustBet)]            = (s, a, _) => HandleAdjustBet(s, (AdjustBet)a),
         [typeof(RenamePlayer)]         = (s, a, _) => HandleRenamePlayer(s, (RenamePlayer)a),
         [typeof(ToggleSittingOut)]     = (s, a, _) => HandleToggleSittingOut(s, (ToggleSittingOut)a),
         [typeof(ReorderPlayers)]       = (s, a, _) => HandleReorderPlayers(s, (ReorderPlayers)a),
@@ -1134,6 +1135,14 @@ public static class GameEngine
     private static GameState HandleSetPlayerBet(GameState state, SetPlayerBet a)
     {
         var p = state.Players[a.PlayerIndex];
+        return state with { Players = WithPlayer(state.Players, a.PlayerIndex, p with { Bet = a.Bet }) };
+    }
+
+    private static GameState HandleAdjustBet(GameState state, AdjustBet a)
+    {
+        if (state.Phase != GamePhase.Deal) return state;
+        var p = state.Players[a.PlayerIndex];
+        if (p.SittingOut) return state;
         return state with { Players = WithPlayer(state.Players, a.PlayerIndex, p with { Bet = a.Bet }) };
     }
 

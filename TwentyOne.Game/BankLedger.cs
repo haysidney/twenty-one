@@ -2,7 +2,7 @@ using System;
 
 namespace TwentyOne.Game;
 
-public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split }
+public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split, BetAdjust }
 
 [Serializable]
 public class BankTransactionEntry
@@ -22,6 +22,9 @@ public record BankBet(long Amount)        : IBankTransaction;
 public record BankWin(long Amount)        : IBankTransaction;
 public record BankDoubleDown(long Amount) : IBankTransaction;
 public record BankSplit(long Amount)      : IBankTransaction;
+// Signed delta: positive deducts from bank (bet increased), negative refunds (bet decreased).
+// The recorded Amount keeps the sign so the audit log shows the direction.
+public record BankBetAdjust(long Delta)   : IBankTransaction;
 
 public static class BankLedger
 {
@@ -40,6 +43,7 @@ public static class BankLedger
             BankWin        w => (balance + w.Amount,              BankTransactionKind.Win,        w.Amount),
             BankDoubleDown d => (Math.Max(0, balance - d.Amount), BankTransactionKind.DoubleDown, d.Amount),
             BankSplit      s => (Math.Max(0, balance - s.Amount), BankTransactionKind.Split,      s.Amount),
+            BankBetAdjust  a => (Math.Max(0, balance - a.Delta),  BankTransactionKind.BetAdjust,  a.Delta),
             _                => throw new ArgumentOutOfRangeException(nameof(tx)),
         };
 

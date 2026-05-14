@@ -2583,6 +2583,129 @@ public class BankLedgerTests
         var (_, entry) = BankLedger.Apply(0, new BankDeposit(1), t);
         Assert.Equal(t, entry.Timestamp);
     }
+
+    // ── BetAdjust — signed delta semantics ─────────────────────────────────────
+
+    [Fact]
+    public void BetAdjust_PositiveDelta_DeductsFromBank()
+    {
+        var (bal, entry) = Apply(1000, new BankBetAdjust(300));
+        Assert.Equal(700, bal);
+        Assert.Equal(700, entry.Balance);
+        Assert.Equal(300, entry.Amount);
+        Assert.Equal(BankTransactionKind.BetAdjust, entry.Kind);
+    }
+
+    [Fact]
+    public void BetAdjust_NegativeDelta_RefundsToBank()
+    {
+        var (bal, entry) = Apply(500, new BankBetAdjust(-200));
+        Assert.Equal(700, bal);
+        Assert.Equal(700, entry.Balance);
+        Assert.Equal(-200, entry.Amount); // signed amount preserves direction
+        Assert.Equal(BankTransactionKind.BetAdjust, entry.Kind);
+    }
+
+    [Fact]
+    public void BetAdjust_ZeroDelta_BalanceUnchanged()
+    {
+        var (bal, entry) = Apply(1000, new BankBetAdjust(0));
+        Assert.Equal(1000, bal);
+        Assert.Equal(0,    entry.Amount);
+    }
+
+    [Fact]
+    public void BetAdjust_PositiveDeltaExceedingBalance_ClampsToZero()
+    {
+        // Caller is responsible for pre-validating; if not, balance still floors at 0.
+        var (bal, _) = Apply(100, new BankBetAdjust(500));
+        Assert.Equal(0, bal);
+    }
+
+    [Fact]
+    public void BetAdjust_Sequence_BetIncreaseThenDecrease_NetsCorrectly()
+    {
+        // Player bets 1000 at deal start (deducted), then bumps bet to 1500 (additional 500 out),
+        // then drops to 800 (refund 700). Bank should end at: 1000 - 1000 + 0 - 500 + 700 = 200.
+        long bank = 1000;
+        (bank, _) = Apply(bank, new BankBet(1000));         // initial deal
+        Assert.Equal(0, bank);
+
+        (bank, _) = Apply(bank, new BankDeposit(1000));     // player traded 1000
+        Assert.Equal(1000, bank);
+
+        (bank, _) = Apply(bank, new BankBetAdjust(500));    // bet up by 500
+        Assert.Equal(500, bank);
+
+        (bank, _) = Apply(bank, new BankBetAdjust(-700));   // bet down by 700
+        Assert.Equal(1200, bank);
+    }
+}
+
+public class AdjustBetTests
+{
+    [Fact]
+    public void AdjustBet_DealPhase_UpdatesPlayerBet()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Player("Lorah", "500")
+            .Build();
+        var (next, _) = GameEngine.Apply(state, new AdjustBet(0, "1000"));
+        Assert.Equal("1000", next.Players[0].Bet);
+    }
+
+    [Fact]
+    public void AdjustBet_OutsideDealPhase_IsNoop()
+    {
+        var bettingState = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah", "500")
+            .Build();
+        var (next, _) = GameEngine.Apply(bettingState, new AdjustBet(0, "1000"));
+        Assert.Equal("500", next.Players[0].Bet);
+
+        var playerTurnsState = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", "500", 5, 6)
+            .Build();
+        (next, _) = GameEngine.Apply(playerTurnsState, new AdjustBet(0, "1000"));
+        Assert.Equal("500", next.Players[0].Bet);
+    }
+
+    [Fact]
+    public void AdjustBet_SittingOutPlayer_IsNoop()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Player(new Player
+            {
+                Nickname   = "Lorah",
+                Bet        = "500",
+                SittingOut = true,
+                Hands      = [new Hand()],
+            })
+            .Build();
+        var (next, _) = GameEngine.Apply(state, new AdjustBet(0, "1000"));
+        Assert.Equal("500", next.Players[0].Bet);
+    }
+
+    [Fact]
+    public void AdjustBet_DoesNotEmitNarration()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Player("Lorah", "500")
+            .Build();
+        var (_, effects) = GameEngine.Apply(state, new AdjustBet(0, "1000"));
+        Assert.Empty(effects);
+    }
+
+    [Fact]
+    public void AdjustBet_DoesNotPushUndo()
+    {
+        Assert.False(new AdjustBet(0, "100").PushesUndo);
+    }
 }
 
 public class GameActionPushesUndoTests
@@ -2605,6 +2728,7 @@ public class GameActionPushesUndoTests
         new object[] { new AnnouncePlayerDeal(0) },
         new object[] { new AnnounceDealerDeal() },
         new object[] { new BeginDealerTurn() },
+        new object[] { new AdjustBet(0, "100") },
     };
 
     [Theory]

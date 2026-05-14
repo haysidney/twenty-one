@@ -197,17 +197,10 @@ public partial class MainWindow
                 : 0;
             if (Phase != GamePhase.Betting || isReorderMode)
             {
-                var eb        = GameEngine.GetEffectiveBet(p, hand);
-                var betLabel  = eb > 0 ? GameEngine.FormatGil(eb) : p.Bet;
-                var betCopy   = eb > 0 ? $"{eb:0.##}" : p.Bet;
-                ImGui.AlignTextToFramePadding();
-                ImGui.TextDisabled(betLabel);
-                if (!isReorderMode && ImGui.IsItemHovered())
-                {
-                    ImGui.SetTooltip("Click to copy bet");
-                    if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                        ImGui.SetClipboardText(betCopy);
-                }
+                if (Phase == GamePhase.Deal && !p.SittingOut && adjustBetIndex == pi)
+                    DrawAdjustBetEditor(pi, p, cellRight, tradeButtonW);
+                else
+                    DrawDealBetLabel(pi, p, hand, cellRight, tradeButtonW);
             }
             else
             {
@@ -283,6 +276,97 @@ public partial class MainWindow
                 betDisplay = p.Bet;
             ImGui.TextDisabled(betDisplay);
         }
+    }
+
+    private void DrawDealBetLabel(int pi, Player p, Hand hand, float cellRight, float tradeButtonW)
+    {
+        var eb       = GameEngine.GetEffectiveBet(p, hand);
+        var betLabel = eb > 0 ? GameEngine.FormatGil(eb) : p.Bet;
+        var betCopy  = eb > 0 ? $"{eb:0.##}" : p.Bet;
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextDisabled(betLabel);
+        if (!isReorderMode && ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Click to copy bet");
+            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                ImGui.SetClipboardText(betCopy);
+        }
+
+        if (Phase == GamePhase.Deal && !p.SittingOut && !isReorderMode)
+        {
+            var fp        = ImGui.GetStyle().FramePadding.X;
+            var adjustW   = ImGui.CalcTextSize("Adjust").X + fp * 2;
+            var adjustPos = cellRight - tradeButtonW - adjustW;
+            ImGui.SameLine();
+            if (ImGui.GetCursorPosX() < adjustPos)
+                ImGui.SetCursorPosX(adjustPos);
+            if (ImGui.SmallButton($"Adjust##{pi}adjustbet"))
+            {
+                adjustBetIndex = pi;
+                adjustBetBuf   = p.Bet;
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Adjust this player's bet (reconciles bank automatically).");
+        }
+    }
+
+    private void DrawAdjustBetEditor(int pi, Player p, float cellRight, float tradeButtonW)
+    {
+        var fp       = ImGui.GetStyle().FramePadding.X;
+        var sp       = ImGui.GetStyle().ItemSpacing.X;
+        var okW      = ImGui.CalcTextSize("OK").X     + fp * 2;
+        var cancelW  = ImGui.CalcTextSize("Cancel").X + fp * 2;
+        var reservedRight = tradeButtonW + okW + sp + cancelW + sp;
+
+        // Compute live shortfall preview while the user types
+        var parsedNew = GameEngine.ParseBet(adjustBetBuf);
+        var parsedOld = GameEngine.ParseBet(p.Bet);
+        var newAmt    = (long)Math.Ceiling(parsedNew);
+        var oldAmt    = (long)Math.Ceiling(parsedOld);
+        var delta     = newAmt - oldAmt;
+        long shortfall = 0;
+        if (p.TryGetBankingStat(config, out var stat) && delta > 0 && stat.Bank < delta)
+            shortfall = delta - stat.Bank;
+
+        ImGui.SetNextItemWidth(cellRight - ImGui.GetCursorPosX() - reservedRight);
+        var submitted = ImGui.InputText($"##adjustbet{pi}", ref adjustBetBuf, 16,
+            ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll);
+
+        var canCommit = parsedNew > 0 && shortfall == 0;
+        ImGui.SameLine();
+        if (!canCommit) ImGui.BeginDisabled();
+        if (ImGui.SmallButton($"OK##{pi}adjustok") || (submitted && canCommit))
+        {
+            var (ok, _) = TryAdjustBet(pi, adjustBetBuf);
+            if (ok)
+            {
+                adjustBetIndex = -1;
+                adjustBetBuf   = string.Empty;
+            }
+        }
+        if (!canCommit) ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+        {
+            if (shortfall > 0)
+                ImGui.SetTooltip($"Bank short by {shortfall:N0} gil — lower the amount or take a trade first.");
+            else if (parsedNew <= 0)
+                ImGui.SetTooltip("Enter a positive bet amount.");
+            else if (delta == 0)
+                ImGui.SetTooltip("Commit the bet (unchanged amount).");
+            else if (delta > 0)
+                ImGui.SetTooltip($"Increase bet by {delta:N0} (bank will be debited {delta:N0}).");
+            else
+                ImGui.SetTooltip($"Decrease bet by {-delta:N0} (bank will be refunded {-delta:N0}).");
+        }
+
+        ImGui.SameLine();
+        if (ImGui.SmallButton($"Cancel##{pi}adjustcancel"))
+        {
+            adjustBetIndex = -1;
+            adjustBetBuf   = string.Empty;
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Cancel adjustment");
     }
 
     private void DrawStatusCell(RowCtx ctx, float cellRight)
@@ -960,7 +1044,9 @@ public partial class MainWindow
                 for (var li = log.Count - 1; li >= 0; li--)
                 {
                     var entry    = log[li];
-                    var isCredit = entry.Kind is BankTransactionKind.Deposit or BankTransactionKind.Win;
+                    // BetAdjust stores a signed delta: negative means bet decreased → bank refunded.
+                    var isCredit = entry.Kind is BankTransactionKind.Deposit or BankTransactionKind.Win
+                                || (entry.Kind == BankTransactionKind.BetAdjust && entry.Amount < 0);
                     ImGui.TableNextRow();
                     ImGui.TableSetColumnIndex(0); ImGui.TextUnformatted(entry.Timestamp.ToString("HH:mm"));
                     ImGui.TableSetColumnIndex(1); ImGui.TextUnformatted(entry.Kind switch
@@ -971,11 +1057,13 @@ public partial class MainWindow
                         BankTransactionKind.Win        => "Win",
                         BankTransactionKind.DoubleDown => "Double",
                         BankTransactionKind.Split      => "Split",
+                        BankTransactionKind.BetAdjust  => "Bet Adj",
                         _                              => "?"
                     });
                     ImGui.TableSetColumnIndex(2);
-                    if (isCredit) ImGui.TextColored(GameColors.CreditGreen, $"+{entry.Amount:N0}");
-                    else          ImGui.TextColored(GameColors.DebitRed, $"-{entry.Amount:N0}");
+                    var absAmt = Math.Abs(entry.Amount);
+                    if (isCredit) ImGui.TextColored(GameColors.CreditGreen, $"+{absAmt:N0}");
+                    else          ImGui.TextColored(GameColors.DebitRed, $"-{absAmt:N0}");
                     ImGui.TableSetColumnIndex(3); ImGui.TextUnformatted($"{entry.Balance:N0}");
                 }
                 ImGui.EndTable();

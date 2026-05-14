@@ -100,12 +100,13 @@ nix develop --command dotnet test TwentyOne.Tests/TwentyOne.Tests.csproj
 `BankLedger.Apply(long balance, BankTransaction) → (long NewBalance, BankTransactionEntry)`
 
 - Lives in `TwentyOne.Game/BankLedger.cs` — no Dalamud dependency, fully unit-testable.
-- `BankTransaction` is a discriminated union: `BankDeposit`, `BankWithdrawal`, `BankBet`, `BankWin`, `BankDoubleDown`, `BankSplit`.
+- `BankTransaction` is a discriminated union: `BankDeposit`, `BankWithdrawal`, `BankBet`, `BankWin`, `BankDoubleDown`, `BankSplit`, `BankBetAdjust`.
 - Never produces a negative balance — debits clamp to zero.
 - Returns both the new balance and a log entry (timestamp, kind, amount, post-transaction balance).
 - `MainWindow` calls `ApplyBank(stat, tx)` which calls `BankLedger.Apply`, writes result back to `stat.Bank`, appends entry to `stat.BankLog`. No raw bank arithmetic anywhere else.
 - Bank mutations are intentionally outside `GameState` and the undo stack — they represent real-money ledger entries.
 - Double/split bank deduction happens at **Confirm** time (not at Dbl/Spl button click).
+- `BankBetAdjust` carries a **signed** `Delta`: positive deducts (bet went up), negative refunds (bet went down). The stored `BankTransactionEntry.Amount` keeps the sign so the audit log shows direction.
 
 ### GameEngine (pure functional core)
 
@@ -239,6 +240,7 @@ The old `GameEngine.With(...)` optional-parameter helper has been removed.
 - `BjPayout` (3:2 / 6:5 / 1:1) is a venue setting stored in `GameState` so it is snapshotted with each undo entry. It is changed directly (not via `Apply`) since payout changes are not undoable game actions.
 - `Player.Hands` supports multiple hands for splits. `GameState.ActiveHandIndex` tracks which hand is currently active alongside `ActivePlayerIndex`. `AdvanceFrom` iterates all `(player, hand)` pairs in order.
 - Double Down and Split require additional funds before they take effect. The UI tracks this as `pendingDouble`/`pendingSplit` (not in `GameState`). Clicking Dbl/Spl fires `AnnounceDouble`/`AnnounceSplit` (which picks a bank-covers or trade-required narration template based on current bank balance) and optionally opens the trade window. The actual `DoubleDown`/`SplitHand` action fires only after the dealer clicks Confirm. Bank deduction via `BankLedger` happens at Confirm time so any mid-round deposits land first.
+- Bet adjustment during the Deal phase (between Start Deal and Begin Player Turns): the dealer can click "Adjust" next to a player's bet to change it after cards have started dealing. `MainWindow.TryAdjustBet` computes the delta vs. the prior bet, validates bank can cover an increase (shortfall blocks the commit), applies a single `BankBetAdjust(delta)` ledger entry, then dispatches an `AdjustBet` action. The `AdjustBet` action has `PushesUndo => false` — bank entries are append-only, so a state-only revert would diverge from the ledger. Only allowed in `GamePhase.Deal`; sitting-out players are ignored. Cleared on `NewRound` and `BeginPlayerTurns`.
 - `AnnounceDouble` and `AnnounceSplit` are excluded from the undo stack (like `AnnounceBettingOpen`).
 - Split rules: re-splits allowed (no limit); 21 on a split hand (`IsFromSplit=true`) is Playing/Stand, never Blackjack; split aces receive exactly one card then auto-stand (standard casino rule, see ToDo.txt for variant note).
 - Payout is calculated per-hand. `Hand.Bet` holds the effective bet when a hand has been doubled (empty = inherit `Player.Bet`).

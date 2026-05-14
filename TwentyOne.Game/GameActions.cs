@@ -81,6 +81,11 @@ public record NewRound : GameAction;
 public record AddPlayer(string Nickname, string FullName = "", string World = "") : GameAction;
 public record RemovePlayer(int Index) : GameAction;
 public record SetPlayerBet(int PlayerIndex, string Bet) : GameAction;
+// Adjusts a player's bet during the Deal phase (between Start Deal and Begin Player Turns).
+// Bank reconciliation is the caller's responsibility (handled in MainWindow). This action
+// does NOT push undo: bank entries are append-only, so a state-only revert would leave the
+// player's recorded bet inconsistent with their actual bank deductions.
+public record AdjustBet(int PlayerIndex, string Bet) : GameAction { public override bool PushesUndo => false; }
 public record RenamePlayer(int PlayerIndex, string Nickname) : GameAction;
 public record ReorderPlayers(List<int> NewOrder) : GameAction;
 public record ToggleSittingOut(int PlayerIndex) : GameAction;
