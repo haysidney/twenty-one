@@ -1,6 +1,6 @@
 ## Meta
 
-After completing any feature or significant design decision, update CLAUDE.md to reflect it. Keep architecture sections current — future sessions depend on this file for context.
+After completing any feature or significant design decision, update CLAUDE.md to reflect it. Keep architecture sections current - future sessions depend on this file for context.
 
 ## Project
 
@@ -16,13 +16,13 @@ Plugin config is saved to `/home/sidney/.xlcore/pluginConfigs/TwentyOne.json`.
 
 ### Debug build (DEBUG-only UI features)
 
-All debug tooling is `#if DEBUG` — absent in Release builds. Enable via the **Debug** button in the MainWindow top bar (appears in Debug builds only).
+All debug tooling is `#if DEBUG` - absent in Release builds. Enable via the **Debug** button in the MainWindow top bar (appears in Debug builds only).
 
 #### DebugWindow
 
-- **Roll queue** — pre-load card values (1–13) that `QueueHitRoll` consumes instead of sending chat rolls. Manual entry or loaded from scenario file.
-- **Scenario** — loads a JSON scenario file that sets up players/bets, enqueues rolls, and scripts the exact sequence of UI button clicks to execute. An orange banner appears in MainWindow while a scenario is active showing the next required step.
-- **Snapshot save/load** — serialize/restore `GameState` directly for reproducing specific game states.
+- **Roll queue** - pre-load card values (1–13) that `QueueHitRoll` consumes instead of sending chat rolls. Manual entry or loaded from scenario file.
+- **Scenario** - loads a JSON scenario file that sets up players/bets, enqueues rolls, and scripts the exact sequence of UI button clicks to execute. An orange banner appears in MainWindow while a scenario is active showing the next required step.
+- **Snapshot save/load** - serialize/restore `GameState` directly for reproducing specific game states.
 
 #### Scenario format
 
@@ -91,20 +91,20 @@ nix develop --command dotnet test TwentyOne.Tests/TwentyOne.Tests.csproj
 
 ### Project layout
 
-- `TwentyOne.Game/` — pure .NET library, no Dalamud dependency. Contains all game logic.
-- `TwentyOne/` — Dalamud plugin. UI and plugin lifecycle only. References `TwentyOne.Game`.
-- `TwentyOne.Tests/` — xUnit tests. References `TwentyOne.Game` only.
+- `TwentyOne.Game/` - pure .NET library, no Dalamud dependency. Contains all game logic.
+- `TwentyOne/` - Dalamud plugin. UI and plugin lifecycle only. References `TwentyOne.Game`.
+- `TwentyOne.Tests/` - xUnit tests. References `TwentyOne.Game` only.
 
 ### BankLedger (pure functional bank accounting)
 
 `BankLedger.Apply(long balance, BankTransaction) → (long NewBalance, BankTransactionEntry)`
 
-- Lives in `TwentyOne.Game/BankLedger.cs` — no Dalamud dependency, fully unit-testable.
+- Lives in `TwentyOne.Game/BankLedger.cs` - no Dalamud dependency, fully unit-testable.
 - `BankTransaction` is a discriminated union: `BankDeposit`, `BankWithdrawal`, `BankBet`, `BankWin`, `BankDoubleDown`, `BankSplit`, `BankBetAdjust`.
-- Never produces a negative balance — debits clamp to zero.
+- Never produces a negative balance - debits clamp to zero.
 - Returns both the new balance and a log entry (timestamp, kind, amount, post-transaction balance).
 - `MainWindow` calls `ApplyBank(stat, tx)` which calls `BankLedger.Apply`, writes result back to `stat.Bank`, appends entry to `stat.BankLog`. No raw bank arithmetic anywhere else.
-- Bank mutations are intentionally outside `GameState` and the undo stack — they represent real-money ledger entries.
+- Bank mutations are intentionally outside `GameState` and the undo stack - they represent real-money ledger entries.
 - Double/split bank deduction happens at **Confirm** time (not at Dbl/Spl button click).
 - `BankBetAdjust` carries a **signed** `Delta`: positive deducts (bet went up), negative refunds (bet went down). The stored `BankTransactionEntry.Amount` keeps the sign so the audit log shows direction.
 
@@ -142,7 +142,7 @@ Fields in `Configuration` (persisted, outside undo):
 
 ### Sessions
 
-`SessionManager` (in `TwentyOne.Game/SessionManager.cs`) — pure static class:
+`SessionManager` (in `TwentyOne.Game/SessionManager.cs`) - pure static class:
 - `TryStartSession`, `ShouldShowSessionBanner`, `BuildArchive`, `ResetGameStats`
 
 `MainWindow` shows a session banner (dismissible, resets on territory change). `SessionLedgerWindow.NewSession()` archives session, resets stat fields, clears round history/tips/gil tracker.
@@ -155,7 +155,7 @@ Fields in `Configuration` (persisted, outside undo):
 
 ### History viewer mode
 
-`MainWindow.isHistoryView` — when viewing a historical round via `HistoryWindow`:
+`MainWindow.isHistoryView` - when viewing a historical round via `HistoryWindow`:
 - `UpdatePlayerStats` is a no-op.
 - Current `GameState`, `UndoStack`, `RedoStack` saved in-memory, restored on `ExitHistoryView`.
 - A banner shown; all other UI renders normally against the historical snapshot.
@@ -181,15 +181,15 @@ Set by `OnChatMessage` switch over `TradeMonitor.Outcome`. Consumed by `DrawTrad
 ### MainWindow.Render.cs cell helpers
 
 The player table in `Draw()` uses extracted per-cell methods for navigability:
-- `DrawNameCell(RowCtx ctx, float cellRight)` — name with rename/spade/target/clear
-- `DrawBetCell(RowCtx ctx, float cellRight)` — bet input/display + Trade + Remind
-- `DrawCardsCell(Hand hand)` — hand string + "2x" badge
-- `DrawScoreCell(IReadOnlyList<int> cards, HandState state)` — score colored by bust/21
-- `DrawStatusCell(RowCtx ctx, float cellRight)` — payout result / hand state + Sit Out / Remind
-- `DrawActionsCell(RowCtx ctx, ScenarioGates gates, float cellRight, ref int removePlayerIndex)` — Hit/Stand/Dbl/Spl/Confirm/Cancel/Remove
-- `DrawSummaryRow(int pi, Player p, int displayPi, bool hasWorld, bool hasNickname, bool uiBusy)` — merged row for split-hand players
-- `DrawBankCell(loopIdx, actualIdx, player, bankCellRight, uiBusy)` — bank balance/shortfall/manage
-- `DrawBankManageButton(playerIndex, cellRight, idSuffix, uiBusy)` — Manage button
+- `DrawNameCell(RowCtx ctx, float cellRight)` - name with rename/spade/target/clear
+- `DrawBetCell(RowCtx ctx, float cellRight)` - bet input/display + Trade + Remind
+- `DrawCardsCell(Hand hand)` - hand string + "2x" badge
+- `DrawScoreCell(IReadOnlyList<int> cards, HandState state)` - score colored by bust/21
+- `DrawStatusCell(RowCtx ctx, float cellRight)` - payout result / hand state + Sit Out / Remind
+- `DrawActionsCell(RowCtx ctx, ScenarioGates gates, float cellRight, ref int removePlayerIndex)` - Hit/Stand/Dbl/Spl/Confirm/Cancel/Remove
+- `DrawSummaryRow(int pi, Player p, int displayPi, bool hasWorld, bool hasNickname, bool uiBusy)` - merged row for split-hand players
+- `DrawBankCell(loopIdx, actualIdx, player, bankCellRight, uiBusy)` - bank balance/shortfall/manage
+- `DrawBankManageButton(playerIndex, cellRight, idSuffix, uiBusy)` - Manage button
 
 `RowCtx` and `ScenarioGates` are readonly record structs that bundle per-row state.
 
@@ -197,16 +197,16 @@ The player table in `Draw()` uses extracted per-cell methods for navigability:
 
 Use only these player names in test cases: Lorah, Bekki, Nolla. If more than 3 names are needed, invent new ones. When a test requires a winning player, that player must always be Lorah. Write tests for all new features.
 
-**Two distinct test layers — do not conflate them:**
+**Two distinct test layers - do not conflate them:**
 
-- `TwentyOne.Tests/GameEngineTests.cs` — xUnit unit tests. Test `GameEngine.Apply()` calls in isolation. No Dalamud dependency. Covers individual action transitions, narration, payout math.
-- `TwentyOne.Tests/SessionTests.cs` — unit tests for `SessionManager`: banner logic, archive building, stat reset, auto-session tracking.
-- `TwentyOne.Tests/Helpers/GameStateBuilder.cs` — fluent builder for assembling `GameState` in tests. Supports `.Phase()`, `.Dealer()`, `.Player()`, `.ActiveHand()`, `.Charlie()`, `.BjPayout()`, `.WaitingForNextPlayer()`, `.WaitingForDealer()`, `.SkipDealSummaryOnePlayer()`, `.LastRoundWinners()`, `.LastRoundPushers()`. Use the `Player(Player)` overload for complex cases (split hands, sitting out, doubled hands).
-- `Scenarios/*.json` — human-replay integration tests. Loaded via DebugWindow in-game. Test the full stack: `MainWindow` orchestration (autoDealQueue deal sequence, deferred rolls, `AutoHit` side effects, button gating). Cannot be automated without replicating `MainWindow` logic separately, which creates a divergence risk. Run manually by loading and stepping/fast-forwarding in-game.
+- `TwentyOne.Tests/GameEngineTests.cs` - xUnit unit tests. Test `GameEngine.Apply()` calls in isolation. No Dalamud dependency. Covers individual action transitions, narration, payout math.
+- `TwentyOne.Tests/SessionTests.cs` - unit tests for `SessionManager`: banner logic, archive building, stat reset, auto-session tracking.
+- `TwentyOne.Tests/Helpers/GameStateBuilder.cs` - fluent builder for assembling `GameState` in tests. Supports `.Phase()`, `.Dealer()`, `.Player()`, `.ActiveHand()`, `.Charlie()`, `.BjPayout()`, `.WaitingForNextPlayer()`, `.WaitingForDealer()`, `.SkipDealSummaryOnePlayer()`, `.LastRoundWinners()`, `.LastRoundPushers()`. Use the `Player(Player)` overload for complex cases (split hands, sitting out, doubled hands).
+- `Scenarios/*.json` - human-replay integration tests. Loaded via DebugWindow in-game. Test the full stack: `MainWindow` orchestration (autoDealQueue deal sequence, deferred rolls, `AutoHit` side effects, button gating). Cannot be automated without replicating `MainWindow` logic separately, which creates a divergence risk. Run manually by loading and stepping/fast-forwarding in-game.
 
 ## Narration Templates
 
-`NarrationTemplates` properties are `List<List<string>>` — the outer list is random variants (one picked per use via `Random.Shared`), the inner list is the sequence of chat lines sent for that variant. Defaults always have exactly one variant. The three `DealSummary*` properties remain plain `string` (they are concatenated components, not narrated independently).
+`NarrationTemplates` properties are `List<List<string>>` - the outer list is random variants (one picked per use via `Random.Shared`), the inner list is the sequence of chat lines sent for that variant. Defaults always have exactly one variant. The three `DealSummary*` properties remain plain `string` (they are concatenated components, not narrated independently).
 
 Every narration string emitted via `SendChat` must have a corresponding property in `NarrationTemplates` and a row in `NarrationEditorWindow`. When adding a new `Narrate(...)` call in `GameEngine`, always:
 1. Add a `List<List<string>>` property to `NarrationTemplates` with a sensible single-variant default.
@@ -220,7 +220,7 @@ Active refactoring work is on the `refactor` branch (off `experimental`). Commit
 ## UI Rules
 
 - Never use non-ASCII characters (icons, arrows, symbols) on buttons unless explicitly requested. Use plain text labels only.
-- To right-align a button within a cell/region: use `SameLine()` followed by `if (GetCursorPosX() < targetX) SetCursorPosX(targetX)`, where `targetX = cellRight - buttonWidth` (button width = `CalcTextSize(...).X + FramePadding.X * 2`). Do **not** pass a position directly to `SameLine(pos)` — if `pos` is behind the current cursor, ImGui will clip or hide the widget.
+- To right-align a button within a cell/region: use `SameLine()` followed by `if (GetCursorPosX() < targetX) SetCursorPosX(targetX)`, where `targetX = cellRight - buttonWidth` (button width = `CalcTextSize(...).X + FramePadding.X * 2`). Do **not** pass a position directly to `SameLine(pos)` - if `pos` is behind the current cursor, ImGui will clip or hide the widget.
 
 ### Record types for immutable state
 
@@ -240,11 +240,11 @@ The old `GameEngine.With(...)` optional-parameter helper has been removed.
 - `BjPayout` (3:2 / 6:5 / 1:1) is a venue setting stored in `GameState` so it is snapshotted with each undo entry. It is changed directly (not via `Apply`) since payout changes are not undoable game actions.
 - `Player.Hands` supports multiple hands for splits. `GameState.ActiveHandIndex` tracks which hand is currently active alongside `ActivePlayerIndex`. `AdvanceFrom` iterates all `(player, hand)` pairs in order.
 - Double Down and Split require additional funds before they take effect. The UI tracks this as `pendingDouble`/`pendingSplit` (not in `GameState`). Clicking Dbl/Spl fires `AnnounceDouble`/`AnnounceSplit` (which picks a bank-covers or trade-required narration template based on current bank balance) and optionally opens the trade window. The actual `DoubleDown`/`SplitHand` action fires only after the dealer clicks Confirm. Bank deduction via `BankLedger` happens at Confirm time so any mid-round deposits land first.
-- Bet adjustment during the Deal phase (between Start Deal and Begin Player Turns): the dealer can click "Adjust" next to a player's bet to change it after cards have started dealing. `MainWindow.TryAdjustBet` computes the delta vs. the prior bet, validates bank can cover an increase (shortfall blocks the commit), applies a single `BankBetAdjust(delta)` ledger entry, then dispatches an `AdjustBet` action. The `AdjustBet` action has `PushesUndo => false` — bank entries are append-only, so a state-only revert would diverge from the ledger. Only allowed in `GamePhase.Deal`; sitting-out players are ignored. Cleared on `NewRound` and `BeginPlayerTurns`.
+- Bet adjustment during the Deal phase (between Start Deal and Begin Player Turns): the dealer can click "Adjust" next to a player's bet to change it after cards have started dealing. `MainWindow.TryAdjustBet` computes the delta vs. the prior bet, validates bank can cover an increase (shortfall blocks the commit), applies a single `BankBetAdjust(delta)` ledger entry, then dispatches an `AdjustBet` action. The `AdjustBet` action has `PushesUndo => false` - bank entries are append-only, so a state-only revert would diverge from the ledger. Only allowed in `GamePhase.Deal`; sitting-out players are ignored. Cleared on `NewRound` and `BeginPlayerTurns`.
 - `AnnounceDouble` and `AnnounceSplit` are excluded from the undo stack (like `AnnounceBettingOpen`).
 - Split rules: re-splits allowed (no limit); 21 on a split hand (`IsFromSplit=true`) is Playing/Stand, never Blackjack; split aces receive exactly one card then auto-stand (standard casino rule, see ToDo.txt for variant note).
 - Payout is calculated per-hand. `Hand.Bet` holds the effective bet when a hand has been doubled (empty = inherit `Player.Bet`).
 - `WaitingForDealer` must never be set unconditionally when transitioning to `DealerTurn`. Always derive it as `!CanGoToPayout(provisionalDealerState)`. This ensures special cases (all-bust, all-BJ, all-Charlie, or mixed terminal winning hands with safe upcard) skip the "Begin Dealer Turn" prompt and show "Go to Payout" directly. `CanGoToPayout` is the single source of truth for whether the dealer still needs to act.
 - All-bust: `AdvanceFrom` returns `GamePhase.Payout`; the engine maps this to `DealerTurn` with `WaitingForDealer=false`. The dealer Hit button and recommendation label are suppressed when all hands are bust. `CanGoToPayout` returns `true` immediately for all-bust.
 - All-BJ, all-Charlie (LosesToDealerBJ), or mixed BJ+Charlie: dealer must reveal their hole card only if their upcard is an ace or 10-value (could be BJ or Charlie-losing scenario). `CanGoToPayout` checks `allTerminalWin` for mixed hands, applying the same upcard rule. When the hole card is not needed, the game goes straight to "Go to Payout". `AnnounceDealerHit` emits `DealerBJCheck` instead of `DealerHitAnnounce` when all players have Blackjack.
-- `BeginPlayerTurns` auto-skips consecutive BJ hands when all remaining active hands are BJ. Scans ahead through BJ hands; if all are BJ, transitions directly to `DealerTurn` (or `Payout`) with no narration. If a non-BJ hand follows, narrates "moving along" for the first BJ and waits (old behavior). `AdvanceToNextPlayer` does NOT auto-skip — narrates and waits for each BJ hand encountered mid-round. The `allTerminalWin` check in `CanGoToPayout` ensures mixed BJ+Charlie hands skip the dealer turn when appropriate.
+- `BeginPlayerTurns` auto-skips consecutive BJ hands when all remaining active hands are BJ. Scans ahead through BJ hands; if all are BJ, transitions directly to `DealerTurn` (or `Payout`) with no narration. If a non-BJ hand follows, narrates "moving along" for the first BJ and waits (old behavior). `AdvanceToNextPlayer` does NOT auto-skip - narrates and waits for each BJ hand encountered mid-round. The `allTerminalWin` check in `CanGoToPayout` ensures mixed BJ+Charlie hands skip the dealer turn when appropriate.
