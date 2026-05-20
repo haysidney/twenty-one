@@ -1,5 +1,5 @@
 {
-  "name": "Single player \u2014 hits to 21 then stands (not blackjack, player wins)",
+  "name": "Single player - hits to 21 (auto-stand, not blackjack, player wins)",
   "players": [
     {
       "name": "Lorah",
@@ -18,7 +18,6 @@
     "StartDeal",
     "BeginPlayerTurns",
     "Hit:0:0",
-    "Stand:0:0",
     "BeginDealerTurn",
     "DealerHit",
     "DealerHit",
