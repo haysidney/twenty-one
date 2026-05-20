@@ -297,7 +297,7 @@ public partial class MainWindow : Window, IDisposable
             if (delta > 0 && stat.Bank < delta)
             {
                 var shortBy = delta - stat.Bank;
-                return (false, $"Bank short by {shortBy:N0} gil — trade more before increasing the bet.");
+                return (false, $"Bank short by {shortBy:N0} gil - trade more before increasing the bet.");
             }
             var beforeBank = stat.Bank;
             ApplyBank(stat, new BankBetAdjust(delta));

@@ -348,7 +348,7 @@ public partial class MainWindow
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
         {
             if (shortfall > 0)
-                ImGui.SetTooltip($"Bank short by {shortfall:N0} gil — lower the amount or take a trade first.");
+                ImGui.SetTooltip($"Bank short by {shortfall:N0} gil - lower the amount or take a trade first.");
             else if (parsedNew <= 0)
                 ImGui.SetTooltip("Enter a positive bet amount.");
             else if (delta == 0)
@@ -1633,7 +1633,7 @@ public partial class MainWindow
                 }
                 else
                 {
-                    ImGui.TextDisabled("—");
+                    ImGui.TextDisabled("-");
                 }
                 DrawBankManageButton(spi, sitBankCellRight, "sitbank", uiBusy);
 
@@ -1714,7 +1714,7 @@ public partial class MainWindow
             var acts = ah != null
                 ? GameEngine.ValidActionsString(ah, GameEngine.CanDouble(ah, ap.Bet), GameEngine.CanSplit(ah))
                 : string.Empty;
-            phaseLabel = $"Phase: Player Actions  ({name}'s turn — {acts})";
+            phaseLabel = $"Phase: Player Actions  ({name}'s turn - {acts})";
         }
         else
         {
@@ -1800,7 +1800,7 @@ public partial class MainWindow
                     if (State.Players.Length == 0)
                         tooltip = "Add at least one player first.";
                     else if (shortfallPlayers.Count > 0)
-                        tooltip = $"Bank shortfall — resolve before dealing:\n{string.Join("\n", shortfallPlayers)}";
+                        tooltip = $"Bank shortfall - resolve before dealing:\n{string.Join("\n", shortfallPlayers)}";
                     else
                         tooltip = "All players need a bet before dealing.";
                     ImGui.SetTooltip(tooltip);

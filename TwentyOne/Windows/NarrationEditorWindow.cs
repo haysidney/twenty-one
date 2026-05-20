@@ -16,7 +16,7 @@ public class NarrationEditorWindow : Window
     private readonly Configuration config;
 
     public NarrationEditorWindow(Configuration config)
-        : base("Twenty One — Narration Templates##NarrationEditor")
+        : base("Twenty One - Narration Templates##NarrationEditor")
     {
         this.config = config;
         SizeConstraints = new WindowSizeConstraints { MinimumSize = new Vector2(500, 300), MaximumSize = new Vector2(float.MaxValue, float.MaxValue) };
