@@ -15,7 +15,7 @@ public abstract record GameAction
 }
 
 /// <summary>
-/// Narration-only action — produces chat side effects but does not change
+/// Narration-only action - produces chat side effects but does not change
 /// <see cref="GameState"/>, so it must not push onto the undo stack.
 /// </summary>
 public abstract record Announcement : GameAction
@@ -50,20 +50,20 @@ public record AnnouncePlayerTurn(int PlayerIndex, int HandIndex) : Announcement;
 // Betting phase announcement (narration only)
 public record AnnounceBettingOpen : Announcement;
 
-// Bet-request announcement — sent when dealer shift+clicks Trade during Betting phase
+// Bet-request announcement - sent when dealer shift+clicks Trade during Betting phase
 public record AnnounceBetRequest(int PlayerIndex) : Announcement;
 
-// Bet-confirm announcement — sent when dealer clicks Confirm in the Bet cell during Betting phase
+// Bet-confirm announcement - sent when dealer clicks Confirm in the Bet cell during Betting phase
 // Bank is carried here since it lives outside GameState
 public record AnnounceBetConfirm(int PlayerIndex, long Bank) : Announcement;
 
-// Bank remind — sent when dealer clicks Remind in the Bank cell; carries bank balance since it lives outside GameState
+// Bank remind - sent when dealer clicks Remind in the Bank cell; carries bank balance since it lives outside GameState
 public record AnnounceBankRemind(int PlayerIndex, long Bank) : Announcement;
 
-// Bank shortfall request — sent when dealer shift+clicks Deposit and bank < bet
+// Bank shortfall request - sent when dealer shift+clicks Deposit and bank < bet
 public record AnnounceBankShortfall(int PlayerIndex, long ShortfallAmount) : Announcement;
 
-// Bank deposit/withdraw narration — logged after direct bank mutations
+// Bank deposit/withdraw narration - logged after direct bank mutations
 public record AnnounceBankDeposit (int PlayerIndex, long Amount, long NewBalance) : Announcement;
 public record AnnounceBankWithdraw(int PlayerIndex, long Amount, long NewBalance) : Announcement;
 

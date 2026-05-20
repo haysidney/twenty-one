@@ -21,7 +21,7 @@ internal sealed partial class ChatQueue
 
     private static readonly HashSet<string> RateLimitedSlashCommands = ["/random", "/dice"];
 
-    // Slash commands that produce visible chat in some channel — used to detect "cross-channel"
+    // Slash commands that produce visible chat in some channel - used to detect "cross-channel"
     // overrides that would otherwise silently broadcast.
     private static readonly HashSet<string> ChannelCommands = new(StringComparer.OrdinalIgnoreCase)
     {

@@ -139,7 +139,7 @@ public class ApplyAddDealerCardTests
     [Fact]
     public void AddDealerCard_DealerTurn_NarratesNormalDraw()
     {
-        // Draw a 4 → total 14, dealer must still hit — only one narration line
+        // Draw a 4 → total 14, dealer must still hit - only one narration line
         var (newState, effects) = GameEngine.Apply(DealerTurnState(), new AddDealerCard(4));
         Assert.Single(effects);
         Assert.Contains("Dealer draws 4", ((SendChat)effects[0]).Text);
@@ -333,7 +333,7 @@ public class ApplyPhaseTransitionTests
     [Fact]
     public void AddPlayerCard_CompletingDeal_NarratesDealSummary()
     {
-        // Last card dealt (Bekki's 2nd card) completes the deal — summary fires here.
+        // Last card dealt (Bekki's 2nd card) completes the deal - summary fires here.
         var state = new GameStateBuilder()
             .Phase(GamePhase.Deal)
             .Dealer(10)
@@ -342,7 +342,7 @@ public class ApplyPhaseTransitionTests
             .Build();
         var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(1, 0, 9));
         Assert.Single(effects);
-        Assert.Contains("Deal —", ((SendChat)effects[0]).Text);
+        Assert.Contains("Deal -", ((SendChat)effects[0]).Text);
     }
 
     [Fact]
@@ -462,7 +462,7 @@ public class PayoutTests
     [Fact]
     public void DealerBlackjack_PlayerStand21_Loses()
     {
-        // Player has 21 via three cards (not BJ); dealer has natural BJ — player loses
+        // Player has 21 via three cards (not BJ); dealer has natural BJ - player loses
         var state = PayoutState([7, 7, 7], HandState.Stand, [1, 10]);
         Assert.Equal(PayoutResult.Lose, GameEngine.GetPayoutResult(state, 0));
     }
@@ -1341,7 +1341,7 @@ public class DoubleDownTests
     [Fact]
     public void AnnounceDouble_FromBank_ZeroRemaining_ShowsZeroNotNegative()
     {
-        // Bank exactly covers the bet — BankAfter must be 0, never negative
+        // Bank exactly covers the bet - BankAfter must be 0, never negative
         var state = ActiveState([5, 6]);
         var t = new NarrationTemplates { PlayerDoubleRequestBank = [["{name} {amount} {bank}"]] };
         var (_, effects) = GameEngine.Apply(state, new AnnounceDouble(0, 0, FromBank: true, BankAfter: 0), t);
@@ -2461,7 +2461,7 @@ public class BankLedgerTests
         Assert.Equal(1000, bal);
     }
 
-    // ── Debits — normal ────────────────────────────────────────────────────────
+    // ── Debits - normal ────────────────────────────────────────────────────────
 
     [Fact]
     public void Withdrawal_DecreasesBalance()
@@ -2495,7 +2495,7 @@ public class BankLedgerTests
         Assert.Equal(BankTransactionKind.Split, entry.Kind);
     }
 
-    // ── Debits — floor at zero, never negative ─────────────────────────────────
+    // ── Debits - floor at zero, never negative ─────────────────────────────────
 
     [Fact]
     public void Withdrawal_ExceedsBalance_ClampsToZero()
@@ -2514,7 +2514,7 @@ public class BankLedgerTests
     [Fact]
     public void DoubleDown_ExceedsBalance_ClampsToZero()
     {
-        // Player traded to cover the double — bank may be 0; deduction never goes negative
+        // Player traded to cover the double - bank may be 0; deduction never goes negative
         var (bal, _) = Apply(0, new BankDoubleDown(1000));
         Assert.Equal(0, bal);
     }
@@ -2534,7 +2534,7 @@ public class BankLedgerTests
         Assert.Equal(0, entry.Balance);
     }
 
-    // ── Sequence — bet-all then double via trade ────────────────────────────────
+    // ── Sequence - bet-all then double via trade ────────────────────────────────
 
     [Fact]
     public void BetAll_ThenDepositForDouble_ThenDoubleDown_CorrectSequence()
@@ -2554,7 +2554,7 @@ public class BankLedgerTests
     [Fact]
     public void BetAll_ThenDepositExtra_ThenDoubleDown_ExcessStaysInBank()
     {
-        // Player trades 2000 (only 1000 needed for double) — excess stays in bank
+        // Player trades 2000 (only 1000 needed for double) - excess stays in bank
         long bank = 1000;
         (bank, _) = Apply(bank, new BankBet(1000));
         Assert.Equal(0, bank);
@@ -2584,7 +2584,7 @@ public class BankLedgerTests
         Assert.Equal(t, entry.Timestamp);
     }
 
-    // ── BetAdjust — signed delta semantics ─────────────────────────────────────
+    // ── BetAdjust - signed delta semantics ─────────────────────────────────────
 
     [Fact]
     public void BetAdjust_PositiveDelta_DeductsFromBank()

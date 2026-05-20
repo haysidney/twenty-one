@@ -92,7 +92,7 @@ public class SessionTests
     [Fact]
     public void BuildArchive_NoGameStateReference()
     {
-        // RoundSummary has no GameState — verify by construction
+        // RoundSummary has no GameState - verify by construction
         var src = new RoundSummary { RoundNumber = 1, BankNet = 0 };
         Assert.IsType<RoundSummary>(src);
     }

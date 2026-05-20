@@ -206,7 +206,7 @@ public partial class MainWindow : Window, IDisposable
                  && !IsTransientSplitState(config.GameState)
                  && !IsTransientDoubleState(config.GameState))
         {
-            // GameEngine is pure — it never mutates state, so pushing the current
+            // GameEngine is pure - it never mutates state, so pushing the current
             // reference is safe; future Apply calls create entirely new objects.
             config.UndoStack.Add(config.GameState);
         }
@@ -480,11 +480,11 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    // "You roll a [icon] 7 (out of 13)." — response to /random in public channels
+    // "You roll a [icon] 7 (out of 13)." - response to /random in public channels
     [GeneratedRegex(@"You roll a\D+(\d+) \(out of 13\)")]
     private static partial Regex RandomRollRegex();
 
-    // "Random! (1-13)[icon] 7" — response to /dice in private channels
+    // "Random! (1-13)[icon] 7" - response to /dice in private channels
     [GeneratedRegex(@"Random! \(1-13\)\D*(\d+)")]
     private static partial Regex DiceRollRegex();
 
@@ -542,7 +542,7 @@ public partial class MainWindow : Window, IDisposable
         {
             var before = stat.Bank;
             ApplyBank(stat, new BankDoubleDown(amt));
-            config.NarrationLog.Add($"[Bank] {p.DisplayName}: doubled — {amt:N0} deducted (was {before:N0} → {stat.Bank:N0})");
+            config.NarrationLog.Add($"[Bank] {p.DisplayName}: doubled - {amt:N0} deducted (was {before:N0} → {stat.Bank:N0})");
             config.Save();
         }
         pendingDouble = null;
@@ -558,7 +558,7 @@ public partial class MainWindow : Window, IDisposable
         {
             var before = stat.Bank;
             ApplyBank(stat, new BankSplit(amt));
-            config.NarrationLog.Add($"[Bank] {p.DisplayName}: split — {amt:N0} deducted (was {before:N0} → {stat.Bank:N0})");
+            config.NarrationLog.Add($"[Bank] {p.DisplayName}: split - {amt:N0} deducted (was {before:N0} → {stat.Bank:N0})");
             config.Save();
         }
         Apply(new SplitHand(pi, hi));

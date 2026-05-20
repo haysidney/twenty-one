@@ -1,5 +1,5 @@
 {
-  "name": "Two players + sitting out — all active BJ, dealer 10-value upcard (must check hole card, no dealer BJ)",
+  "name": "Two players + sitting out - all active BJ, dealer 10-value upcard (must check hole card, no dealer BJ)",
   "players": [
     {
       "name": "Lorah",

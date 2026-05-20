@@ -149,7 +149,7 @@ public class Configuration : IPluginConfiguration
     /// <summary>
     /// Mutate <see cref="GameState"/> directly and persist. Reserved for "house rule"
     /// settings that intentionally live on <c>GameState</c> (so they snapshot with
-    /// undo entries) but are NOT themselves undoable game actions — payout ratios,
+    /// undo entries) but are NOT themselves undoable game actions - payout ratios,
     /// charlie rules, and similar UI-driven knobs. All such writes should go through
     /// here so the exception to "no direct GameState writes outside Apply" is named
     /// and greppable.

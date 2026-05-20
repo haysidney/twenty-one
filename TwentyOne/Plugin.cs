@@ -32,7 +32,7 @@ public sealed class Plugin : IDalamudPlugin
     // Outdoor housing territory IDs.
     private static readonly HashSet<uint> OutdoorHousingTerritories = [339, 340, 341, 641, 979];
 
-    // Last outdoor housing territory seen — used to resolve indoor addresses.
+    // Last outdoor housing territory seen - used to resolve indoor addresses.
     internal static uint LastOutdoorHousingTerritoryId { get; private set; }
 
     /// <summary>Returns the current housing address key, or null if not in a housing zone.</summary>

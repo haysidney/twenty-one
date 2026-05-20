@@ -1310,7 +1310,7 @@ public partial class MainWindow
             sessionBannerDismissed  = false;
         }
 
-        // Drain outgoing queue — hold a roll entry until the previous roll's response has arrived.
+        // Drain outgoing queue - hold a roll entry until the previous roll's response has arrived.
         var isPublicChannel = config.ChatChannel is "/say" or "/yell" or "/shout";
         var cooldownMs      = isPublicChannel ? config.PublicChatCooldownMs : config.PrivateChatCooldownMs;
         chatQueue.TryDrain(DateTime.UtcNow, cooldownMs, config.SlashCommandCooldownMs, blockedByPendingHit: pendingHit != null);

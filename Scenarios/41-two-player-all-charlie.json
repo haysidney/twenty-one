@@ -1,5 +1,5 @@
 {
-  "name": "Two players — both Five Card Charlie (BeatsAll, safe upcard 7, skips dealer)",
+  "name": "Two players - both Five Card Charlie (BeatsAll, safe upcard 7, skips dealer)",
   "fiveCardCharlie": "BeatsAll",
   "players": [
     {

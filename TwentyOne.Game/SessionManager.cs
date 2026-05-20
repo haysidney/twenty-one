@@ -18,7 +18,7 @@ public class PlayerStatData
     public long   TotalWon    { get; set; }
 }
 
-// Pure static session logic — no Dalamud dependency, fully unit-testable.
+// Pure static session logic - no Dalamud dependency, fully unit-testable.
 public static class SessionManager
 {
     private static readonly TimeSpan StaleThreshold = TimeSpan.FromHours(8);

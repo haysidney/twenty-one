@@ -1,5 +1,5 @@
 {
-  "name": "Single player — Five Card Charlie loses to dealer BJ (LosesToDealerBJ rule)",
+  "name": "Single player - Five Card Charlie loses to dealer BJ (LosesToDealerBJ rule)",
   "fiveCardCharlie": "LosesToDealerBJ",
   "players": [
     {

@@ -4,7 +4,7 @@ using System.Linq;
 namespace TwentyOne.Game;
 
 /// <summary>
-/// Read-only convenience queries over <see cref="GameState"/>. Pure-core only —
+/// Read-only convenience queries over <see cref="GameState"/>. Pure-core only -
 /// these are derived predicates that show up at many call sites and benefit
 /// from a shared name and definition.
 /// </summary>
@@ -24,7 +24,7 @@ public static class GameStateQueries
 
     /// <summary>
     /// True if every non-sitting-out player has busted on every hand. Returns
-    /// false for an empty roster — there is no round to evaluate.
+    /// false for an empty roster - there is no round to evaluate.
     /// </summary>
     public static bool IsAllBust(this GameState s) =>
         s.Players.Length > 0

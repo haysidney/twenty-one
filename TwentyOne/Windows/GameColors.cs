@@ -4,8 +4,8 @@ namespace TwentyOne.Windows;
 
 /// <summary>
 /// Centralised ImGui colour palette. Every coloured text/style call site in the
-/// plugin's windows should pull from this class so that semantic names — and
-/// the actual RGB values — stay in one place.
+/// plugin's windows should pull from this class so that semantic names - and
+/// the actual RGB values - stay in one place.
 /// </summary>
 internal static class GameColors
 {

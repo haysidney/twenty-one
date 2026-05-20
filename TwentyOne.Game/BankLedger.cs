@@ -13,7 +13,7 @@ public class BankTransactionEntry
     public long                Balance   { get; set; }
 }
 
-// Discriminated union — one type per bank event
+// Discriminated union - one type per bank event
 public interface IBankTransaction;
 
 public record BankDeposit(long Amount)    : IBankTransaction;
