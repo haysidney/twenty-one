@@ -1365,9 +1365,27 @@ public partial class MainWindow
 
         ImGui.Separator();
 
-        var dealerHitActive = GameEngine.CanHitDealer(State);
+        DrawDealerSection();
 
-        // ── Dealer section ────────────────────────────────────────────────────
+        DrawPlayerTable(uiBusy, out int removeAt);
+        if (removeAt >= 0)
+        {
+            betEdits.Remove(removeAt);
+            var shifted = betEdits.Where(kv => kv.Key > removeAt).ToList();
+            foreach (var kv in shifted) { betEdits.Remove(kv.Key); betEdits[kv.Key - 1] = kv.Value; }
+            Apply(new RemovePlayer(removeAt));
+        }
+
+        DrawAddPlayerRow();
+        DrawPhaseActionBar();
+
+        if (uiBusy) ImGui.EndDisabled();
+
+        DrawNarrationPanel();
+    }
+
+    private void DrawDealerSection()
+    {
         ImGui.Text("-- Dealer --");
         ImGui.Separator();
 
@@ -1386,20 +1404,18 @@ public partial class MainWindow
             else
             {
                 ImGui.Text($"= {scoreStr}");
-                var rec = GameEngine.DealerRecommendation(State.DealerHand);
+                var rec     = GameEngine.DealerRecommendation(State.DealerHand);
                 var allBust = State.IsAllBust();
                 if (rec.Length > 0 && Phase == GamePhase.DealerTurn && !allBust)
                 {
                     ImGui.SameLine();
-                    var rc = rec == "HIT"
-                        ? GameColors.PlayingGreen
-                        : GameColors.DisabledGrey;
+                    var rc = rec == "HIT" ? GameColors.PlayingGreen : GameColors.DisabledGrey;
                     ImGui.TextColored(rc, $"→ {rec}");
                 }
             }
         }
 
-        if (dealerHitActive)
+        if (GameEngine.CanHitDealer(State))
         {
             if (State.DealerHand.Cards.Length > 0) ImGui.SameLine();
 #if DEBUG
@@ -1418,8 +1434,12 @@ public partial class MainWindow
             if (!_scenDHit) ImGui.EndDisabled();
 #endif
         }
+    }
 
-        // ── Player table ──────────────────────────────────────────────────────
+    private void DrawPlayerTable(bool uiBusy, out int removeAt)
+    {
+        removeAt = -1;
+
         ImGui.AlignTextToFramePadding();
         ImGui.Text("-- Players --");
         if (Phase == GamePhase.Betting)
@@ -1430,7 +1450,7 @@ public partial class MainWindow
                 if (ImGui.SmallButton("Confirm"))
                 {
                     Apply(new ReorderPlayers(reorderIndices));
-                    isReorderMode = false;
+                    isReorderMode  = false;
                     reorderIndices = [];
                 }
             }
@@ -1459,238 +1479,220 @@ public partial class MainWindow
 
         var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
                          ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
-        int removeAt = -1;
-        if (ImGui.BeginTable("##players"u8, 7, tableFlags))
+        if (!ImGui.BeginTable("##players"u8, 7, tableFlags)) return;
+        ImGui.TableSetupColumn("Name"u8,      ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Bet"u8,       ImGuiTableColumnFlags.WidthFixed, 70);
+        ImGui.TableSetupColumn("Bank"u8,      ImGuiTableColumnFlags.WidthFixed, 130);
+        ImGui.TableSetupColumn("Cards"u8,     ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Score"u8,     ImGuiTableColumnFlags.WidthFixed, 55);
+        ImGui.TableSetupColumn("Status"u8,    ImGuiTableColumnFlags.WidthFixed, 100);
+        ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 190);
+        ImGui.TableHeadersRow();
+
+        (int A, int B)? reorderSwap = null;
+        for (var pi = 0; pi < State.Players.Length; pi++)
         {
-            ImGui.TableSetupColumn("Name"u8,      ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Bet"u8,       ImGuiTableColumnFlags.WidthFixed, 70);
-            ImGui.TableSetupColumn("Bank"u8,      ImGuiTableColumnFlags.WidthFixed, 130);
-            ImGui.TableSetupColumn("Cards"u8,     ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Score"u8,     ImGuiTableColumnFlags.WidthFixed, 55);
-            ImGui.TableSetupColumn("Status"u8,    ImGuiTableColumnFlags.WidthFixed, 100);
-            ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 190);
-            ImGui.TableHeadersRow();
+            var displayPi = isReorderMode ? reorderIndices[pi] : pi;
+            var p         = State.Players[displayPi];
+            if (p.SittingOut) continue;
+            var hasWorld    = p.World.Length > 0;
+            var hasNickname = p.Nickname.Length > 0;
+            var multiHand   = p.Hands.Length > 1;
 
-            (int A, int B)? reorderSwap = null;
-            for (var pi = 0; pi < State.Players.Length; pi++)
+            if (multiHand)
+                DrawSummaryRow(pi, p, displayPi, hasWorld, hasNickname, uiBusy);
+
+            for (var hi = 0; hi < p.Hands.Length; hi++)
             {
-                var displayPi = isReorderMode ? reorderIndices[pi] : pi;
-                var p         = State.Players[displayPi];
-                if (p.SittingOut) continue;
-                var hasWorld    = p.World.Length > 0;
-                var hasNickname = p.Nickname.Length > 0;
-                var multiHand = p.Hands.Length > 1;
+                var hand         = p.Hands[hi];
+                var isFirstHand  = hi == 0;
+                var isActiveHand = Phase == GamePhase.PlayerTurns
+                                && pi == ActivePlayerIndex && hi == ActiveHandIndex;
+                var ctx = new RowCtx(
+                    LoopIndex:    pi,
+                    Pi:           pi,
+                    Hi:           hi,
+                    Player:       p,
+                    Hand:         hand,
+                    IsFirstHand:  isFirstHand,
+                    IsActiveHand: isActiveHand,
+                    MultiHand:    multiHand,
+                    HasWorld:     hasWorld,
+                    HasNickname:  hasNickname);
 
-                // ── Summary row for split players ─────────────────────────────
-                if (multiHand)
-                    DrawSummaryRow(pi, p, displayPi, hasWorld, hasNickname, uiBusy);
+                ImGui.TableNextRow();
+                if (isActiveHand)
+                    ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1,
+                        ToU32(new Vector4(0.25f, 0.45f, 0.75f, 0.35f)));
 
-                for (var hi = 0; hi < p.Hands.Length; hi++)
+                // ── Name column ────────────────────────────────────────────
+                ImGui.TableSetColumnIndex(0);
+                var nameCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                if (isReorderMode && isFirstHand && !multiHand)
                 {
-                    var hand        = p.Hands[hi];
-                    var isFirstHand = hi == 0;
-                    var isActiveHand = Phase == GamePhase.PlayerTurns
-                                    && pi == ActivePlayerIndex && hi == ActiveHandIndex;
-                    var ctx = new RowCtx(
-                        LoopIndex:    pi,
-                        Pi:           pi,
-                        Hi:           hi,
-                        Player:       p,
-                        Hand:         hand,
-                        IsFirstHand:  isFirstHand,
-                        IsActiveHand: isActiveHand,
-                        MultiHand:    multiHand,
-                        HasWorld:     hasWorld,
-                        HasNickname:  hasNickname);
-
-                    ImGui.TableNextRow();
-                    if (isActiveHand)
-                        ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1,
-                            ToU32(new Vector4(0.25f, 0.45f, 0.75f, 0.35f)));
-
-                    // ── Name column ───────────────────────────────────────────
-                    ImGui.TableSetColumnIndex(0);
-                    var nameCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                    if (isReorderMode && isFirstHand && !multiHand)
-                    {
-                        if (pi == 0) ImGui.BeginDisabled();
-                        if (ImGui.SmallButton($"\u2191##{pi}reorderUp")) reorderSwap = (pi, pi - 1);
-                        if (pi == 0) ImGui.EndDisabled();
-                        ImGui.SameLine();
-                        if (pi == State.Players.Length - 1) ImGui.BeginDisabled();
-                        if (ImGui.SmallButton($"\u2193##{pi}reorderDown")) reorderSwap = (pi, pi + 1);
-                        if (pi == State.Players.Length - 1) ImGui.EndDisabled();
-                        ImGui.SameLine();
-                        ImGui.AlignTextToFramePadding();
-                        ImGui.TextUnformatted(p.DisplayName);
-                    }
-                    else
-                    {
-                        DrawNameCell(ctx, nameCellRight);
-                    }
-
-                    // ── Bet column ────────────────────────────────────────────
-                    ImGui.TableSetColumnIndex(1);
-                    var betCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                    DrawBetCell(ctx, betCellRight);
-
-                    // ── Bank column ───────────────────────────────────────────
-                    ImGui.TableSetColumnIndex(2);
-                    if (isFirstHand && !multiHand)
-                        DrawBankCell(pi, displayPi, p, ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X, uiBusy);
-
-                    // ── Cards column ──────────────────────────────────────────
-                    ImGui.TableSetColumnIndex(3);
-                    DrawCardsCell(hand);
-
-                    // ── Score column ──────────────────────────────────────────
-                    ImGui.TableSetColumnIndex(4);
-                    DrawScoreCell(hand.Cards, hand.State);
-
-                    // ── Status column ─────────────────────────────────────────
-                    ImGui.TableSetColumnIndex(5);
-                    var statusCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                    DrawStatusCell(ctx, statusCellRight);
-
-                    // ── Actions column ────────────────────────────────────────
-                    ImGui.TableSetColumnIndex(6);
-                    var actionsCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-#if DEBUG
-                    var gates = new ScenarioGates(
-                        Hit: Scenario.IsStep($"Hit:{pi}:{hi}"),
-                        Stand: Scenario.IsStep($"Stand:{pi}:{hi}"),
-                        Dbl: Scenario.IsStep($"Dbl:{pi}:{hi}"),
-                        Spl: Scenario.IsStep($"Spl:{pi}:{hi}"),
-                        ConfirmDbl: Scenario.IsStep($"ConfirmDbl:{pi}:{hi}"),
-                        ConfirmSpl: Scenario.IsStep($"ConfirmSpl:{pi}:{hi}"),
-                        AdvancePlayer: Scenario.IsStep("AdvancePlayer"));
-#endif
-                    DrawActionsCell(ctx,
-#if DEBUG
-                        gates,
-#endif
-                        actionsCellRight, ref removeAt);
+                    if (pi == 0) ImGui.BeginDisabled();
+                    if (ImGui.SmallButton($"↑##{pi}reorderUp")) reorderSwap = (pi, pi - 1);
+                    if (pi == 0) ImGui.EndDisabled();
+                    ImGui.SameLine();
+                    if (pi == State.Players.Length - 1) ImGui.BeginDisabled();
+                    if (ImGui.SmallButton($"↓##{pi}reorderDown")) reorderSwap = (pi, pi + 1);
+                    if (pi == State.Players.Length - 1) ImGui.EndDisabled();
+                    ImGui.SameLine();
+                    ImGui.AlignTextToFramePadding();
+                    ImGui.TextUnformatted(p.DisplayName);
+                }
+                else
+                {
+                    DrawNameCell(ctx, nameCellRight);
                 }
 
+                // ── Bet column ────────────────────────────────────────────────
+                ImGui.TableSetColumnIndex(1);
+                DrawBetCell(ctx, ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X);
+
+                // ── Bank column ───────────────────────────────────────────────
+                ImGui.TableSetColumnIndex(2);
+                if (isFirstHand && !multiHand)
+                    DrawBankCell(pi, displayPi, p, ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X, uiBusy);
+
+                // ── Cards column ──────────────────────────────────────────────
+                ImGui.TableSetColumnIndex(3);
+                DrawCardsCell(hand);
+
+                // ── Score column ──────────────────────────────────────────────
+                ImGui.TableSetColumnIndex(4);
+                DrawScoreCell(hand.Cards, hand.State);
+
+                // ── Status column ─────────────────────────────────────────────
+                ImGui.TableSetColumnIndex(5);
+                DrawStatusCell(ctx, ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X);
+
+                // ── Actions column ────────────────────────────────────────────
+                ImGui.TableSetColumnIndex(6);
+#if DEBUG
+                var gates = new ScenarioGates(
+                    Hit: Scenario.IsStep($"Hit:{pi}:{hi}"),
+                    Stand: Scenario.IsStep($"Stand:{pi}:{hi}"),
+                    Dbl: Scenario.IsStep($"Dbl:{pi}:{hi}"),
+                    Spl: Scenario.IsStep($"Spl:{pi}:{hi}"),
+                    ConfirmDbl: Scenario.IsStep($"ConfirmDbl:{pi}:{hi}"),
+                    ConfirmSpl: Scenario.IsStep($"ConfirmSpl:{pi}:{hi}"),
+                    AdvancePlayer: Scenario.IsStep("AdvancePlayer"));
+#endif
+                DrawActionsCell(ctx,
+#if DEBUG
+                    gates,
+#endif
+                    ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X, ref removeAt);
             }
+        }
 
-            if (reorderSwap.HasValue)
-                (reorderIndices[reorderSwap.Value.A], reorderIndices[reorderSwap.Value.B]) =
-                    (reorderIndices[reorderSwap.Value.B], reorderIndices[reorderSwap.Value.A]);
+        if (reorderSwap.HasValue)
+            (reorderIndices[reorderSwap.Value.A], reorderIndices[reorderSwap.Value.B]) =
+                (reorderIndices[reorderSwap.Value.B], reorderIndices[reorderSwap.Value.A]);
 
-            // ── Sitting-out section ───────────────────────────────────────────
-            var sittingOutPlayers = State.Players
-                .Select((p, i) => (p, i))
-                .Where(x => x.p.SittingOut)
-                .ToList();
-            if (sittingOutPlayers.Count > 0)
+        // ── Sitting-out section ────────────────────────────────────────────
+        var sittingOutPlayers = State.Players
+            .Select((p, i) => (p, i))
+            .Where(x => x.p.SittingOut)
+            .ToList();
+        if (sittingOutPlayers.Count > 0)
+        {
+            ImGui.TableNextRow();
+            ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ToU32(new Vector4(0.10f, 0.10f, 0.10f, 1f)));
+            ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, ToU32(new Vector4(0.10f, 0.10f, 0.10f, 1f)));
+            ImGui.TableSetColumnIndex(0);
+            ImGui.AlignTextToFramePadding();
+            ImGui.TextDisabled("Sitting out");
+
+            foreach (var (sp, spi) in sittingOutPlayers)
             {
-                // Separator label row
                 ImGui.TableNextRow();
-                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ToU32(new Vector4(0.10f, 0.10f, 0.10f, 1f)));
-                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, ToU32(new Vector4(0.10f, 0.10f, 0.10f, 1f)));
+                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ToU32(new Vector4(0.18f, 0.18f, 0.18f, 1f)));
+                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, ToU32(new Vector4(0.18f, 0.18f, 0.18f, 1f)));
+
                 ImGui.TableSetColumnIndex(0);
                 ImGui.AlignTextToFramePadding();
-                ImGui.TextDisabled("Sitting out");
+                ImGui.TextDisabled(sp.DisplayName);
+                if (ImGui.IsItemHovered() && sp.World.Length > 0)
+                    ImGui.SetTooltip($"{sp.FullName}@{sp.World}");
 
-                foreach (var (sp, spi) in sittingOutPlayers)
+                ImGui.TableSetColumnIndex(2);
+                var sitBankVal       = sp.BankBalance(config);
+                var sitBankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                ImGui.AlignTextToFramePadding();
+                if (sitBankVal > 0)
                 {
-                    ImGui.TableNextRow();
-                    ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, ToU32(new Vector4(0.18f, 0.18f, 0.18f, 1f)));
-                    ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, ToU32(new Vector4(0.18f, 0.18f, 0.18f, 1f)));
-
-                    // Name
-                    ImGui.TableSetColumnIndex(0);
-                    ImGui.AlignTextToFramePadding();
-                    ImGui.TextDisabled(sp.DisplayName);
-                    if (ImGui.IsItemHovered() && sp.World.Length > 0)
-                        ImGui.SetTooltip($"{sp.FullName}@{sp.World}");
-
-                    // Bank
-                    ImGui.TableSetColumnIndex(2);
-                    var sitBankVal = sp.BankBalance(config);
-                    var sitBankCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                    ImGui.AlignTextToFramePadding();
-                    if (sitBankVal > 0)
+                    ImGui.TextDisabled(GameEngine.FormatGil(sitBankVal));
+                    if (ImGui.IsItemHovered())
                     {
-                        ImGui.TextDisabled(GameEngine.FormatGil(sitBankVal));
-                        if (ImGui.IsItemHovered())
-                        {
-                            ImGui.SetTooltip("Click to copy");
-                            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                                ImGui.SetClipboardText(sitBankVal.ToString());
-                        }
-                    }
-                    else
-                    {
-                        ImGui.TextDisabled("—");
-                    }
-                    DrawBankManageButton(spi, sitBankCellRight, "sitbank", uiBusy);
-
-                    // Status: Resume button
-                    ImGui.TableSetColumnIndex(5);
-                    var sitStatusCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                    var resumeW = ImGui.CalcTextSize("Resume").X + ImGui.GetStyle().FramePadding.X * 2;
-                    ImGui.SetCursorPosX(sitStatusCellRight - resumeW);
-                    var canResume = Phase == GamePhase.Betting;
-                    if (!canResume) ImGui.BeginDisabled();
-                    ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.55f, 0.35f, 0.1f, 1f));
-                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.65f, 0.45f, 0.15f, 1f));
-                    ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.75f, 0.55f, 0.2f, 1f));
-                    if (ImGui.SmallButton($"Resume##{spi}sitresume"))
-                        Apply(new ToggleSittingOut(spi));
-                    ImGui.PopStyleColor(3);
-                    if (!canResume) ImGui.EndDisabled();
-                    if (!canResume && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                        ImGui.SetTooltip("Players can only resume during the betting phase.");
-
-                    // Actions: Remove (betting only)
-                    ImGui.TableSetColumnIndex(6);
-                    if (Phase == GamePhase.Betting)
-                    {
-                        var sitActCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                        var sitRemoveW = ImGui.CalcTextSize("X").X + ImGui.GetStyle().FramePadding.X * 2;
-                        ImGui.SetCursorPosX(sitActCellRight - sitRemoveW);
-                        ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.7f, 0.15f, 0.15f, 1f));
-                        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.25f, 0.25f, 1f));
-                        ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.5f, 0.05f, 0.05f, 1f));
-                        if (ImGui.SmallButton($"X##{spi}sitremove")) removeAt = spi;
-                        ImGui.PopStyleColor(3);
+                        ImGui.SetTooltip("Click to copy");
+                        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                            ImGui.SetClipboardText(sitBankVal.ToString());
                     }
                 }
+                else
+                {
+                    ImGui.TextDisabled("—");
+                }
+                DrawBankManageButton(spi, sitBankCellRight, "sitbank", uiBusy);
+
+                ImGui.TableSetColumnIndex(5);
+                var sitStatusCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                var resumeW = ImGui.CalcTextSize("Resume").X + ImGui.GetStyle().FramePadding.X * 2;
+                ImGui.SetCursorPosX(sitStatusCellRight - resumeW);
+                var canResume = Phase == GamePhase.Betting;
+                if (!canResume) ImGui.BeginDisabled();
+                ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.55f, 0.35f, 0.1f, 1f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.65f, 0.45f, 0.15f, 1f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.75f, 0.55f, 0.2f, 1f));
+                if (ImGui.SmallButton($"Resume##{spi}sitresume"))
+                    Apply(new ToggleSittingOut(spi));
+                ImGui.PopStyleColor(3);
+                if (!canResume) ImGui.EndDisabled();
+                if (!canResume && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip("Players can only resume during the betting phase.");
+
+                ImGui.TableSetColumnIndex(6);
+                if (Phase == GamePhase.Betting)
+                {
+                    var sitActCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
+                    var sitRemoveW = ImGui.CalcTextSize("X").X + ImGui.GetStyle().FramePadding.X * 2;
+                    ImGui.SetCursorPosX(sitActCellRight - sitRemoveW);
+                    ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.7f, 0.15f, 0.15f, 1f));
+                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.9f, 0.25f, 0.25f, 1f));
+                    ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.5f, 0.05f, 0.05f, 1f));
+                    if (ImGui.SmallButton($"X##{spi}sitremove")) removeAt = spi;
+                    ImGui.PopStyleColor(3);
+                }
             }
-
-            ImGui.EndTable();
         }
 
-        if (removeAt >= 0)
-        {
-            betEdits.Remove(removeAt);
-            var shifted = betEdits.Where(kv => kv.Key > removeAt).ToList();
-            foreach (var kv in shifted) { betEdits.Remove(kv.Key); betEdits[kv.Key - 1] = kv.Value; }
-            Apply(new RemovePlayer(removeAt));
-        }
+        ImGui.EndTable();
+    }
 
-        // ── Add player (Betting only) ─────────────────────────────────────────
+    private void DrawAddPlayerRow()
+    {
         ImGui.Spacing();
-        if (Phase == GamePhase.Betting)
-        {
-            ImGui.SetNextItemWidth(200);
-            var nameSubmitted = ImGui.InputText("##newName"u8, ref newPlayerName, 64,
-                ImGuiInputTextFlags.EnterReturnsTrue);
-            ImGui.SameLine();
-            var canAdd = newPlayerName.Length > 0;
-            if (!canAdd) ImGui.BeginDisabled();
-            if (ImGui.Button("Add Player") || (nameSubmitted && canAdd))
-            {
-                Apply(new AddPlayer(Nickname: newPlayerName));
-                newPlayerName = string.Empty;
-            }
-            if (!canAdd) ImGui.EndDisabled();
-            ImGui.Spacing();
-        }
+        if (Phase != GamePhase.Betting) return;
 
-        // ── Phase action bar ──────────────────────────────────────────────────
+        ImGui.SetNextItemWidth(200);
+        var nameSubmitted = ImGui.InputText("##newName"u8, ref newPlayerName, 64,
+            ImGuiInputTextFlags.EnterReturnsTrue);
+        ImGui.SameLine();
+        var canAdd = newPlayerName.Length > 0;
+        if (!canAdd) ImGui.BeginDisabled();
+        if (ImGui.Button("Add Player") || (nameSubmitted && canAdd))
+        {
+            Apply(new AddPlayer(Nickname: newPlayerName));
+            newPlayerName = string.Empty;
+        }
+        if (!canAdd) ImGui.EndDisabled();
+        ImGui.Spacing();
+    }
+
+    private void DrawPhaseActionBar()
+    {
         ImGui.Separator();
         ImGui.Spacing();
 
@@ -1718,12 +1720,12 @@ public partial class MainWindow
         {
             phaseLabel = Phase switch
             {
-                GamePhase.Betting    => "Phase: Betting",
-                GamePhase.Deal       => $"Phase: Deal{dealProgress}",
+                GamePhase.Betting     => "Phase: Betting",
+                GamePhase.Deal        => $"Phase: Deal{dealProgress}",
                 GamePhase.PlayerTurns => "Phase: Player Actions",
-                GamePhase.DealerTurn => "Phase: Dealer Turn",
-                GamePhase.Payout     => "Phase: Payout",
-                _                    => string.Empty,
+                GamePhase.DealerTurn  => "Phase: Dealer Turn",
+                GamePhase.Payout      => "Phase: Payout",
+                _                     => string.Empty,
             };
         }
         ImGui.TextDisabled(phaseLabel);
@@ -1764,7 +1766,6 @@ public partial class MainWindow
 #if DEBUG
                     Scenario.Advance();
 #endif
-                    // Flush uncommitted bet edits before transitioning
                     foreach (var (idx, val) in betEdits.ToList())
                     {
                         betEdits.Remove(idx);
@@ -1772,7 +1773,6 @@ public partial class MainWindow
                             Apply(new SetPlayerBet(idx, val));
                     }
                     Apply(new StartDeal());
-                    // Deduct initial bets from player banks (skip sitting-out players)
                     foreach (var p in State.Players)
                     {
                         if (p.SittingOut) continue;
@@ -1781,12 +1781,11 @@ public partial class MainWindow
                         if (!p.TryGetBankingStat(config, out var betStat)) continue;
                         ApplyBank(betStat, new BankBet(betAmt));
                     }
-                    // Queue initial cards: dealer first, then each active player gets both cards in a pair
                     for (var i = 0; i < State.Players.Length; i++)
                     {
                         if (State.Players[i].SittingOut) continue;
-                        autoDealQueue.Enqueue((false, i, 0, true));   // first card — announce
-                        autoDealQueue.Enqueue((false, i, 0, false));  // second card
+                        autoDealQueue.Enqueue((false, i, 0, true));
+                        autoDealQueue.Enqueue((false, i, 0, false));
                     }
                     Apply(new AnnounceDealerDeal());
                     QueueHitRoll(isDealer: true, -1, -1);
@@ -1911,9 +1910,10 @@ public partial class MainWindow
                 ImGui.SetTooltip("Hold Ctrl to abort the round."u8);
         }
 
-        if (uiBusy) ImGui.EndDisabled();
+    }
 
-        // ── Narration panel ───────────────────────────────────────────────────
+    private void DrawNarrationPanel()
+    {
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -1921,49 +1921,49 @@ public partial class MainWindow
         ImGui.Text("Chat Narration");
         ImGui.Separator();
         var narUseCmd = config.NarrationUseChannelCommand;
-            if (ImGui.Checkbox("Add channel command", ref narUseCmd))
-            {
-                config.NarrationUseChannelCommand = narUseCmd;
-                config.Save();
-            }
+        if (ImGui.Checkbox("Add channel command", ref narUseCmd))
+        {
+            config.NarrationUseChannelCommand = narUseCmd;
+            config.Save();
+        }
 
-            ImGui.SameLine();
-            if (config.NarrationLog.Count == 0) ImGui.BeginDisabled();
-            if (ImGui.Button("Copy All"))
+        ImGui.SameLine();
+        if (config.NarrationLog.Count == 0) ImGui.BeginDisabled();
+        if (ImGui.Button("Copy All"))
+        {
+            var sb = new StringBuilder();
+            foreach (var line in config.NarrationLog)
             {
-                var sb = new StringBuilder();
-                foreach (var line in config.NarrationLog)
-                {
-                    if (sb.Length > 0) sb.Append('\n');
-                    sb.Append(config.NarrationUseChannelCommand
-                        ? config.ChatChannel + " " + line
-                        : line);
-                }
-                ImGui.SetClipboardText(sb.ToString());
+                if (sb.Length > 0) sb.Append('\n');
+                sb.Append(config.NarrationUseChannelCommand
+                    ? config.ChatChannel + " " + line
+                    : line);
             }
-            ImGui.SameLine();
-            if (ImGui.Button("Clear")) { config.NarrationLog.Clear(); config.Save(); }
-            if (config.NarrationLog.Count == 0) ImGui.EndDisabled();
+            ImGui.SetClipboardText(sb.ToString());
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Clear")) { config.NarrationLog.Clear(); config.Save(); }
+        if (config.NarrationLog.Count == 0) ImGui.EndDisabled();
 
-            ImGui.Spacing();
-            if (ImGui.BeginChild("##narLog", new Vector2(0, 0), true))
+        ImGui.Spacing();
+        if (ImGui.BeginChild("##narLog", new Vector2(0, 0), true))
+        {
+            for (var ni = 0; ni < config.NarrationLog.Count; ni++)
             {
-                for (var ni = 0; ni < config.NarrationLog.Count; ni++)
-                {
-                    var line    = config.NarrationLog[ni];
-                    var display = config.NarrationUseChannelCommand
-                        ? config.ChatChannel + " " + line
-                        : line;
-                    ImGui.PushID(ni);
-                    if (ImGui.SmallButton("Copy")) ImGui.SetClipboardText(display);
-                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Copy to clipboard"u8);
-                    ImGui.PopID();
-                    ImGui.SameLine();
-                    ImGui.TextUnformatted(display);
-                }
-                if (ImGui.GetScrollY() >= ImGui.GetScrollMaxY())
-                    ImGui.SetScrollHereY(1.0f);
+                var line    = config.NarrationLog[ni];
+                var display = config.NarrationUseChannelCommand
+                    ? config.ChatChannel + " " + line
+                    : line;
+                ImGui.PushID(ni);
+                if (ImGui.SmallButton("Copy")) ImGui.SetClipboardText(display);
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Copy to clipboard"u8);
+                ImGui.PopID();
+                ImGui.SameLine();
+                ImGui.TextUnformatted(display);
             }
-            ImGui.EndChild();
+            if (ImGui.GetScrollY() >= ImGui.GetScrollMaxY())
+                ImGui.SetScrollHereY(1.0f);
+        }
+        ImGui.EndChild();
     }
 }
