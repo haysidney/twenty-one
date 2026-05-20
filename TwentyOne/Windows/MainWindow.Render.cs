@@ -132,7 +132,7 @@ public partial class MainWindow
             {
                 var tip = new System.Text.StringBuilder();
                 if (shortfall > 0)
-                    tip.AppendLine($"Short by {GameEngine.FormatGil(shortfall)} \u2014 needs trade before deal");
+                    tip.AppendLine($"Short by {GameEngine.FormatGil(shortfall)} - needs trade before deal");
                 if (Phase == GamePhase.Payout && bankCredit > 0)
                 {
                     if (bankDelta != 0)
@@ -178,7 +178,7 @@ public partial class MainWindow
         }
         else
         {
-            ImGui.TextDisabled("\u2014");
+            ImGui.TextDisabled("-");
         }
 
         DrawBankManageButton(actualIdx, bankCellRight, "bank", uiBusy);
