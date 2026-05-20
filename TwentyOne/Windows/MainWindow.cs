@@ -642,7 +642,7 @@ public partial class MainWindow : Window, IDisposable
         Apply(new AnnounceDoubleConfirm(pi, hi));
         Apply(new DoubleDown(pi, hi));
         var amt = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-        if (config.PlayerStatsStore.TryGetValue(p.StatsKey(), out var stat) && amt > 0 && stat.IsBanking())
+        if (amt > 0 && p.TryGetBankingStat(config, out var stat))
         {
             var before = stat.Bank;
             ApplyBank(stat, new BankDoubleDown(amt));
@@ -658,7 +658,7 @@ public partial class MainWindow : Window, IDisposable
         var p    = State.Players[pi];
         var hand = p.Hands[hi];
         var amt  = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-        if (config.PlayerStatsStore.TryGetValue(p.StatsKey(), out var stat) && amt > 0 && stat.IsBanking())
+        if (amt > 0 && p.TryGetBankingStat(config, out var stat))
         {
             var before = stat.Bank;
             ApplyBank(stat, new BankSplit(amt));
