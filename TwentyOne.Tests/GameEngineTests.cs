@@ -194,6 +194,56 @@ public class ApplyAddPlayerCardTests
     }
 
     [Fact]
+    public void AddPlayerCard_HitsTo21_AutoStands_NoAfterHitNarration()
+    {
+        // 5 + 6 + 10 = 21: hand auto-stands, no "hit or stand?" prompt
+        var (newState, effects) = GameEngine.Apply(ActivePlayerState(), new AddPlayerCard(0, 0, 10));
+        Assert.Equal(HandState.Stand, newState.Players[0].Hands[0].State);
+        Assert.Single(effects); // PlayerHit only, no PlayerAfterHit
+        Assert.Contains("Lorah", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void AddPlayerCard_HitsTo21_SinglePlayer_AdvancesToDealerTurn()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", 5, 6)
+            .Build();
+        var (newState, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 10));
+        Assert.Equal(HandState.Stand, newState.Players[0].Hands[0].State);
+        Assert.Equal(GamePhase.DealerTurn, newState.Phase);
+    }
+
+    [Fact]
+    public void AddPlayerCard_HitsTo21_MultiPlayer_WaitsForNextPlayer()
+    {
+        var (newState, _) = GameEngine.Apply(ActivePlayerState(), new AddPlayerCard(0, 0, 10));
+        Assert.True(newState.WaitingForNextPlayer);
+        Assert.Equal(0, newState.ActivePlayerIndex);
+    }
+
+    [Fact]
+    public void AddPlayerCard_SplitHand21_AutoStands()
+    {
+        // Split hand: 5+6+10 = 21. IsFromSplit means it can't be Blackjack - should still auto-stand.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands = [
+                    new Hand { Cards = [5, 6], State = HandState.Playing, IsFromSplit = true },
+                    new Hand { Cards = [3, 4], State = HandState.Playing, IsFromSplit = true },
+                ],
+            })
+            .ActiveHand(0, 0)
+            .Build();
+        var (newState, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 10));
+        Assert.Equal(HandState.Stand, newState.Players[0].Hands[0].State);
+    }
+
+    [Fact]
     public void AddPlayerCard_Bust_NarratesBustAndAdvances()
     {
         var state = new GameStateBuilder()

@@ -510,6 +510,8 @@ public static class GameEngine
             else if (newHand.IsFromSplit && newHand.Cards.Length == 2
                      && newHand.Cards[0] == 1)
                 newHand = newHand with { State = HandState.Stand };
+            else if (HandValue(newHand.Cards) == 21)
+                newHand = newHand with { State = HandState.Stand };
         }
 
         var newPlayers = WithPlayer(state.Players, pi, WithHand(state.Players[pi], hi, newHand));
