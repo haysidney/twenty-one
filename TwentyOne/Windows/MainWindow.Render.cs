@@ -1227,7 +1227,7 @@ public partial class MainWindow
 
     private void DrawTopBar()
     {
-        if (ImGui.SmallButton("Config"))
+        if (ImGui.SmallButton("Settings"))
             configWindow.Toggle();
         ImGui.SameLine();
         if (ImGui.SmallButton("Session Ledger"))

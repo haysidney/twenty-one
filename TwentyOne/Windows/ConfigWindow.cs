@@ -16,13 +16,12 @@ public class ConfigWindow : Window, IDisposable
     private readonly NarrationEditorWindow narrationEditorWindow;
 
     public ConfigWindow(Configuration config, SessionLedgerWindow sessionLedgerWindow, NarrationEditorWindow narrationEditorWindow)
-        : base("Twenty One — Settings##TwentyOneConfig")
+        : base("Twenty One - Settings##TwentyOneConfig")
     {
         this.config              = config;
         this.sessionLedgerWindow = sessionLedgerWindow;
         this.narrationEditorWindow = narrationEditorWindow;
-        SizeConstraints = new WindowSizeConstraints { MinimumSize = new Vector2(400, 200), MaximumSize = new Vector2(float.MaxValue, float.MaxValue) };
-        Flags = ImGuiWindowFlags.NoCollapse;
+        Flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize;
     }
 
     public void Dispose()
