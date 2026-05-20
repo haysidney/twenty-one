@@ -753,19 +753,7 @@ public partial class MainWindow
 #if DEBUG
                 Scenario.Advance();
 #endif
-                Apply(new AnnounceDoubleConfirm(pi, hi));
-                Apply(new DoubleDown(pi, hi));
-                var dblKey2    = p.StatsKey();
-                var dblAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-                if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0 && dblStat2.IsBanking())
-                {
-                    var before2 = dblStat2.Bank;
-                    ApplyBank(dblStat2, new BankDoubleDown(dblAmt2));
-                    config.NarrationLog.Add($"[Bank] {p.DisplayName}: doubled \u2014 {dblAmt2:N0} deducted (was {before2:N0} \u2192 {dblStat2.Bank:N0})");
-                    config.Save();
-                }
-                pendingDouble = null;
-                QueueHitRoll(isDealer: false, pi, hi);
+                ConfirmDoublePayment(pi, hi);
             }
 #if DEBUG
             if (!gates.ConfirmDbl) ImGui.EndDisabled();
@@ -784,17 +772,7 @@ public partial class MainWindow
 #if DEBUG
                 Scenario.Advance();
 #endif
-                var splKey2    = p.StatsKey();
-                var splAmt2    = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-                if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0 && splStat2.IsBanking())
-                {
-                    var before2 = splStat2.Bank;
-                    ApplyBank(splStat2, new BankSplit(splAmt2));
-                    config.NarrationLog.Add($"[Bank] {p.DisplayName}: split \u2014 {splAmt2:N0} deducted (was {before2:N0} \u2192 {splStat2.Bank:N0})");
-                    config.Save();
-                }
-                Apply(new SplitHand(pi, hi));
-                pendingSplit = null;
+                ConfirmSplitPayment(pi, hi);
             }
 #if DEBUG
             if (!gates.ConfirmSpl) ImGui.EndDisabled();

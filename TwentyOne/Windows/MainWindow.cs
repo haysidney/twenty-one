@@ -175,32 +175,10 @@ public partial class MainWindow : Window, IDisposable
                         break;
                     }
                     case "ConfirmDbl":
-                        Apply(new AnnounceDoubleConfirm(pi, hi));
-                        Apply(new DoubleDown(pi, hi));
-                        var dblKey2 = p.StatsKey();
-                        var dblAmt2 = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-                        if (config.PlayerStatsStore.TryGetValue(dblKey2, out var dblStat2) && dblAmt2 > 0)
-                        {
-                            var before2 = dblStat2.Bank;
-                            ApplyBank(dblStat2, new BankDoubleDown(dblAmt2));
-                            config.NarrationLog.Add($"[Bank] {p.DisplayName}: doubled — {dblAmt2:N0} deducted (was {before2:N0} → {dblStat2.Bank:N0})");
-                            config.Save();
-                        }
-                        pendingDouble = null;
-                        QueueHitRoll(isDealer: false, pi, hi);
+                        ConfirmDoublePayment(pi, hi);
                         break;
                     case "ConfirmSpl":
-                        var splKey2 = p.StatsKey();
-                        var splAmt2 = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-                        if (config.PlayerStatsStore.TryGetValue(splKey2, out var splStat2) && splAmt2 > 0)
-                        {
-                            var before2 = splStat2.Bank;
-                            ApplyBank(splStat2, new BankSplit(splAmt2));
-                            config.NarrationLog.Add($"[Bank] {p.DisplayName}: split — {splAmt2:N0} deducted (was {before2:N0} → {splStat2.Bank:N0})");
-                            config.Save();
-                        }
-                        Apply(new SplitHand(pi, hi));
-                        pendingSplit = null;
+                        ConfirmSplitPayment(pi, hi);
                         break;
                 }
                 break;
@@ -655,6 +633,40 @@ public partial class MainWindow : Window, IDisposable
         pendingHit   = null;
         LogRoll(isDealer, pi2, roll);
         deferredRoll = (isDealer, pi2, hi, roll);
+    }
+
+    private void ConfirmDoublePayment(int pi, int hi)
+    {
+        var p    = State.Players[pi];
+        var hand = p.Hands[hi];
+        Apply(new AnnounceDoubleConfirm(pi, hi));
+        Apply(new DoubleDown(pi, hi));
+        var amt = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
+        if (config.PlayerStatsStore.TryGetValue(p.StatsKey(), out var stat) && amt > 0 && stat.IsBanking())
+        {
+            var before = stat.Bank;
+            ApplyBank(stat, new BankDoubleDown(amt));
+            config.NarrationLog.Add($"[Bank] {p.DisplayName}: doubled — {amt:N0} deducted (was {before:N0} → {stat.Bank:N0})");
+            config.Save();
+        }
+        pendingDouble = null;
+        QueueHitRoll(isDealer: false, pi, hi);
+    }
+
+    private void ConfirmSplitPayment(int pi, int hi)
+    {
+        var p    = State.Players[pi];
+        var hand = p.Hands[hi];
+        var amt  = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
+        if (config.PlayerStatsStore.TryGetValue(p.StatsKey(), out var stat) && amt > 0 && stat.IsBanking())
+        {
+            var before = stat.Bank;
+            ApplyBank(stat, new BankSplit(amt));
+            config.NarrationLog.Add($"[Bank] {p.DisplayName}: split — {amt:N0} deducted (was {before:N0} → {stat.Bank:N0})");
+            config.Save();
+        }
+        Apply(new SplitHand(pi, hi));
+        pendingSplit = null;
     }
 
     // ── ImGui helpers ─────────────────────────────────────────────────────────
