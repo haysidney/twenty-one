@@ -1,5 +1,5 @@
 {
-  "name": "Two players \u2014 both blackjack (dealer safe upcard 7, skips reveal)",
+  "name": "Two players - both blackjack (dealer safe upcard 7, skips reveal)",
   "players": [
     {
       "name": "Lorah",
