@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using TwentyOne.Game;
 using TwentyOne.Game.Edge;
 using Xunit;
@@ -107,5 +108,142 @@ public class EdgeSolverTests
         _out.WriteLine($"21-cell sweep took {sw.ElapsedMilliseconds} ms across {cells} cells");
         Assert.Equal(21, cells);
         Assert.True(sw.ElapsedMilliseconds < 5000, $"sweep too slow: {sw.ElapsedMilliseconds} ms");
+    }
+
+    // Upcards in chart order: 2,3,4,5,6,7,8,9,10,A. Ace is rank 1 internally.
+    private static readonly int[] Upcards   = { 2, 3, 4, 5, 6, 7, 8, 9, 10, 1 };
+    private static readonly string[] UpLbls = { "2", "3", "4", "5", "6", "7", "8", "9", "10", "A" };
+
+    private static string ActionGlyph(OptimalAction a) => a switch
+    {
+        OptimalAction.Hit    => "H",
+        OptimalAction.Stand  => "S",
+        OptimalAction.Double => "D",
+        OptimalAction.Split  => "P",
+        _                    => "?",
+    };
+
+    // Canonical 2-card hard hand for a given total. Avoids pairs and aces.
+    private static (int, int) HardHand(int total) => total switch
+    {
+        5  => (2, 3),
+        6  => (2, 4),
+        7  => (2, 5),
+        8  => (2, 6),
+        9  => (2, 7),
+        10 => (2, 8),
+        11 => (2, 9),
+        12 => (2, 10),
+        13 => (3, 10),
+        14 => (4, 10),
+        15 => (5, 10),
+        16 => (6, 10),
+        17 => (7, 10),
+        18 => (8, 10),
+        19 => (9, 10),
+        20 => (10, 11), // 10 + J: both face value 10, different ranks, not splittable
+        _  => throw new System.ArgumentOutOfRangeException(nameof(total)),
+    };
+
+    [Fact]
+    public void Print_BasicStrategy_For_3to2_NoCharlie()
+    {
+        var rules = Rules();
+        var sb = new StringBuilder();
+        sb.AppendLine();
+        sb.AppendLine("Basic strategy (H17 ENHC 3:2 no Charlie):");
+        sb.AppendLine("=========================================");
+
+        sb.AppendLine();
+        sb.AppendLine("Hard totals");
+        sb.Append("     ");
+        foreach (var l in UpLbls) sb.Append($" {l,3}");
+        sb.AppendLine();
+        for (int total = 5; total <= 20; total++)
+        {
+            sb.Append($"{total,3}  ");
+            var (c1, c2) = HardHand(total);
+            foreach (var up in Upcards)
+            {
+                var act = EdgeSolver.GetOptimalAction(c1, c2, up, rules);
+                sb.Append($" {ActionGlyph(act),3}");
+            }
+            sb.AppendLine();
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("Soft totals (A,X)");
+        sb.Append("     ");
+        foreach (var l in UpLbls) sb.Append($" {l,3}");
+        sb.AppendLine();
+        for (int x = 2; x <= 9; x++)
+        {
+            sb.Append($"A,{x}  ");
+            foreach (var up in Upcards)
+            {
+                var act = EdgeSolver.GetOptimalAction(1, x, up, rules);
+                sb.Append($" {ActionGlyph(act),3}");
+            }
+            sb.AppendLine();
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("Pairs");
+        sb.Append("     ");
+        foreach (var l in UpLbls) sb.Append($" {l,3}");
+        sb.AppendLine();
+        var pairLabels = new[] { "2,2", "3,3", "4,4", "5,5", "6,6", "7,7", "8,8", "9,9", "T,T", "A,A" };
+        var pairRanks  = new[] { 2,     3,     4,     5,     6,     7,     8,     9,     10,    1     };
+        for (int i = 0; i < pairRanks.Length; i++)
+        {
+            sb.Append($"{pairLabels[i]}  ");
+            foreach (var up in Upcards)
+            {
+                var act = EdgeSolver.GetOptimalAction(pairRanks[i], pairRanks[i], up, rules);
+                sb.Append($" {ActionGlyph(act),3}");
+            }
+            sb.AppendLine();
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("Legend: H=Hit  S=Stand  D=Double  P=Split");
+
+        _out.WriteLine(sb.ToString());
+    }
+
+    [Fact]
+    public void Print_ActionEVs_For_Deviation_Cells()
+    {
+        var rules = Rules();
+        var cells = new (string name, int c1, int c2, int up)[]
+        {
+            ("A,2 vs 5  (we said Hit; standard H17 DAS says Double)", 1, 2, 5),
+            ("hard 11 vs 10 (we said Hit; non-ENHC says Double)",     2, 9, 10),
+            ("hard 11 vs A  (we said Hit; non-ENHC says Double)",     2, 9, 1),
+            ("8,8 vs 10    (we said Hit; non-ENHC says Split)",       8, 8, 10),
+            ("8,8 vs A     (we said Hit; non-ENHC says Split)",       8, 8, 1),
+            ("A,A vs A     (we said Hit; non-ENHC says Split)",       1, 1, 1),
+        };
+        var sb = new StringBuilder();
+        sb.AppendLine();
+        sb.AppendLine("Per-action EV at each deviation cell (H17 ENHC 3:2 no Charlie):");
+        sb.AppendLine();
+        foreach (var (name, c1, c2, up) in cells)
+        {
+            var standEV  = EdgeSolver.GetActionEV(OptimalAction.Stand,  c1, c2, up, rules);
+            var hitEV    = EdgeSolver.GetActionEV(OptimalAction.Hit,    c1, c2, up, rules);
+            var doubleEV = EdgeSolver.GetActionEV(OptimalAction.Double, c1, c2, up, rules);
+            var splitEV  = c1 == c2
+                ? EdgeSolver.GetActionEV(OptimalAction.Split, c1, c2, up, rules)
+                : double.NaN;
+            sb.AppendLine(name);
+            sb.AppendLine($"  Stand  = {standEV,+8:F5}");
+            sb.AppendLine($"  Hit    = {hitEV,+8:F5}");
+            sb.AppendLine($"  Double = {doubleEV,+8:F5}");
+            if (!double.IsNaN(splitEV))
+                sb.AppendLine($"  Split  = {splitEV,+8:F5}");
+            sb.AppendLine();
+        }
+        _out.WriteLine(sb.ToString());
     }
 }

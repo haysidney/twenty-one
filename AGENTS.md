@@ -140,6 +140,15 @@ Fields in `Configuration` (persisted, outside undo):
 
 `VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round).
 
+### Docs
+
+`docs/` holds long-form notes about rule decisions and design rationale.
+
+- `docs/dealer-hole-card.md` - explains why the engine uses European No-Hole-Card
+  (ENHC) style, walks through how it differs from peek rules, and documents the
+  ~0.11% house-edge impact. Read this before considering any changes to dealer
+  BJ resolution (`GameEngine.cs:213`).
+
 ### EdgeSolver (house-edge calculator)
 
 `TwentyOne.Game/Edge/EdgeSolver.cs` - pure exact EV solver. Computes the expected house edge for a given `(BjPayout, CharliePayout, FiveCardCharlie)` triple under optimal player strategy with infinite-deck draws. No Dalamud dependency, fully unit-tested.

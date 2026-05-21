@@ -9,6 +9,14 @@ public readonly record struct EdgeRules(
     PayoutRatio CharliePayout,
     FiveCardCharlieRule FiveCardCharlie);
 
+public enum OptimalAction
+{
+    Stand,
+    Hit,
+    Double,
+    Split,
+}
+
 /// <summary>
 /// Exact infinite-deck EV solver for the venue rule set. Returns the house edge
 /// (negative of optimal player EV) under basic-strategy decisions. Uses
@@ -22,6 +30,21 @@ public static class EdgeSolver
     {
         var s = new Solver(rules);
         return -s.OverallPlayerEV();
+    }
+
+    public static OptimalAction GetOptimalAction(int card1, int card2, int upcard, EdgeRules rules)
+    {
+        var s = new Solver(rules);
+        return s.OptimalActionForInitial(card1, card2, upcard);
+    }
+
+    // Per-action EV for an initial 2-card hand vs dealer upcard. Useful for
+    // diagnosing borderline strategy cells. Returns NaN for Split when the
+    // initial hand isn't a pair.
+    public static double GetActionEV(OptimalAction action, int card1, int card2, int upcard, EdgeRules rules)
+    {
+        var s = new Solver(rules);
+        return s.ActionEVForInitial(action, card1, card2, upcard);
     }
 
     private sealed class Solver
@@ -181,31 +204,83 @@ public static class EdgeSolver
 
             double best = StandEV(total, upcard);
 
-            double hitEV = 0;
-            double sub   = 1.0 / 13.0;
-            for (int c = 1; c <= 13; c++)
-            {
-                var (nt, ns) = AddCard(total, isSoft, c);
-                hitEV += sub * EvalHand(nt, ns, numCards + 1, isFromSplit, upcard);
-            }
+            double hitEV = HitEVInternal(total, isSoft, numCards, isFromSplit, upcard);
             if (hitEV > best) best = hitEV;
 
             if (numCards == 2)
             {
-                double dblSum = 0;
-                for (int c = 1; c <= 13; c++)
-                {
-                    var (nt, _) = AddCard(total, isSoft, c);
-                    double outcomeEV;
-                    if (nt > 21) outcomeEV = -1.0;
-                    else outcomeEV = StandEV(nt, upcard);
-                    dblSum += sub * outcomeEV;
-                }
-                double doubled = 2.0 * dblSum;
+                double doubled = DoubleEVInternal(total, isSoft, upcard);
                 if (doubled > best) best = doubled;
             }
 
             _playerCache[key] = best;
+            return best;
+        }
+
+        private double HitEVInternal(int total, bool isSoft, int numCards, bool isFromSplit, int upcard)
+        {
+            double sub = 1.0 / 13.0;
+            double ev  = 0;
+            for (int c = 1; c <= 13; c++)
+            {
+                var (nt, ns) = AddCard(total, isSoft, c);
+                ev += sub * EvalHand(nt, ns, numCards + 1, isFromSplit, upcard);
+            }
+            return ev;
+        }
+
+        // Double down: one card then forced stand, with 2x stake.
+        // Charlie cannot trigger (3 cards), BJ cannot trigger (>2 cards).
+        private double DoubleEVInternal(int total, bool isSoft, int upcard)
+        {
+            double sub = 1.0 / 13.0;
+            double ev  = 0;
+            for (int c = 1; c <= 13; c++)
+            {
+                var (nt, _) = AddCard(total, isSoft, c);
+                double outcomeEV;
+                if (nt > 21) outcomeEV = -1.0;
+                else         outcomeEV = StandEV(nt, upcard);
+                ev += sub * outcomeEV;
+            }
+            return 2.0 * ev;
+        }
+
+        public double ActionEVForInitial(OptimalAction action, int c1, int c2, int upcard)
+        {
+            var (t1, soft1) = AddCard(0, false, c1);
+            var (t,  soft)  = AddCard(t1, soft1, c2);
+            return action switch
+            {
+                OptimalAction.Stand  => t == 21 ? BjEV(upcard) : StandEV(t, upcard),
+                OptimalAction.Hit    => HitEVInternal(t, soft, 2, false, upcard),
+                OptimalAction.Double => DoubleEVInternal(t, soft, upcard),
+                OptimalAction.Split  => c1 == c2 ? EvalSplit(c1, upcard) : double.NaN,
+                _                    => double.NaN,
+            };
+        }
+
+        public OptimalAction OptimalActionForInitial(int c1, int c2, int upcard)
+        {
+            var (t1, soft1) = AddCard(0, false, c1);
+            var (t,  soft)  = AddCard(t1, soft1, c2);
+
+            // Natural BJ has no decision; treat as Stand for chart purposes.
+            if (t == 21) return OptimalAction.Stand;
+
+            double standEV  = StandEV(t, upcard);
+            double hitEV    = HitEVInternal(t, soft, 2, false, upcard);
+            double doubleEV = DoubleEVInternal(t, soft, upcard);
+
+            var    best   = OptimalAction.Stand;
+            double bestEV = standEV;
+            if (hitEV > bestEV)    { best = OptimalAction.Hit;    bestEV = hitEV; }
+            if (doubleEV > bestEV) { best = OptimalAction.Double; bestEV = doubleEV; }
+            if (c1 == c2)
+            {
+                double splitEV = EvalSplit(c1, upcard);
+                if (splitEV > bestEV) best = OptimalAction.Split;
+            }
             return best;
         }
 
