@@ -5,7 +5,7 @@ namespace TwentyOne.Game.Edge;
 
 // Rule axes that affect house edge. Mirrors the relevant GameState fields.
 public readonly record struct EdgeRules(
-    PayoutRatio BjPayout,
+    double BjPayout,
     PayoutRatio CharliePayout,
     FiveCardCharlieRule FiveCardCharlie,
     bool DealerStandsOnSoft17 = false,
@@ -75,7 +75,7 @@ public static class EdgeSolver
         {
             _rules      = rules;
             _charlieOn  = rules.FiveCardCharlie != FiveCardCharlieRule.Disabled;
-            _bjMul      = Multiplier(rules.BjPayout);
+            _bjMul      = rules.BjPayout;
             _charlieMul = Multiplier(rules.CharliePayout);
         }
 

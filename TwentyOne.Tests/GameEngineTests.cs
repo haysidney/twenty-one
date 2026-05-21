@@ -533,14 +533,15 @@ public class PayoutTests
     }
 
     [Theory]
-    [InlineData(PayoutRatio.ThreeToTwo, "+150")]   // 100 * 1.5 = 150
-    [InlineData(PayoutRatio.SixToFive,  "+120")]   // 100 * 1.2 = 120
-    [InlineData(PayoutRatio.EvenMoney,  "+100")]   // 100 * 1.0 = 100
-    public void BjPayoutAmounts(PayoutRatio payout, string expected)
+    [InlineData(1.5,  "+150")]   // 100 * 1.5 = 150
+    [InlineData(1.2,  "+120")]   // 100 * 1.2 = 120
+    [InlineData(1.0,  "+100")]   // 100 * 1.0 = 100
+    [InlineData(1.37, "+137")]   // arbitrary multiplier rounds up via Math.Ceiling
+    public void BjPayoutAmounts(double mul, string expected)
     {
         var state = new GameStateBuilder()
             .Phase(GamePhase.Payout)
-            .BjPayout(payout)
+            .BjPayout(mul)
             .Dealer(HandState.Stand, 10, 7)
             .Player("Lorah", "100", HandState.Blackjack, 1, 10)
             .Build();
@@ -551,7 +552,7 @@ public class PayoutTests
     public void RegularWin_ReturnsBetAmount()
     {
         var state = PayoutState([10, 9], HandState.Stand, [10, 7]);
-        state.BjPayout = PayoutRatio.ThreeToTwo;
+        state.BjPayout = 1.5;
         Assert.Equal("+100", GameEngine.PayoutAmountString(state, 0));
     }
 
@@ -566,14 +567,14 @@ public class PayoutTests
     }
 
     [Theory]
-    [InlineData(PayoutRatio.ThreeToTwo, 250)]   // 100 + 150
-    [InlineData(PayoutRatio.SixToFive,  220)]   // 100 + 120
-    [InlineData(PayoutRatio.EvenMoney,  200)]   // 100 + 100
-    public void PayoutTotalOwed_BjWin_IsBetPlusBjMultiplier(PayoutRatio payout, int expected)
+    [InlineData(1.5, 250)]   // 100 + 150
+    [InlineData(1.2, 220)]   // 100 + 120
+    [InlineData(1.0, 200)]   // 100 + 100
+    public void PayoutTotalOwed_BjWin_IsBetPlusBjMultiplier(double mul, int expected)
     {
         var state = new GameStateBuilder()
             .Phase(GamePhase.Payout)
-            .BjPayout(payout)
+            .BjPayout(mul)
             .Dealer(HandState.Stand, 10, 7)
             .Player("Lorah", "100", HandState.Blackjack, 1, 10)
             .Build();

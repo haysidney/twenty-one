@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.Text;
 using TwentyOne.Game;
@@ -14,7 +15,7 @@ public class EdgeSolverTests
     public EdgeSolverTests(ITestOutputHelper output) { _out = output; }
 
     private static EdgeRules Rules(
-        PayoutRatio bj = PayoutRatio.ThreeToTwo,
+        double bj = 1.5,
         PayoutRatio charlie = PayoutRatio.ThreeToTwo,
         FiveCardCharlieRule cr = FiveCardCharlieRule.Disabled,
         bool s17 = false,
@@ -37,8 +38,8 @@ public class EdgeSolverTests
     [Fact]
     public void SixToFive_Increases_Edge_VsThreeToTwo()
     {
-        var e32 = EdgeSolver.ComputeHouseEdge(Rules(bj: PayoutRatio.ThreeToTwo));
-        var e65 = EdgeSolver.ComputeHouseEdge(Rules(bj: PayoutRatio.SixToFive));
+        var e32 = EdgeSolver.ComputeHouseEdge(Rules(bj: 1.5));
+        var e65 = EdgeSolver.ComputeHouseEdge(Rules(bj: 1.2));
         _out.WriteLine($"3:2 = {e32 * 100:F4}%, 6:5 = {e65 * 100:F4}%, delta = {(e65 - e32) * 100:F4}%");
         // Published delta is ~+1.39% for finite shoe; infinite deck similar.
         Assert.InRange(e65 - e32, 0.012, 0.016);
@@ -47,11 +48,27 @@ public class EdgeSolverTests
     [Fact]
     public void EvenMoney_Increases_Edge_VsThreeToTwo()
     {
-        var e32 = EdgeSolver.ComputeHouseEdge(Rules(bj: PayoutRatio.ThreeToTwo));
-        var e11 = EdgeSolver.ComputeHouseEdge(Rules(bj: PayoutRatio.EvenMoney));
+        var e32 = EdgeSolver.ComputeHouseEdge(Rules(bj: 1.5));
+        var e11 = EdgeSolver.ComputeHouseEdge(Rules(bj: 1.0));
         _out.WriteLine($"3:2 = {e32 * 100:F4}%, 1:1 = {e11 * 100:F4}%, delta = {(e11 - e32) * 100:F4}%");
         // Published delta ~+2.27%.
         Assert.InRange(e11 - e32, 0.020, 0.026);
+    }
+
+    [Fact]
+    public void ArbitraryBjPayout_LinearInMultiplier()
+    {
+        // The BJ contribution is linear in the payout multiplier: each 0.01 of payout
+        // moves the edge by a fixed amount (P(player BJ) * (1 - P(dealer BJ))).
+        var e150 = EdgeSolver.ComputeHouseEdge(Rules(bj: 1.50));
+        var e160 = EdgeSolver.ComputeHouseEdge(Rules(bj: 1.60));
+        var e170 = EdgeSolver.ComputeHouseEdge(Rules(bj: 1.70));
+        _out.WriteLine($"1.50x = {e150 * 100:F4}%, 1.60x = {e160 * 100:F4}%, 1.70x = {e170 * 100:F4}%");
+        var d1 = e150 - e160;
+        var d2 = e160 - e170;
+        // Equal-spaced multipliers => equal-sized deltas (within fp noise).
+        Assert.InRange(Math.Abs(d1 - d2), 0, 1e-9);
+        Assert.True(e170 < e160 && e160 < e150);
     }
 
     [Fact]
@@ -124,7 +141,8 @@ public class EdgeSolverTests
     public void Sweep_All21Cells_FinishesQuickly_AllPositive()
     {
         var sw = Stopwatch.StartNew();
-        var bjOptions = new[] { PayoutRatio.ThreeToTwo, PayoutRatio.SixToFive, PayoutRatio.EvenMoney };
+        var bjOptions = new[] { 1.5, 1.2, 1.0 };
+        var charlieOptions = new[] { PayoutRatio.ThreeToTwo, PayoutRatio.SixToFive, PayoutRatio.EvenMoney };
         var crOptions = new[]
         {
             FiveCardCharlieRule.Disabled,
@@ -144,7 +162,7 @@ public class EdgeSolverTests
             }
             else
             {
-                foreach (var cp in bjOptions)
+                foreach (var cp in charlieOptions)
                 {
                     var edge = EdgeSolver.ComputeHouseEdge(Rules(bj: bj, charlie: cp, cr: cr));
                     _out.WriteLine($"  bj={bj}, charlie={cp}, cr={cr}: {edge * 100:F4}%");

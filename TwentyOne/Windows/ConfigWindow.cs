@@ -60,14 +60,19 @@ public class ConfigWindow : Window, IDisposable
         ImGui.AlignTextToFramePadding();
         ImGui.Text("Blackjack Payout");
         ImGui.SameLine();
-        var bjOptions = new[] { "3:2", "6:5", "1:1" };
-        var bjIdx     = (int)config.BjPayout;
+        var bjMul = (float)config.BjPayout;
         ImGui.SetNextItemWidth(70);
-        if (ImGui.Combo("##bjpayout", ref bjIdx, bjOptions, bjOptions.Length))
+        if (ImGui.InputFloat("##bjpayout", ref bjMul, 0f, 0f, "%.2fx"))
         {
-            config.BjPayout = (PayoutRatio)bjIdx;
+            config.BjPayout = Math.Clamp(bjMul, 1.0f, 3.0f);
             config.Save();
         }
+        ImGui.SameLine();
+        if (ImGui.SmallButton("3:2##bj32")) { config.BjPayout = 1.5; config.Save(); }
+        ImGui.SameLine();
+        if (ImGui.SmallButton("6:5##bj65")) { config.BjPayout = 1.2; config.Save(); }
+        ImGui.SameLine();
+        if (ImGui.SmallButton("1:1##bj11")) { config.BjPayout = 1.0; config.Save(); }
 
         ImGui.AlignTextToFramePadding();
         ImGui.Text("Five Card Charlie");

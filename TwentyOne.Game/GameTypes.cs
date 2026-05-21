@@ -80,7 +80,9 @@ public sealed record class GameState
     public int ActiveHandIndex { get; set; } = -1;
     public bool WaitingForNextPlayer { get; set; } = false;
     public bool WaitingForDealer { get; set; } = false;
-    public PayoutRatio BjPayout { get; set; } = PayoutRatio.ThreeToTwo;
+    // Blackjack payout multiplier (e.g. 1.5 = 3:2, 1.2 = 6:5, 1.0 = even money).
+    // Free-form so venues can offer any payout; the standard 3:2/6:5/1:1 are presets.
+    public double BjPayout { get; set; } = 1.5;
     public PayoutRatio CharliePayout { get; set; } = PayoutRatio.EvenMoney;
     public FiveCardCharlieRule FiveCardCharlie { get; set; } = FiveCardCharlieRule.Disabled;
     // When true, dealer stands on soft 17 (S17). When false (default), dealer hits soft 17 (H17).

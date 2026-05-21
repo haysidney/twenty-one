@@ -90,7 +90,7 @@ public class VenueSettings
     // GameState mirrors these so undo snapshots and history viewer mode stay
     // faithful to the rules at time of recording. Configuration.SeedRulesIntoGameState
     // copies these into GameState on NewRound.
-    public PayoutRatio         BjPayout             { get; set; } = PayoutRatio.ThreeToTwo;
+    public double              BjPayout             { get; set; } = 1.5;
     public PayoutRatio         CharliePayout        { get; set; } = PayoutRatio.EvenMoney;
     public FiveCardCharlieRule FiveCardCharlie      { get; set; } = FiveCardCharlieRule.Disabled;
     public bool                DealerStandsOnSoft17 { get; set; } = false;
@@ -160,7 +160,7 @@ public class Configuration : IPluginConfiguration
 
     // House rules - canonical on VenueSettings. Editing these does NOT affect the
     // current GameState; SeedRulesIntoGameState picks them up at NewRound time.
-    [JsonIgnore] public PayoutRatio         BjPayout             { get => ActiveVenue.BjPayout;             set => ActiveVenue.BjPayout = value; }
+    [JsonIgnore] public double              BjPayout             { get => ActiveVenue.BjPayout;             set => ActiveVenue.BjPayout = value; }
     [JsonIgnore] public PayoutRatio         CharliePayout        { get => ActiveVenue.CharliePayout;        set => ActiveVenue.CharliePayout = value; }
     [JsonIgnore] public FiveCardCharlieRule FiveCardCharlie      { get => ActiveVenue.FiveCardCharlie;      set => ActiveVenue.FiveCardCharlie = value; }
     [JsonIgnore] public bool                DealerStandsOnSoft17 { get => ActiveVenue.DealerStandsOnSoft17; set => ActiveVenue.DealerStandsOnSoft17 = value; }

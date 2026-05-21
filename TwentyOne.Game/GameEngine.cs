@@ -247,7 +247,7 @@ public static class GameEngine
         var delta  = result switch
         {
             PayoutResult.Win        => bet,
-            PayoutResult.BjWin      => Math.Ceiling(bet * BjMultiplier(state.BjPayout)),
+            PayoutResult.BjWin      => Math.Ceiling(bet * (decimal)state.BjPayout),
             PayoutResult.CharlieWin => Math.Ceiling(bet * CharlieMultiplier(state.CharliePayout)),
             PayoutResult.Lose       => -bet,
             _                       => 0m,
@@ -269,7 +269,7 @@ public static class GameEngine
         return GetPayoutResult(state, playerIndex, handIndex) switch
         {
             PayoutResult.Win        => bet * 2m,
-            PayoutResult.BjWin      => bet + Math.Ceiling(bet * BjMultiplier(state.BjPayout)),
+            PayoutResult.BjWin      => bet + Math.Ceiling(bet * (decimal)state.BjPayout),
             PayoutResult.CharlieWin => bet + Math.Ceiling(bet * CharlieMultiplier(state.CharliePayout)),
             PayoutResult.Push       => bet,
             _                       => 0m,
@@ -290,7 +290,6 @@ public static class GameEngine
         _                     => 1.5m,
     };
 
-    private static decimal BjMultiplier(PayoutRatio payout) => PayoutMultiplier(payout);
     private static decimal CharlieMultiplier(PayoutRatio payout) => PayoutMultiplier(payout);
 
     // ── Internal state builders ───────────────────────────────────────────────
@@ -1061,7 +1060,7 @@ public static class GameEngine
                 var eb = GetEffectiveBet(p, p.Hands[hi]);
                 total += GetPayoutResult(state, pi, hi) switch
                 {
-                    PayoutResult.BjWin      => Math.Ceiling(eb * BjMultiplier(state.BjPayout)),
+                    PayoutResult.BjWin      => Math.Ceiling(eb * (decimal)state.BjPayout),
                     PayoutResult.CharlieWin => Math.Ceiling(eb * CharlieMultiplier(state.CharliePayout)),
                     _                       => eb,
                 };

@@ -94,18 +94,21 @@ sweep, but still <100ms for any single live computation. The UX challenge
 Currently `BjPayout` and `CharliePayout` are enums with three values. Going to
 arbitrary decimal multipliers has very different costs depending on which one.
 
-**BjPayout - effectively free.** Blackjack is auto-resolved (2-card 21, no
-decisions), so the BJ payout multiplier doesn't affect any optimal action.
-The solver could expose the BJ contribution separately:
+**BjPayout - effectively free.** ✓ implemented as `double`. Blackjack is
+auto-resolved (2-card 21, no decisions), so the BJ payout multiplier doesn't
+affect any optimal action. The current code re-solves on each multiplier
+change but caches by `EdgeRules.Equals`, so a single live computation stays
+under ~50 ms. A future optimization could factor the BJ contribution out:
 
 ```
 edge(bjMul) = base_edge_without_bj + bjMul * bj_rate
 ```
 
 where `bj_rate = P(player BJ) * (1 - P(dealer BJ | upcard))`, integrated over
-upcards. One solve gets `base_edge_without_bj` and `bj_rate`; the UI does the
-multiplication for any value. A slider over 1.0x-2.0x in 0.01 steps is 100
-"cells" at zero additional compute cost.
+upcards. One solve gets `base_edge_without_bj` and `bj_rate`; the UI would do
+the multiplication for any value. A slider over 1.0x-2.0x in 0.01 steps would
+be 100 "cells" at zero additional compute cost. Worth doing if/when we add a
+sweep view.
 
 **CharliePayout - not free.** Charlie payout *does* affect optimal play: the
 player hits more aggressively when Charlie pays more. Each distinct

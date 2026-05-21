@@ -19,7 +19,7 @@ internal sealed class GameStateBuilder
     private int                  _activePlayerIndex;
     private int                  _activeHandIndex;
     private FiveCardCharlieRule  _fiveCardCharlie       = FiveCardCharlieRule.Disabled;
-    private PayoutRatio          _bjPayout              = PayoutRatio.ThreeToTwo;
+    private double               _bjPayout              = 1.5;
     private PayoutRatio          _charliePayout         = PayoutRatio.EvenMoney;
     private bool                 _dealerStandsOnSoft17  = false;
     private bool                 _doubleAfterSplit      = true;
@@ -98,9 +98,9 @@ internal sealed class GameStateBuilder
         return this;
     }
 
-    public GameStateBuilder BjPayout(PayoutRatio payout)
+    public GameStateBuilder BjPayout(double multiplier)
     {
-        _bjPayout = payout;
+        _bjPayout = multiplier;
         return this;
     }
 
