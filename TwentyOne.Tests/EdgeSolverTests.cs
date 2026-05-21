@@ -82,6 +82,21 @@ public class EdgeSolverTests
     }
 
     [Fact]
+    public void RsaOn_HsaOff_StillLowersEdge_VsBaseline()
+    {
+        // RSA without HSA is a real-world rule combination - the player can split
+        // a paired [A,A] but each new hand still gets only one card. The solver
+        // must reflect this: edge should be strictly lower than baseline (RSA off
+        // + HSA off) but typically higher than HSA on.
+        var baseline = EdgeSolver.ComputeHouseEdge(Rules(hsa: false, rsa: false));
+        var rsaOnly  = EdgeSolver.ComputeHouseEdge(Rules(hsa: false, rsa: true));
+        var hsaOnly  = EdgeSolver.ComputeHouseEdge(Rules(hsa: true,  rsa: false));
+        _out.WriteLine($"baseline = {baseline * 100:F4}%, rsa-only = {rsaOnly * 100:F4}%, hsa-only = {hsaOnly * 100:F4}%");
+        Assert.True(rsaOnly < baseline, "RSA on must lower edge vs baseline");
+        Assert.True(hsaOnly < rsaOnly,  "HSA alone is generally a bigger improvement than RSA alone");
+    }
+
+    [Fact]
     public void RSA_LowersEdge_VsNoRSA()
     {
         var noRSA = EdgeSolver.ComputeHouseEdge(Rules(rsa: false));

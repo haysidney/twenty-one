@@ -162,8 +162,18 @@ public static class GameEngine
         && hand.Cards[0] == hand.Cards[1]
         && (resplitAces || !(hand.IsFromSplit && hand.Cards[0] == 1));
 
-    // Hit is allowed on a Playing hand that already has ≥2 cards (1-card split hands are auto-hit).
-    public static bool CanHit(Hand hand) =>
+    // Hit is allowed on a Playing hand that already has ≥2 cards (1-card split hands
+    // are auto-hit). When hitSplitAces is false, a split-ace hand (IsFromSplit with
+    // an ace as the first card) cannot be hit further - it should already have been
+    // forced to Stand, but the guard catches the RSA-on / HSA-off case where the
+    // engine intentionally leaves a [A,A] pair Playing so the player can resplit.
+    public static bool CanHit(Hand hand, bool hitSplitAces) =>
+        hand.State == HandState.Playing && hand.Cards.Length >= 2
+        && (hitSplitAces || !(hand.IsFromSplit && hand.Cards[0] == 1));
+
+    // Stand is allowed whenever the hand is Playing and has ≥2 cards. Unlike Hit,
+    // Stand is not gated by HSA - the player can always end their hand voluntarily.
+    public static bool CanStand(Hand hand) =>
         hand.State == HandState.Playing && hand.Cards.Length >= 2;
 
     // Deal phase is complete when the dealer has ≥1 card and every player's first hand has ≥2 cards.
@@ -513,7 +523,10 @@ public static class GameEngine
             if (newHand.Doubled)
                 newHand = newHand with { State = HandState.Stand };
             else if (!state.HitSplitAces && newHand.IsFromSplit && newHand.Cards.Length == 2
-                     && newHand.Cards[0] == 1)
+                     && newHand.Cards[0] == 1
+                     && !(state.ResplitAces && newHand.Cards[1] == 1))
+                // Auto-stand split aces UNLESS the player should still get to choose
+                // between Stand and Split on a fresh [A,A] pair (HSA off + RSA on).
                 newHand = newHand with { State = HandState.Stand };
             else if (HandValue(newHand.Cards) == 21)
                 newHand = newHand with { State = HandState.Stand };

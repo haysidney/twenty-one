@@ -810,7 +810,7 @@ public partial class MainWindow
 
             var canStand = !hasAnyPending && Phase == GamePhase.PlayerTurns
                         && pi == ActivePlayerIndex && hi == ActiveHandIndex
-                        && GameEngine.CanHit(hand);
+                        && GameEngine.CanStand(hand);
             if (!canStand) ImGui.BeginDisabled();
 #if DEBUG
             if (!gates.Stand) ImGui.BeginDisabled();

@@ -1782,21 +1782,45 @@ public class SplitHandTests
     public void CanHit_TrueForPlayingHandWith2PlusCards()
     {
         var hand = new Hand { Cards = [5, 7], State = HandState.Playing };
-        Assert.True(GameEngine.CanHit(hand));
+        Assert.True(GameEngine.CanHit(hand, hitSplitAces: false));
+        Assert.True(GameEngine.CanHit(hand, hitSplitAces: true));
     }
 
     [Fact]
     public void CanHit_FalseFor1CardSplitHand()
     {
         var hand = new Hand { Cards = [8], State = HandState.Playing, IsFromSplit = true };
-        Assert.False(GameEngine.CanHit(hand));
+        Assert.False(GameEngine.CanHit(hand, hitSplitAces: true));
     }
 
     [Fact]
     public void CanHit_FalseForStandHand()
     {
         var hand = new Hand { Cards = [5, 7, 3], State = HandState.Stand };
-        Assert.False(GameEngine.CanHit(hand));
+        Assert.False(GameEngine.CanHit(hand, hitSplitAces: false));
+    }
+
+    [Fact]
+    public void CanHit_SplitAcePair_False_WhenHsaOff()
+    {
+        // [A,A] from an earlier split, kept Playing under RSA-on so the player can
+        // resplit. HSA off must still block hitting.
+        var hand = new Hand { Cards = [1, 1], State = HandState.Playing, IsFromSplit = true };
+        Assert.False(GameEngine.CanHit(hand, hitSplitAces: false));
+    }
+
+    [Fact]
+    public void CanHit_SplitAcePair_True_WhenHsaOn()
+    {
+        var hand = new Hand { Cards = [1, 1], State = HandState.Playing, IsFromSplit = true };
+        Assert.True(GameEngine.CanHit(hand, hitSplitAces: true));
+    }
+
+    [Fact]
+    public void CanStand_TrueOnPlayingTwoCardHand_RegardlessOfHsa()
+    {
+        var hand = new Hand { Cards = [1, 1], State = HandState.Playing, IsFromSplit = true };
+        Assert.True(GameEngine.CanStand(hand));
     }
 
     [Fact]
@@ -2930,5 +2954,166 @@ public class GameActionPushesUndoTests
     public void StateChangingActions_PushUndo(GameAction action)
     {
         Assert.True(action.PushesUndo);
+    }
+}
+
+// Combinations of rules that interact with each other. Each test sets up the
+// minimum state to exercise the intersection and asserts the resulting hand
+// state / action eligibility.
+public class RuleInteractionTests
+{
+    private static GameState BuildSplitAcePair(bool hsa, bool rsa)
+    {
+        // Player has [A] from a previous split; we add another A so the post-deal
+        // hand becomes [1, 1] IsFromSplit.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .HitSplitAces(hsa)
+            .ResplitAces(rsa)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
+            })
+            .Build();
+        var (ns, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 1));
+        return ns;
+    }
+
+    [Fact]
+    public void RsaOff_HsaOff_AcePair_AutoStands()
+    {
+        var ns = BuildSplitAcePair(hsa: false, rsa: false);
+        var hand = ns.Players[0].Hands[0];
+        Assert.Equal(HandState.Stand, hand.State);
+        Assert.False(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.False(GameEngine.CanHit(hand, hitSplitAces: false));
+    }
+
+    [Fact]
+    public void RsaOff_HsaOn_AcePair_Playing_CanHitOnly()
+    {
+        var ns = BuildSplitAcePair(hsa: true, rsa: false);
+        var hand = ns.Players[0].Hands[0];
+        Assert.Equal(HandState.Playing, hand.State);
+        Assert.False(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.True(GameEngine.CanHit(hand, hitSplitAces: true));
+        Assert.True(GameEngine.CanStand(hand));
+    }
+
+    [Fact]
+    public void RsaOn_HsaOff_AcePair_Playing_CanSplitNotHit()
+    {
+        var ns = BuildSplitAcePair(hsa: false, rsa: true);
+        var hand = ns.Players[0].Hands[0];
+        Assert.Equal(HandState.Playing, hand.State);
+        Assert.True(GameEngine.CanSplit(hand, resplitAces: true));
+        Assert.False(GameEngine.CanHit(hand, hitSplitAces: false));
+        Assert.True(GameEngine.CanStand(hand));
+    }
+
+    [Fact]
+    public void RsaOn_HsaOn_AcePair_Playing_AllActions()
+    {
+        var ns = BuildSplitAcePair(hsa: true, rsa: true);
+        var hand = ns.Players[0].Hands[0];
+        Assert.Equal(HandState.Playing, hand.State);
+        Assert.True(GameEngine.CanSplit(hand, resplitAces: true));
+        Assert.True(GameEngine.CanHit(hand, hitSplitAces: true));
+        Assert.True(GameEngine.CanStand(hand));
+    }
+
+    [Fact]
+    public void RsaOff_HsaOff_NonAcePostSplit_AutoStands()
+    {
+        // [A, 5] from split with HSA off auto-stands regardless of RSA.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
+            })
+            .Build();
+        var (ns, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 5));
+        Assert.Equal(HandState.Stand, ns.Players[0].Hands[0].State);
+    }
+
+    [Fact]
+    public void RsaOn_HsaOff_NonAcePostSplit_StillAutoStands()
+    {
+        // RSA on but the second card isn't an ace - no resplit possible, so the
+        // hand should still auto-stand under HSA off.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .ResplitAces(true)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
+            })
+            .Build();
+        var (ns, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 5));
+        Assert.Equal(HandState.Stand, ns.Players[0].Hands[0].State);
+    }
+
+    [Fact]
+    public void DasOff_HsaOn_NoDoubleAfterSplitHit()
+    {
+        // Split-ace hand of [A, 5] (soft 16) with HSA on - the player can hit, but
+        // with DAS off cannot double on the 2-card hand.
+        var hand = new Hand { Cards = [1, 5], State = HandState.Playing, IsFromSplit = true };
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false));
+        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true));
+    }
+
+    [Fact]
+    public void EightsSplit_DasOff_NoDouble()
+    {
+        // Pair-of-8s split, post-deal becomes [8, c]; with DAS off, no double.
+        var hand = new Hand { Cards = [8, 5], State = HandState.Playing, IsFromSplit = true };
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false));
+    }
+
+    [Fact]
+    public void NonSplit_DasOff_DoubleStillAllowed()
+    {
+        // DAS off must not block doubling on the original (non-split) hand.
+        var hand = new Hand { Cards = [5, 6], State = HandState.Playing, IsFromSplit = false };
+        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false));
+    }
+
+    [Fact]
+    public void S17_AllPlayerBJ_CanGoToPayoutImmediately()
+    {
+        // With S17 and all players BJ, dealer with soft-17 upcard shouldn't need
+        // to play out the soft 17 - the standard "all-BJ" shortcut still applies
+        // because the dealer reveal-on-BJ-check covers it.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(HandState.Playing, 4) // safe upcard for BJ check
+            .DealerStandsOnSoft17()
+            .Player("Lorah", "100", HandState.Blackjack, 1, 10)
+            .Build();
+        Assert.True(GameEngine.CanGoToPayout(state));
+    }
+
+    [Fact]
+    public void S17_DealerSoft17_StandsImmediately()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(1, 6)
+            .DealerStandsOnSoft17()
+            .Player("Lorah", "100", HandState.Stand, 10, 8)
+            .Build();
+        Assert.False(GameEngine.CanHitDealer(state));
+        Assert.True(GameEngine.CanGoToPayout(state));
     }
 }

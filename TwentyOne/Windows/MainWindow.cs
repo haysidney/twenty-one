@@ -632,7 +632,7 @@ public partial class MainWindow : Window, IDisposable
         {
             GamePhase.Deal        => hand.State == HandState.Playing && hand.Cards.Length < 2,
             GamePhase.PlayerTurns => pi == ActivePlayerIndex && hi == ActiveHandIndex
-                                  && GameEngine.CanHit(hand)
+                                  && GameEngine.CanHit(hand, State.HitSplitAces)
                                   && !pendingDouble.HasValue && !pendingSplit.HasValue
                                   && !State.WaitingForNextPlayer,
             _ => false,
