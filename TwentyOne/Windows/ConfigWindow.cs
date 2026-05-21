@@ -40,14 +40,13 @@ public class ConfigWindow : Window, IDisposable
     private bool   _duplicatePending = false;
 
     private double?   _cachedHouseEdge;
-    private double?   _edgeFlipS17;
-    private double?   _edgeFlipDAS;
-    private double?   _edgeFlipHSA;
-    private double?   _edgeFlipRSA;
-    private double?   _edgeFlipSurrender;
-    // Multi-valued knobs: edge if the knob were reverted to its GameState default
-    // (BjPayout=1.5, CharliePayout=EvenMoney, FiveCardCharlie=Disabled). Null when
-    // the current value already matches the default.
+    // Edge if each knob were reverted to its GameState default. Null when the
+    // current value already matches the default (no delta to show).
+    private double?   _edgeS17AtDefault;
+    private double?   _edgeDASAtDefault;
+    private double?   _edgeHSAAtDefault;
+    private double?   _edgeRSAAtDefault;
+    private double?   _edgeSurrenderAtDefault;
     private double?   _edgeBjPayoutAtDefault;
     private double?   _edgeFiveCardCharlieAtDefault;
     private double?   _edgeCharliePayoutAtDefault;
@@ -125,7 +124,7 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When off (default), dealer hits soft 17 (H17). When on, dealer stands on soft 17 (S17).\nApplies to the next round - mid-round changes do not affect the running round.");
-        DrawFlipDelta(_edgeFlipS17);
+        DrawDefaultDelta(_edgeS17AtDefault, "off");
 
         var das = config.DoubleAfterSplit;
         if (ImGui.Checkbox("Allow double after split", ref das))
@@ -135,7 +134,7 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When on (default), the player may double down on a hand created by splitting.\nWhen off, only non-split hands can be doubled.\nApplies to the next round.");
-        DrawFlipDelta(_edgeFlipDAS);
+        DrawDefaultDelta(_edgeDASAtDefault, "on");
 
         var hsa = config.HitSplitAces;
         if (ImGui.Checkbox("Allow hitting split aces", ref hsa))
@@ -145,7 +144,7 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When off (default), a split-ace hand receives exactly one extra card and auto-stands.\nWhen on, split-ace hands may be hit further.\n21 on a split-ace hand is still treated as Stand, not Blackjack.\nApplies to the next round.");
-        DrawFlipDelta(_edgeFlipHSA);
+        DrawDefaultDelta(_edgeHSAAtDefault, "off");
 
         var rsa = config.ResplitAces;
         if (ImGui.Checkbox("Allow resplitting aces", ref rsa))
@@ -155,7 +154,7 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When on, a pair of aces produced by an earlier split may be split again.\nWhen off (default), split-ace pairs cannot be resplit.\nApplies to the next round.");
-        DrawFlipDelta(_edgeFlipRSA);
+        DrawDefaultDelta(_edgeRSAAtDefault, "off");
 
         var surrender = config.AllowSurrender;
         if (ImGui.Checkbox("Allow surrender", ref surrender))
@@ -165,7 +164,7 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When on, the player may surrender an initial 2-card hand for half their bet.\nNot available after hit, split, or double.\nApplies to the next round.");
-        DrawFlipDelta(_edgeFlipSurrender);
+        DrawDefaultDelta(_edgeSurrenderAtDefault, "off");
 
         DrawHouseEdgeLabel();
 
@@ -315,12 +314,23 @@ public class ConfigWindow : Window, IDisposable
 
         if (_cachedHouseEdge.HasValue && _cachedEdgeRules.Equals(rules)) return;
 
-        _cachedHouseEdge   = EdgeSolver.ComputeHouseEdge(rules);
-        _edgeFlipS17       = EdgeSolver.ComputeHouseEdge(rules with { DealerStandsOnSoft17 = !rules.DealerStandsOnSoft17 });
-        _edgeFlipDAS       = EdgeSolver.ComputeHouseEdge(rules with { DoubleAfterSplit     = !rules.DoubleAfterSplit });
-        _edgeFlipHSA       = EdgeSolver.ComputeHouseEdge(rules with { HitSplitAces         = !rules.HitSplitAces });
-        _edgeFlipRSA       = EdgeSolver.ComputeHouseEdge(rules with { ResplitAces          = !rules.ResplitAces });
-        _edgeFlipSurrender = EdgeSolver.ComputeHouseEdge(rules with { AllowSurrender       = !rules.AllowSurrender });
+        _cachedHouseEdge = EdgeSolver.ComputeHouseEdge(rules);
+
+        _edgeS17AtDefault = !rules.DealerStandsOnSoft17
+            ? null
+            : EdgeSolver.ComputeHouseEdge(rules with { DealerStandsOnSoft17 = false });
+        _edgeDASAtDefault = rules.DoubleAfterSplit
+            ? null
+            : EdgeSolver.ComputeHouseEdge(rules with { DoubleAfterSplit = true });
+        _edgeHSAAtDefault = !rules.HitSplitAces
+            ? null
+            : EdgeSolver.ComputeHouseEdge(rules with { HitSplitAces = false });
+        _edgeRSAAtDefault = !rules.ResplitAces
+            ? null
+            : EdgeSolver.ComputeHouseEdge(rules with { ResplitAces = false });
+        _edgeSurrenderAtDefault = !rules.AllowSurrender
+            ? null
+            : EdgeSolver.ComputeHouseEdge(rules with { AllowSurrender = false });
 
         _edgeBjPayoutAtDefault = Math.Abs(rules.BjPayout - 1.5) < 1e-9
             ? null
@@ -332,28 +342,13 @@ public class ConfigWindow : Window, IDisposable
             ? null
             : EdgeSolver.ComputeHouseEdge(rules with { CharliePayout = PayoutRatio.EvenMoney });
 
-        _cachedEdgeRules   = rules;
+        _cachedEdgeRules = rules;
     }
 
-    // Shows "(±X.XX%)" next to a toggle, colored green if flipping helps the player
-    // (lowers edge), red if flipping hurts the player. Hidden if the delta is zero.
-    private void DrawFlipDelta(double? flipped)
-    {
-        if (!_cachedHouseEdge.HasValue || !flipped.HasValue) return;
-        var delta = (flipped.Value - _cachedHouseEdge.Value) * 100;
-        if (Math.Abs(delta) < 0.005) return; // would round to "(0.00%)"
-        ImGui.SameLine();
-        var color = delta < 0
-            ? new Vector4(0.65f, 0.85f, 0.65f, 1f)   // flipping lowers edge: green
-            : new Vector4(0.95f, 0.55f, 0.55f, 1f); // flipping raises edge: red
-        ImGui.TextColored(color, $"({delta:+0.00;-0.00}%)");
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Change to the house edge if this rule is toggled.");
-    }
-
-    // Shows the edge cost of a multi-valued knob being at its current (non-default)
-    // setting: positive = current setting raises edge (red, worse for player),
-    // negative = current setting lowers edge (green, better for player).
+    // Shows the edge cost of a knob being at its current (non-default) setting:
+    // positive = current setting raises edge (red, worse for player), negative =
+    // current setting lowers edge (green, better for player). Hidden when the
+    // current value matches the default.
     private void DrawDefaultDelta(double? edgeAtDefault, string defaultLabel)
     {
         if (!_cachedHouseEdge.HasValue || !edgeAtDefault.HasValue) return;
