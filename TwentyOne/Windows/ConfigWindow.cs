@@ -345,20 +345,33 @@ public class ConfigWindow : Window, IDisposable
         _cachedEdgeRules = rules;
     }
 
-    // Shows the edge cost of a knob being at its current (non-default) setting:
-    // positive = current setting raises edge (red, worse for player), negative =
-    // current setting lowers edge (green, better for player). Hidden when the
-    // current value matches the default.
+    // Shows the edge effect of a knob being at its current setting vs the default,
+    // from the dealer/house perspective: positive = current setting raises house
+    // edge (green, more house money), negative = current setting lowers house edge
+    // (red, less house money). At default, shows a greyed "(0.00%)".
     private void DrawDefaultDelta(double? edgeAtDefault, string defaultLabel)
     {
-        if (!_cachedHouseEdge.HasValue || !edgeAtDefault.HasValue) return;
-        var delta = (_cachedHouseEdge.Value - edgeAtDefault.Value) * 100;
-        if (Math.Abs(delta) < 0.005) return;
+        if (!_cachedHouseEdge.HasValue) return;
         ImGui.SameLine();
-        var color = delta < 0
-            ? new Vector4(0.65f, 0.85f, 0.65f, 1f)
-            : new Vector4(0.95f, 0.55f, 0.55f, 1f);
-        ImGui.TextColored(color, $"({delta:+0.00;-0.00}%)");
+        if (!edgeAtDefault.HasValue)
+        {
+            ImGui.TextDisabled("(0.00%)");
+        }
+        else
+        {
+            var delta = (_cachedHouseEdge.Value - edgeAtDefault.Value) * 100;
+            if (Math.Abs(delta) < 0.005)
+            {
+                ImGui.TextDisabled("(0.00%)");
+            }
+            else
+            {
+                var color = delta > 0
+                    ? new Vector4(0.65f, 0.85f, 0.65f, 1f)   // raises house edge: green
+                    : new Vector4(0.95f, 0.55f, 0.55f, 1f); // lowers house edge: red
+                ImGui.TextColored(color, $"({delta:+0.00;-0.00}%)");
+            }
+        }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip($"House edge vs the default value ({defaultLabel}).");
     }
