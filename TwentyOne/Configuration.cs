@@ -159,8 +159,10 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public List<RoundHistoryEntry> RoundHistory { get => ActiveVenue.RoundHistory; set => ActiveVenue.RoundHistory = value; }
     [JsonIgnore] public List<PlayerStatsSession> StatsSessions { get => ActiveVenue.StatsSessions; set => ActiveVenue.StatsSessions = value; }
 
-    // House rules - canonical on VenueSettings. Editing these does NOT affect the
-    // current GameState; SeedRulesIntoGameState picks them up at NewRound time.
+    // House rules - canonical on VenueSettings. Editing these does NOT affect a
+    // round that has already started (Deal phase or later). SeedRulesIntoGameState
+    // copies the latest venue rules onto GameState at NewRound and StartDeal time,
+    // so Bet-phase edits land on the round about to be dealt.
     [JsonIgnore] public double              BjPayout             { get => ActiveVenue.BjPayout;             set => ActiveVenue.BjPayout = value; }
     [JsonIgnore] public PayoutRatio         CharliePayout        { get => ActiveVenue.CharliePayout;        set => ActiveVenue.CharliePayout = value; }
     [JsonIgnore] public FiveCardCharlieRule FiveCardCharlie      { get => ActiveVenue.FiveCardCharlie;      set => ActiveVenue.FiveCardCharlie = value; }
@@ -173,10 +175,10 @@ public class Configuration : IPluginConfiguration
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 
     /// <summary>
-    /// Copies the active venue's house rules into the current GameState. Called
-    /// by MainWindow.Apply after a NewRound action so each new round uses the
-    /// latest venue rules. Mid-round edits to venue rules do not affect the
-    /// already-running round.
+    /// Copies the active venue's house rules into the current GameState. Called by
+    /// MainWindow.Apply after NewRound and StartDeal so each round uses the latest
+    /// venue rules - including changes the dealer made during the Betting phase.
+    /// Edits during Deal phase or later do not affect the already-running round.
     /// </summary>
     public void SeedRulesIntoGameState()
     {

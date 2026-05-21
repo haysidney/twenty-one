@@ -216,7 +216,10 @@ public partial class MainWindow : Window, IDisposable
         config.GameState = newState;
 
         // Per-venue rule snapshot: a fresh round picks up the latest venue rules.
-        if (action is NewRound) config.SeedRulesIntoGameState();
+        // StartDeal also re-seeds so rule changes made during Betting take effect
+        // on the round about to start (the round hasn't really "started" until cards
+        // are dealt).
+        if (action is NewRound or StartDeal) config.SeedRulesIntoGameState();
 
         if (config.AutoTargetEnabled
             && action is BeginPlayerTurns or AdvanceToNextPlayer
