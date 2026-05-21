@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TwentyOne.Game;
@@ -1030,6 +1031,101 @@ public class ImmutabilityTests
 
         Assert.Equal(originalCardCount, state.Players[0].Hands[0].Cards.Length);
         Assert.Equal(GamePhase.PlayerTurns, state.Phase);
+    }
+}
+
+// Verifies the "venue-rule edits don't leak into the running round" invariant
+// from the per-venue refactor: house rules live on VenueSettings (canonical)
+// and are mirrored on GameState at NewRound time. Once a round is in progress,
+// nothing in the engine touches the GameState rule fields. The reseed only
+// happens at the call site (Configuration.SeedRulesIntoGameState invoked from
+// MainWindow.Apply when the action is NewRound).
+public class VenueRulesDontLeakTests
+{
+    private static GameState NonDefaultRulesState() => new GameStateBuilder()
+        .BjPayout(1.7)
+        .Charlie(FiveCardCharlieRule.BeatsAll, PayoutRatio.SixToFive)
+        .DealerStandsOnSoft17()
+        .DoubleAfterSplit(false)
+        .HitSplitAces()
+        .ResplitAces()
+        .AllowSurrender()
+        .Phase(GamePhase.PlayerTurns)
+        .ActiveHand(0, 0)
+        .Player("Lorah", "100", HandState.Playing, 10, 6)
+        .Build();
+
+    private static void AssertRulesEqual(GameState a, GameState b)
+    {
+        Assert.Equal(a.BjPayout,             b.BjPayout);
+        Assert.Equal(a.CharliePayout,        b.CharliePayout);
+        Assert.Equal(a.FiveCardCharlie,      b.FiveCardCharlie);
+        Assert.Equal(a.DealerStandsOnSoft17, b.DealerStandsOnSoft17);
+        Assert.Equal(a.DoubleAfterSplit,     b.DoubleAfterSplit);
+        Assert.Equal(a.HitSplitAces,         b.HitSplitAces);
+        Assert.Equal(a.ResplitAces,          b.ResplitAces);
+        Assert.Equal(a.AllowSurrender,       b.AllowSurrender);
+    }
+
+    [Theory]
+    [InlineData("Hit")]
+    [InlineData("Stand")]
+    [InlineData("Surrender")]
+    public void MidRoundActions_PreserveRuleFields(string actionName)
+    {
+        var state = NonDefaultRulesState();
+        GameAction action = actionName switch
+        {
+            "Hit"       => new AddPlayerCard(0, 0, 5),
+            "Stand"     => new StandPlayer(0, 0),
+            "Surrender" => new SurrenderHand(0, 0),
+            _           => throw new ArgumentException(nameof(actionName)),
+        };
+        var (ns, _) = GameEngine.Apply(state, action);
+        AssertRulesEqual(state, ns);
+    }
+
+    [Fact]
+    public void NewRound_PreservesRuleFields()
+    {
+        // HandleNewRound resets phase/hands but leaves rules alone - the seed at
+        // the call site (Configuration.SeedRulesIntoGameState) is what brings
+        // VenueSettings → GameState. The engine itself must NOT erase the rule
+        // fields, or in-progress snapshots and history viewer mode would lose them.
+        var state = NonDefaultRulesState() with { Phase = GamePhase.Payout };
+        var (ns, _) = GameEngine.Apply(state, new NewRound());
+        AssertRulesEqual(state, ns);
+        Assert.Equal(GamePhase.Betting, ns.Phase);
+    }
+
+    [Fact]
+    public void AcrossFullRound_RuleFieldsNeverChange()
+    {
+        // Drive a small round through several actions and confirm rules survive.
+        var state = new GameStateBuilder()
+            .BjPayout(1.7)
+            .DealerStandsOnSoft17()
+            .AllowSurrender()
+            .Phase(GamePhase.Deal)
+            .Dealer(10)
+            .Player("Lorah", "100", HandState.Playing, 5, 9)
+            .Build();
+        var rulesAtStart = state;
+
+        (state, _) = GameEngine.Apply(state, new BeginPlayerTurns());
+        AssertRulesEqual(rulesAtStart, state);
+
+        (state, _) = GameEngine.Apply(state, new StandPlayer(0, 0));
+        AssertRulesEqual(rulesAtStart, state);
+
+        (state, _) = GameEngine.Apply(state, new BeginDealerTurn());
+        AssertRulesEqual(rulesAtStart, state);
+
+        (state, _) = GameEngine.Apply(state, new AddDealerCard(7));
+        AssertRulesEqual(rulesAtStart, state);
+
+        (state, _) = GameEngine.Apply(state, new GoToPayout());
+        AssertRulesEqual(rulesAtStart, state);
     }
 }
 
