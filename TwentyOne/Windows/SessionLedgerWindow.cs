@@ -209,7 +209,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             config.BjPayout, config.CharliePayout, config.FiveCardCharlie,
             config.DealerStandsOnSoft17, config.DoubleAfterSplit,
             config.HitSplitAces, config.ResplitAces, config.AllowSurrender,
-            config.ResplitCap);
+            config.ResplitCap, config.DoubleRestriction);
         var liveStats = _edgeCache.Get(config.RoundHistory, currentRules);
         EdgeStatsDisplay.Draw(liveStats, config.RoundHistory.Count,
             "Expected bank gain per gil wagered under your currently configured rules.\nRecomputed across this session's rounds with the current rule set applied.");

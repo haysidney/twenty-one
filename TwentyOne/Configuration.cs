@@ -119,6 +119,7 @@ public class VenueSettings
     public bool                HitSplitAces         { get; set; } = false;
     public bool                ResplitAces          { get; set; } = false;
     public ResplitCap          ResplitCap           { get; set; } = ResplitCap.Max4;
+    public DoubleRestriction   DoubleRestriction    { get; set; } = DoubleRestriction.Any;
     public bool                AllowSurrender       { get; set; } = false;
 }
 
@@ -193,6 +194,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public bool                HitSplitAces         { get => ActiveVenue.HitSplitAces;         set => ActiveVenue.HitSplitAces = value; }
     [JsonIgnore] public bool                ResplitAces          { get => ActiveVenue.ResplitAces;          set => ActiveVenue.ResplitAces = value; }
     [JsonIgnore] public ResplitCap          ResplitCap           { get => ActiveVenue.ResplitCap;           set => ActiveVenue.ResplitCap = value; }
+    [JsonIgnore] public DoubleRestriction   DoubleRestriction    { get => ActiveVenue.DoubleRestriction;    set => ActiveVenue.DoubleRestriction = value; }
     [JsonIgnore] public bool                AllowSurrender       { get => ActiveVenue.AllowSurrender;       set => ActiveVenue.AllowSurrender = value; }
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
@@ -213,6 +215,7 @@ public class Configuration : IPluginConfiguration
         GameState.HitSplitAces         = ActiveVenue.HitSplitAces;
         GameState.ResplitAces          = ActiveVenue.ResplitAces;
         GameState.ResplitCap           = ActiveVenue.ResplitCap;
+        GameState.DoubleRestriction    = ActiveVenue.DoubleRestriction;
         GameState.AllowSurrender       = ActiveVenue.AllowSurrender;
     }
 

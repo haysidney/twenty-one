@@ -13,7 +13,8 @@ public readonly record struct EdgeRules(
     bool HitSplitAces = false,
     bool ResplitAces = false,
     bool AllowSurrender = false,
-    ResplitCap ResplitCap = ResplitCap.Max4);
+    ResplitCap ResplitCap = ResplitCap.Max4,
+    DoubleRestriction DoubleRestriction = DoubleRestriction.Any);
 
 public enum OptimalAction
 {
@@ -216,7 +217,8 @@ public static class EdgeSolver
             double hitEV = HitEVInternal(total, isSoft, numCards, isFromSplit, upcard);
             if (hitEV > best) best = hitEV;
 
-            if (numCards == 2 && (_rules.DoubleAfterSplit || !isFromSplit))
+            if (numCards == 2 && (_rules.DoubleAfterSplit || !isFromSplit)
+                && TotalDoubleable(total, isSoft, _rules.DoubleRestriction))
             {
                 double doubled = DoubleEVInternal(total, isSoft, upcard);
                 if (doubled > best) best = doubled;
@@ -236,6 +238,21 @@ public static class EdgeSolver
                 ev += sub * EvalHand(nt, ns, numCards + 1, isFromSplit, upcard);
             }
             return ev;
+        }
+
+        // Mirror of GameEngine.IsDoubleableTotal. Solver-side guard against the
+        // Double branch when the venue's DoubleRestriction excludes this total.
+        private static bool TotalDoubleable(int total, bool isSoft, DoubleRestriction r)
+        {
+            if (r == DoubleRestriction.Any) return true;
+            if (isSoft) return false;
+            return r switch
+            {
+                DoubleRestriction.Hard9To11  => total >= 9  && total <= 11,
+                DoubleRestriction.Hard10To11 => total >= 10 && total <= 11,
+                DoubleRestriction.HardOnly   => true,
+                _                            => true,
+            };
         }
 
         // Double down: one card then forced stand, with 2x stake.
@@ -263,7 +280,9 @@ public static class EdgeSolver
             {
                 OptimalAction.Stand     => t == 21 ? BjEV(upcard) : StandEV(t, upcard),
                 OptimalAction.Hit       => HitEVInternal(t, soft, 2, false, upcard),
-                OptimalAction.Double    => DoubleEVInternal(t, soft, upcard),
+                OptimalAction.Double    => TotalDoubleable(t, soft, _rules.DoubleRestriction)
+                                            ? DoubleEVInternal(t, soft, upcard)
+                                            : double.NaN,
                 OptimalAction.Split     => c1 == c2 ? EvalSplit(c1, upcard) : double.NaN,
                 OptimalAction.Surrender => _rules.AllowSurrender ? -0.5 : double.NaN,
                 _                       => double.NaN,
@@ -280,12 +299,15 @@ public static class EdgeSolver
 
             double standEV  = StandEV(t, upcard);
             double hitEV    = HitEVInternal(t, soft, 2, false, upcard);
-            double doubleEV = DoubleEVInternal(t, soft, upcard);
 
             var    best   = OptimalAction.Stand;
             double bestEV = standEV;
             if (hitEV > bestEV)    { best = OptimalAction.Hit;    bestEV = hitEV; }
-            if (doubleEV > bestEV) { best = OptimalAction.Double; bestEV = doubleEV; }
+            if (TotalDoubleable(t, soft, _rules.DoubleRestriction))
+            {
+                double doubleEV = DoubleEVInternal(t, soft, upcard);
+                if (doubleEV > bestEV) { best = OptimalAction.Double; bestEV = doubleEV; }
+            }
             if (c1 == c2)
             {
                 double splitEV = EvalSplit(c1, upcard);

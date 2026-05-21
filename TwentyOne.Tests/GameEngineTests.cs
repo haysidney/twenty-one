@@ -1051,6 +1051,7 @@ public class VenueRulesDontLeakTests
         .HitSplitAces()
         .ResplitAces()
         .ResplitCap(ResplitCap.Max2)
+        .DoubleRestriction(DoubleRestriction.Hard9To11)
         .AllowSurrender()
         .Phase(GamePhase.PlayerTurns)
         .ActiveHand(0, 0)
@@ -1067,6 +1068,7 @@ public class VenueRulesDontLeakTests
         Assert.Equal(a.HitSplitAces,         b.HitSplitAces);
         Assert.Equal(a.ResplitAces,          b.ResplitAces);
         Assert.Equal(a.ResplitCap,           b.ResplitCap);
+        Assert.Equal(a.DoubleRestriction,    b.DoubleRestriction);
         Assert.Equal(a.AllowSurrender,       b.AllowSurrender);
     }
 
@@ -1455,42 +1457,42 @@ public class DoubleDownTests
     public void CanDouble_TwoCards_NumericBet_True()
     {
         var hand = new Hand { Cards = [5, 6], State = HandState.Playing };
-        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true));
+        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true, DoubleRestriction.Any));
     }
 
     [Fact]
     public void CanDouble_AlreadyDoubled_False()
     {
         var hand = new Hand { Cards = [5, 6], State = HandState.Playing, Doubled = true, Bet = "200" };
-        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true));
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true, DoubleRestriction.Any));
     }
 
     [Fact]
     public void CanDouble_ThreeCards_False()
     {
         var hand = new Hand { Cards = [5, 3, 6], State = HandState.Playing };
-        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true));
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true, DoubleRestriction.Any));
     }
 
     [Fact]
     public void CanDouble_FromSplit_True_WhenDoubleAfterSplitAllowed()
     {
         var hand = new Hand { Cards = [5, 6], State = HandState.Playing, IsFromSplit = true };
-        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true));
+        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true, DoubleRestriction.Any));
     }
 
     [Fact]
     public void CanDouble_FromSplit_False_WhenDoubleAfterSplitDisallowed()
     {
         var hand = new Hand { Cards = [5, 6], State = HandState.Playing, IsFromSplit = true };
-        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false));
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false, DoubleRestriction.Any));
     }
 
     [Fact]
     public void CanDouble_NotFromSplit_True_WhenDoubleAfterSplitDisallowed()
     {
         var hand = new Hand { Cards = [5, 6], State = HandState.Playing, IsFromSplit = false };
-        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false));
+        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false, DoubleRestriction.Any));
     }
 
     [Fact]
@@ -3382,8 +3384,8 @@ public class RuleInteractionTests
         // Split-ace hand of [A, 5] (soft 16) with HSA on - the player can hit, but
         // with DAS off cannot double on the 2-card hand.
         var hand = new Hand { Cards = [1, 5], State = HandState.Playing, IsFromSplit = true };
-        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false));
-        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true));
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false, DoubleRestriction.Any));
+        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true, DoubleRestriction.Any));
     }
 
     [Fact]
@@ -3391,7 +3393,7 @@ public class RuleInteractionTests
     {
         // Pair-of-8s split, post-deal becomes [8, c]; with DAS off, no double.
         var hand = new Hand { Cards = [8, 5], State = HandState.Playing, IsFromSplit = true };
-        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false));
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false, DoubleRestriction.Any));
     }
 
     [Fact]
@@ -3399,7 +3401,7 @@ public class RuleInteractionTests
     {
         // DAS off must not block doubling on the original (non-split) hand.
         var hand = new Hand { Cards = [5, 6], State = HandState.Playing, IsFromSplit = false };
-        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false));
+        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false, DoubleRestriction.Any));
     }
 
     [Fact]
@@ -3532,5 +3534,90 @@ public class ResplitCapTests
 
         Assert.True(Math.Abs(e4 - eu) < 0.001,
             $"Max4 ({e4:P4}) should be within 0.1% of Unlimited ({eu:P4})");
+    }
+}
+
+public class DoubleRestrictionTests
+{
+    private static Hand TwoCard(int a, int b) =>
+        new() { Cards = [a, b], State = HandState.Playing };
+
+    [Theory]
+    // Any: every 2-card hand qualifies
+    [InlineData(DoubleRestriction.Any,        2, 3,  true)]  // hard 5
+    [InlineData(DoubleRestriction.Any,        1, 5,  true)]  // soft 16
+    [InlineData(DoubleRestriction.Any,       10, 10, true)]  // hard 20
+    // Hard9To11: only hard 9, 10, 11
+    [InlineData(DoubleRestriction.Hard9To11,  4, 5,  true)]  // hard 9
+    [InlineData(DoubleRestriction.Hard9To11,  5, 5,  true)]  // hard 10
+    [InlineData(DoubleRestriction.Hard9To11,  5, 6,  true)]  // hard 11
+    [InlineData(DoubleRestriction.Hard9To11,  4, 4,  false)] // hard 8
+    [InlineData(DoubleRestriction.Hard9To11,  6, 6,  false)] // hard 12
+    [InlineData(DoubleRestriction.Hard9To11,  1, 8,  false)] // soft 19 - not hard 9
+    [InlineData(DoubleRestriction.Hard9To11,  1, 10, false)] // soft 21 / BJ
+    // Hard10To11: only hard 10, 11
+    [InlineData(DoubleRestriction.Hard10To11, 4, 5,  false)] // hard 9
+    [InlineData(DoubleRestriction.Hard10To11, 5, 5,  true)]  // hard 10
+    [InlineData(DoubleRestriction.Hard10To11, 5, 6,  true)]  // hard 11
+    [InlineData(DoubleRestriction.Hard10To11, 1, 9,  false)] // soft 20
+    // HardOnly: any hard total
+    [InlineData(DoubleRestriction.HardOnly,   2, 3,  true)]  // hard 5
+    [InlineData(DoubleRestriction.HardOnly,  10, 10, true)]  // hard 20
+    [InlineData(DoubleRestriction.HardOnly,   1, 5,  false)] // soft 16
+    [InlineData(DoubleRestriction.HardOnly,   1, 9,  false)] // soft 20
+    public void IsDoubleableTotal_Cases(DoubleRestriction r, int c1, int c2, bool expected)
+    {
+        Assert.Equal(expected, GameEngine.IsDoubleableTotal([c1, c2], r));
+    }
+
+    [Fact]
+    public void CanDouble_HardOnly_BlocksSoftHand()
+    {
+        var hand = TwoCard(1, 5); // soft 16
+        Assert.True (GameEngine.CanDouble(hand, "100", doubleAfterSplit: true, DoubleRestriction.Any));
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true, DoubleRestriction.HardOnly));
+    }
+
+    [Fact]
+    public void CanDouble_Hard9To11_OnlyAllowsRange()
+    {
+        Assert.True (GameEngine.CanDouble(TwoCard(5, 5), "100", true, DoubleRestriction.Hard9To11)); // 10
+        Assert.False(GameEngine.CanDouble(TwoCard(4, 4), "100", true, DoubleRestriction.Hard9To11)); // 8
+        Assert.False(GameEngine.CanDouble(TwoCard(6, 6), "100", true, DoubleRestriction.Hard9To11)); // 12
+    }
+
+    [Fact]
+    public void CanDouble_DasAndRestriction_StackIndependently()
+    {
+        // Post-split hard 10: DAS off + Any → blocked by DAS. DAS on + restriction → ok.
+        var hand = new Hand { Cards = [5, 5], State = HandState.Playing, IsFromSplit = true };
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false, DoubleRestriction.Any));
+        Assert.True (GameEngine.CanDouble(hand, "100", doubleAfterSplit: true,  DoubleRestriction.Hard9To11));
+        // DAS on but restriction excludes total → blocked.
+        var hand2 = new Hand { Cards = [4, 4], State = HandState.Playing, IsFromSplit = true };
+        Assert.False(GameEngine.CanDouble(hand2, "100", doubleAfterSplit: true, DoubleRestriction.Hard9To11));
+    }
+
+    // Solver: house edge should rise monotonically as the rule restricts double options.
+    [Fact]
+    public void SolverEdge_MonotonicWithRestriction()
+    {
+        EdgeRules Make(DoubleRestriction r) => new(
+            BjPayout: 1.5,
+            CharliePayout: PayoutRatio.EvenMoney,
+            FiveCardCharlie: FiveCardCharlieRule.Disabled,
+            DoubleRestriction: r);
+
+        var any  = EdgeSolver.ComputeHouseEdge(Make(DoubleRestriction.Any));
+        var hard = EdgeSolver.ComputeHouseEdge(Make(DoubleRestriction.HardOnly));
+        var d911 = EdgeSolver.ComputeHouseEdge(Make(DoubleRestriction.Hard9To11));
+        var d1011= EdgeSolver.ComputeHouseEdge(Make(DoubleRestriction.Hard10To11));
+
+        // Each restriction removes options from a strict superset, so the edge moves
+        // toward the house. HardOnly disallows soft doubling; Hard9To11 further bans
+        // hard totals outside 9-11; Hard10To11 is the tightest.
+        Assert.True(hard  >= any,  $"HardOnly ({hard}) >= Any ({any})");
+        Assert.True(d911  >= hard, $"Hard9To11 ({d911}) >= HardOnly ({hard})");
+        Assert.True(d1011 >= d911, $"Hard10To11 ({d1011}) >= Hard9To11 ({d911})");
     }
 }

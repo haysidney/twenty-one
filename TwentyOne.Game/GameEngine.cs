@@ -152,12 +152,35 @@ public static class GameEngine
         hand.Bet.Length > 0 ? ParseBet(hand.Bet) : ParseBet(player.Bet);
 
     // Double is allowed on any 2-card Playing hand that hasn't already been doubled,
-    // provided the effective bet is numeric. When doubleAfterSplit is false, the
-    // hand must not originate from a split.
-    public static bool CanDouble(Hand hand, string playerBet, bool doubleAfterSplit) =>
-        hand.Cards.Length == 2 && hand.State == HandState.Playing && !hand.Doubled
-        && (doubleAfterSplit || !hand.IsFromSplit)
-        && (hand.Bet.Length > 0 ? ParseBet(hand.Bet) : ParseBet(playerBet)) > 0;
+    // provided the effective bet is numeric, DAS permits it on split hands, and the
+    // total qualifies under the venue's DoubleRestriction.
+    public static bool CanDouble(Hand hand, string playerBet, bool doubleAfterSplit, DoubleRestriction restriction)
+    {
+        if (hand.State != HandState.Playing) return false;
+        if (hand.Cards.Length != 2)          return false;
+        if (hand.Doubled)                    return false;
+        if (!doubleAfterSplit && hand.IsFromSplit) return false;
+        var bet = hand.Bet.Length > 0 ? ParseBet(hand.Bet) : ParseBet(playerBet);
+        if (bet <= 0) return false;
+        return IsDoubleableTotal(hand.Cards, restriction);
+    }
+
+    // Returns true if a 2-card total qualifies for double-down under the rule.
+    // The restricted variants exclude soft totals entirely - "9-11" means hard 9/10/11
+    // since A+8 is conventionally treated as soft 19, not a doubleable 9.
+    public static bool IsDoubleableTotal(IReadOnlyList<int> cards, DoubleRestriction restriction)
+    {
+        if (restriction == DoubleRestriction.Any) return true;
+        if (IsSoft(cards)) return false;
+        var total = HandValue(cards);
+        return restriction switch
+        {
+            DoubleRestriction.Hard9To11  => total >= 9  && total <= 11,
+            DoubleRestriction.Hard10To11 => total >= 10 && total <= 11,
+            DoubleRestriction.HardOnly   => true,
+            _                            => true,
+        };
+    }
 
     // Split is allowed on any 2-card Playing hand where both cards share the same rank.
     // Re-splits are supported up to the ResplitCap (counts total player hands). Aces
@@ -404,14 +427,14 @@ public static class GameEngine
             if (!string.IsNullOrWhiteSpace(text)) Effects.Add(new SendChat(text));
         }
 
-        public void NarratePlayerTurn(int pi, int hi, ImmutableArray<Player> players, Hand dealerHand, bool doubleAfterSplit, bool resplitAces, ResplitCap resplitCap)
+        public void NarratePlayerTurn(int pi, int hi, ImmutableArray<Player> players, Hand dealerHand, bool doubleAfterSplit, bool resplitAces, ResplitCap resplitCap, DoubleRestriction doubleRestriction)
         {
             if (pi < 0 || pi >= players.Length) return;
             var player = players[pi];
             if (hi < 0 || hi >= player.Hands.Length) return;
             var hand = player.Hands[hi];
             if (hand.Cards.Length < 2) return;
-            var cd = CanDouble(hand, player.Bet, doubleAfterSplit);
+            var cd = CanDouble(hand, player.Bet, doubleAfterSplit, doubleRestriction);
             var cs = CanSplit(hand, player, resplitAces, resplitCap);
             var actions = ValidActionsString(hand, cd, cs);
             var name = player.Hands.Length > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
@@ -608,7 +631,7 @@ public static class GameEngine
                 }
                 else if (prevCardCount == 1)
                 {
-                    ctx.NarratePlayerTurn(pi, hi, newPlayers, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap);
+                    ctx.NarratePlayerTurn(pi, hi, newPlayers, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap, state.DoubleRestriction);
                 }
             }
         }
@@ -659,7 +682,7 @@ public static class GameEngine
                 ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
             if (newHand.State == HandState.Playing && pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
             {
-                var cd2 = CanDouble(newHand, state.Players[pi].Bet, state.DoubleAfterSplit);
+                var cd2 = CanDouble(newHand, state.Players[pi].Bet, state.DoubleAfterSplit, state.DoubleRestriction);
                 var cs2 = CanSplit(newHand, state.Players[pi], state.ResplitAces, state.ResplitCap);
                 ctx.Narrate(t.PlayerAfterHit,
                     ("name",    displayName),
@@ -840,7 +863,7 @@ public static class GameEngine
 
     private static GameState HandleAnnouncePlayerTurn(GameState state, AnnouncePlayerTurn a, NarrationContext ctx)
     {
-        ctx.NarratePlayerTurn(a.PlayerIndex, a.HandIndex, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap);
+        ctx.NarratePlayerTurn(a.PlayerIndex, a.HandIndex, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap, state.DoubleRestriction);
         return state;
     }
 
@@ -1033,7 +1056,7 @@ public static class GameEngine
         var waitDealer = nextPhase == GamePhase.DealerTurn && !CanGoToPayout(provisionalDealer);
         var waitNext   = false;
         if (nextPhase == GamePhase.PlayerTurns)
-            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap);
+            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap, state.DoubleRestriction);
         if (waitDealer) nextPhase = GamePhase.DealerTurn;
         return state with
         {
@@ -1092,7 +1115,7 @@ public static class GameEngine
             };
         }
         else
-            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap);
+            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap, state.DoubleRestriction);
 
         return state with
         {

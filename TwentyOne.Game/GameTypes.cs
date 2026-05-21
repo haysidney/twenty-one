@@ -29,6 +29,7 @@ public enum PayoutRatio { ThreeToTwo, SixToFive, EvenMoney }
 public enum PayoutResult { None, Win, BjWin, CharlieWin, Lose, Push, Surrender }
 public enum FiveCardCharlieRule { Disabled, BeatsAll, LosesToDealerBJ }
 public enum ResplitCap { Max2, Max3, Max4, Unlimited }
+public enum DoubleRestriction { Any, Hard9To11, Hard10To11, HardOnly }
 
 [Serializable]
 public sealed record class Hand
@@ -96,6 +97,10 @@ public sealed record class GameState
     // Maximum number of hands a non-ace pair may be split into. Aces ignore this cap
     // and are governed solely by ResplitAces. Default Max4 matches typical casinos.
     public ResplitCap ResplitCap { get; set; } = ResplitCap.Max4;
+    // Which 2-card totals may be doubled down. Any (default) allows every 2-card
+    // hand; the other values restrict to common European/Reno style ranges. DAS
+    // stacks independently - both must allow doubling on a post-split hand.
+    public DoubleRestriction DoubleRestriction { get; set; } = DoubleRestriction.Any;
     // When true, the player may surrender an initial 2-card hand for a -0.5x bet
     // payout. Available only on the original hand (not after hit or split). Because
     // the engine is ENHC (no peek), this is effectively early surrender: half the bet

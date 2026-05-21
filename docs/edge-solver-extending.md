@@ -92,6 +92,7 @@ just the **aggregation** at the end.
 | **Peek toggle** (US-style) | New phase, dealer reveals BJ before player turns when upcard is A or 10 | DealerDist for A/10 upcards conditions on "not BJ" if peek is on; payout resolution changes for non-BJ players vs dealer BJ | Unchanged | ×2 |
 | **Charlie at N cards** (currently 5) | Generalize `ComputeHandState` Charlie check | Generalize the Charlie terminal in `EvalHand` | Unchanged | linear in N range |
 | **Player splits limited to N hands** ✓ implemented as `ResplitCap` (Max2/Max3/Max4/Unlimited; default Max4). Aces are exempt from the numeric cap and gated by `ResplitAces`. | Cap counts total `player.Hands.Length`; `CanSplit` refuses once at the limit. | Bounded form unrolls `EvalSplitBounded(budget=cap-2)`; Unlimited uses the closed-form fixed-point. Tree-model approximation - each subtree gets `budget-1` rather than sharing a pool - over-counts only at probability `(1/13)^depth`, negligible at any cap. | Tiny | ×4 |
+| **Double restriction** ✓ implemented as `DoubleRestriction` (Any/Hard9To11/Hard10To11/HardOnly; default Any). DAS and the restriction stack independently. | `CanDouble` calls `IsDoubleableTotal` to check the (total, isSoft) pair against the rule. | `TotalDoubleable` guard in front of the Double branch in `EvalHand`, `ActionEVForInitial`, and `OptimalActionForInitial`. | Negligible | ×4 |
 
 Adding all of S17, DAS toggle, HSA, RSA, peek, surrender = 21 base cells × 64
 combinations = ~1300 cells. At ~50ms per cell that's ~65 seconds for a full

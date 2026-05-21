@@ -33,6 +33,7 @@ public class RulesEditorWindow : Window
     private double?   _edgeFiveCardCharlieAtDefault;
     private double?   _edgeCharliePayoutAtDefault;
     private double?   _edgeResplitCapAtDefault;
+    private double?   _edgeDoubleRestrictionAtDefault;
     private EdgeRules _cachedEdgeRules;
 
     public override void Draw()
@@ -112,6 +113,21 @@ public class RulesEditorWindow : Window
             ImGui.SetTooltip("When on (default), the player may double down on a hand created by splitting.\nWhen off, only non-split hands can be doubled.");
         DrawDefaultDelta(_edgeDASAtDefault, "on");
 
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text("Double on");
+        ImGui.SameLine();
+        var drOptions = new[] { "Any total", "Hard 9-11", "Hard 10-11", "Hard only" };
+        var drIdx     = (int)config.DoubleRestriction;
+        ImGui.SetNextItemWidth(140);
+        if (ImGui.Combo("##doublerestrict", ref drIdx, drOptions, drOptions.Length))
+        {
+            config.DoubleRestriction = (DoubleRestriction)drIdx;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Which 2-card totals may be doubled down.\nAny: every 2-card hand (default).\nHard 9-11 / 10-11: classic European / Reno ranges.\nHard only: any hard total, no soft doubling.\nDAS stacks with this - both must allow doubling on a post-split hand.");
+        DrawDefaultDelta(_edgeDoubleRestrictionAtDefault, "Any total");
+
         var hsa = config.HitSplitAces;
         if (ImGui.Checkbox("Allow hitting split aces", ref hsa))
         {
@@ -176,6 +192,7 @@ public class RulesEditorWindow : Window
             config.HitSplitAces         = defaults.HitSplitAces;
             config.ResplitAces          = defaults.ResplitAces;
             config.ResplitCap           = defaults.ResplitCap;
+            config.DoubleRestriction    = defaults.DoubleRestriction;
             config.AllowSurrender       = defaults.AllowSurrender;
             config.Save();
         }
@@ -195,7 +212,8 @@ public class RulesEditorWindow : Window
             config.HitSplitAces,
             config.ResplitAces,
             config.AllowSurrender,
-            config.ResplitCap);
+            config.ResplitCap,
+            config.DoubleRestriction);
 
         if (_cachedHouseEdge.HasValue && _cachedEdgeRules.Equals(rules)) return;
 
@@ -229,6 +247,9 @@ public class RulesEditorWindow : Window
         _edgeResplitCapAtDefault = rules.ResplitCap == ResplitCap.Max4
             ? null
             : EdgeSolver.ComputeHouseEdge(rules with { ResplitCap = ResplitCap.Max4 });
+        _edgeDoubleRestrictionAtDefault = rules.DoubleRestriction == DoubleRestriction.Any
+            ? null
+            : EdgeSolver.ComputeHouseEdge(rules with { DoubleRestriction = DoubleRestriction.Any });
 
         _cachedEdgeRules = rules;
     }
