@@ -1592,6 +1592,45 @@ public class SplitHandTests
     }
 
     [Fact]
+    public void SplitAce_SecondCard_StaysPlaying_WhenHSA()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .HitSplitAces()
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands    = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
+            })
+            .Build();
+        var (ns, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
+        // A + 7 = 18, with HSA the player can keep hitting.
+        Assert.Equal(HandState.Playing, ns.Players[0].Hands[0].State);
+    }
+
+    [Fact]
+    public void SplitAce_AcePlusTen_NotBlackjack_EvenWithHSA()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .HitSplitAces()
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands    = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
+            })
+            .Build();
+        var (ns, _) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 10));
+        // 21 from a split hand stands; never Blackjack.
+        Assert.Equal(HandState.Stand, ns.Players[0].Hands[0].State);
+        Assert.NotEqual(HandState.Blackjack, ns.Players[0].Hands[0].State);
+    }
+
+    [Fact]
     public void SplitAce_AcePlusTen_NotBlackjack()
     {
         var state = new GameStateBuilder()

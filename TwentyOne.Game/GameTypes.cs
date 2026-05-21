@@ -88,6 +88,9 @@ public sealed record class GameState
     // When true (default), the player may double after splitting. When false, doubling
     // is restricted to non-split hands.
     public bool DoubleAfterSplit { get; set; } = true;
+    // When true, a split-ace hand may be hit beyond its first dealt card. When false
+    // (default), split aces auto-stand after receiving their one extra card (standard rule).
+    public bool HitSplitAces { get; set; } = false;
     // FullNames (or Nicknames for manual players) of players who won last round.
     public HashSet<string> LastRoundWinners { get; set; } = [];
     // FullNames (or Nicknames for manual players) of players who pushed last round.

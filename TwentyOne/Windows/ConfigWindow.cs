@@ -114,6 +114,15 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When on (default), the player may double down on a hand created by splitting.\nWhen off, only non-split hands can be doubled.\nApplies to the next round.");
 
+        var hsa = config.HitSplitAces;
+        if (ImGui.Checkbox("Allow hitting split aces", ref hsa))
+        {
+            config.HitSplitAces = hsa;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("When off (default), a split-ace hand receives exactly one extra card and auto-stands.\nWhen on, split-ace hands may be hit further.\n21 on a split-ace hand is still treated as Stand, not Blackjack.\nApplies to the next round.");
+
         DrawHouseEdgeControl();
 
         ImGui.Spacing();
@@ -255,7 +264,8 @@ public class ConfigWindow : Window, IDisposable
             config.CharliePayout,
             config.FiveCardCharlie,
             config.DealerStandsOnSoft17,
-            config.DoubleAfterSplit);
+            config.DoubleAfterSplit,
+            config.HitSplitAces);
 
         if (_cachedHouseEdge.HasValue && !_cachedEdgeRules.Equals(rules))
             _cachedHouseEdge = null;

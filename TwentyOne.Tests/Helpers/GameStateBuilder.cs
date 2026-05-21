@@ -23,6 +23,7 @@ internal sealed class GameStateBuilder
     private PayoutRatio          _charliePayout         = PayoutRatio.EvenMoney;
     private bool                 _dealerStandsOnSoft17  = false;
     private bool                 _doubleAfterSplit      = true;
+    private bool                 _hitSplitAces          = false;
     private bool                 _waitingForNextPlayer;
     private bool                 _waitingForDealer;
     private bool                 _skipDealSummaryOnePlayer = true;
@@ -114,6 +115,12 @@ internal sealed class GameStateBuilder
         return this;
     }
 
+    public GameStateBuilder HitSplitAces(bool value = true)
+    {
+        _hitSplitAces = value;
+        return this;
+    }
+
     public GameStateBuilder WaitingForNextPlayer(bool value = true)
     {
         _waitingForNextPlayer = value;
@@ -158,6 +165,7 @@ internal sealed class GameStateBuilder
             CharliePayout            = _charliePayout,
             DealerStandsOnSoft17     = _dealerStandsOnSoft17,
             DoubleAfterSplit         = _doubleAfterSplit,
+            HitSplitAces             = _hitSplitAces,
             WaitingForNextPlayer     = _waitingForNextPlayer,
             WaitingForDealer         = _waitingForDealer,
             SkipDealSummaryOnePlayer = _skipDealSummaryOnePlayer,

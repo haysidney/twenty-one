@@ -18,8 +18,9 @@ public class EdgeSolverTests
         PayoutRatio charlie = PayoutRatio.ThreeToTwo,
         FiveCardCharlieRule cr = FiveCardCharlieRule.Disabled,
         bool s17 = false,
-        bool das = true)
-        => new(bj, charlie, cr, s17, das);
+        bool das = true,
+        bool hsa = false)
+        => new(bj, charlie, cr, s17, das, hsa);
 
     [Fact]
     public void H17_3to2_NoCharlie_EdgeInPublishedRange()
@@ -60,6 +61,17 @@ public class EdgeSolverTests
             Rules(charlie: PayoutRatio.ThreeToTwo, cr: FiveCardCharlieRule.BeatsAll));
         _out.WriteLine($"Charlie off = {off * 100:F4}%, BeatsAll@3:2 = {beat * 100:F4}%");
         Assert.True(beat < off, "Charlie should reduce house edge");
+    }
+
+    [Fact]
+    public void HSA_LowersEdge_VsNoHSA()
+    {
+        var noHSA = EdgeSolver.ComputeHouseEdge(Rules(hsa: false));
+        var hsa   = EdgeSolver.ComputeHouseEdge(Rules(hsa: true));
+        _out.WriteLine($"no-HSA = {noHSA * 100:F4}%, HSA = {hsa * 100:F4}%, delta = {(hsa - noHSA) * 100:F4}%");
+        Assert.True(hsa < noHSA, "Allowing HSA should lower house edge");
+        // Published delta is ~-0.13%; allow a band.
+        Assert.InRange(noHSA - hsa, 0.0005, 0.0030);
     }
 
     [Fact]

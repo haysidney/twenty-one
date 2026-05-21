@@ -9,7 +9,8 @@ public readonly record struct EdgeRules(
     PayoutRatio CharliePayout,
     FiveCardCharlieRule FiveCardCharlie,
     bool DealerStandsOnSoft17 = false,
-    bool DoubleAfterSplit = true);
+    bool DoubleAfterSplit = true,
+    bool HitSplitAces = false);
 
 public enum OptimalAction
 {
@@ -304,13 +305,28 @@ public static class EdgeSolver
 
             if (card == 1)
             {
-                // Split aces: each new hand gets exactly one more card then
-                // auto-stands. Engine forces state=Stand, so no re-split.
+                // Split aces.
+                //   HSA off (default): each new hand gets exactly one more card
+                //     then auto-stands (engine forces state=Stand). No re-split.
+                //   HSA on: the post-deal hand is played normally via EvalHand
+                //     (isFromSplit=true). 21 from this path is not a BJ - matches
+                //     engine logic.
                 double singleEV = 0;
                 for (int c = 1; c <= 13; c++)
                 {
-                    var (t, _) = AddCard(11, true, c);
-                    singleEV += sub * StandEV(t, upcard);
+                    var (t, soft) = AddCard(11, true, c);
+                    double playEV;
+                    if (_rules.HitSplitAces)
+                    {
+                        playEV = t == 21
+                            ? StandEV(21, upcard)
+                            : EvalHand(t, soft, 2, true, upcard);
+                    }
+                    else
+                    {
+                        playEV = StandEV(t, upcard);
+                    }
+                    singleEV += sub * playEV;
                 }
                 return 2.0 * singleEV;
             }
