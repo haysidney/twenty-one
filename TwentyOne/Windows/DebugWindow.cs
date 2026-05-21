@@ -17,12 +17,18 @@ namespace TwentyOne.Windows;
 
 public class DebugScenarioFile
 {
-    public string?                   Name            { get; set; }
-    public List<DebugScenarioPlayer>? Players        { get; set; }
-    public List<int>?                Rolls           { get; set; }
-    public List<string>?             Actions         { get; set; }
-    public FiveCardCharlieRule?      FiveCardCharlie { get; set; }
-    public double?               BjPayout        { get; set; }
+    public string?                   Name                 { get; set; }
+    public List<DebugScenarioPlayer>? Players             { get; set; }
+    public List<int>?                Rolls                { get; set; }
+    public List<string>?             Actions              { get; set; }
+    public FiveCardCharlieRule?      FiveCardCharlie      { get; set; }
+    public PayoutRatio?              CharliePayout        { get; set; }
+    public double?                   BjPayout             { get; set; }
+    public bool?                     DealerStandsOnSoft17 { get; set; }
+    public bool?                     DoubleAfterSplit     { get; set; }
+    public bool?                     HitSplitAces         { get; set; }
+    public bool?                     ResplitAces          { get; set; }
+    public bool?                     AllowSurrender       { get; set; }
 }
 
 public class DebugScenarioPlayer
@@ -225,11 +231,19 @@ public class DebugWindow : Window
         _playlistIndex = _playlist.IndexOf(path);
         _playlistFile  = Path.GetFileName(path);
 
-        // Build initial GameState: Betting phase with players set
+        // Build initial GameState: Betting phase with players set. Each rule
+        // override falls back to the active venue (so a scenario inherits the
+        // dealer's current rules unless it pins one explicitly).
         var state = new GameState
         {
-            BjPayout        = file.BjPayout ?? config.GameState.BjPayout,
-            FiveCardCharlie = file.FiveCardCharlie ?? FiveCardCharlieRule.Disabled,
+            BjPayout             = file.BjPayout             ?? config.BjPayout,
+            FiveCardCharlie      = file.FiveCardCharlie      ?? config.FiveCardCharlie,
+            CharliePayout        = file.CharliePayout        ?? config.CharliePayout,
+            DealerStandsOnSoft17 = file.DealerStandsOnSoft17 ?? config.DealerStandsOnSoft17,
+            DoubleAfterSplit     = file.DoubleAfterSplit     ?? config.DoubleAfterSplit,
+            HitSplitAces         = file.HitSplitAces         ?? config.HitSplitAces,
+            ResplitAces          = file.ResplitAces          ?? config.ResplitAces,
+            AllowSurrender       = file.AllowSurrender       ?? config.AllowSurrender,
         };
         foreach (var sp in file.Players ?? [])
         {

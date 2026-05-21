@@ -76,7 +76,7 @@ public partial class MainWindow
 
 #if DEBUG
     private readonly record struct ScenarioGates(
-        bool Hit, bool Stand, bool Dbl, bool Spl,
+        bool Hit, bool Stand, bool Dbl, bool Spl, bool Srn,
         bool ConfirmDbl, bool ConfirmSpl, bool AdvancePlayer);
 #endif
 
@@ -909,12 +909,21 @@ public partial class MainWindow
                 var canSurrender = !hasAnyPending && ctx.IsActiveHand
                                 && GameEngine.CanSurrender(hand, State.AllowSurrender);
                 if (!canSurrender) ImGui.BeginDisabled();
+#if DEBUG
+                if (!gates.Srn) ImGui.BeginDisabled();
+#endif
                 if (ImGui.SmallButton($"Srn##{pi}_{hi}"))
                 {
+#if DEBUG
+                    Scenario.Advance();
+#endif
                     Apply(new SurrenderHand(pi, hi));
                 }
                 if (ImGui.IsItemHovered())
                     ImGui.SetTooltip("Surrender: forfeit half the bet.");
+#if DEBUG
+                if (!gates.Srn) ImGui.EndDisabled();
+#endif
                 if (!canSurrender) ImGui.EndDisabled();
             }
 
@@ -1627,6 +1636,7 @@ public partial class MainWindow
                     Stand: Scenario.IsStep($"Stand:{pi}:{hi}"),
                     Dbl: Scenario.IsStep($"Dbl:{pi}:{hi}"),
                     Spl: Scenario.IsStep($"Spl:{pi}:{hi}"),
+                    Srn: Scenario.IsStep($"Srn:{pi}:{hi}"),
                     ConfirmDbl: Scenario.IsStep($"ConfirmDbl:{pi}:{hi}"),
                     ConfirmSpl: Scenario.IsStep($"ConfirmSpl:{pi}:{hi}"),
                     AdvancePlayer: Scenario.IsStep("AdvancePlayer"));

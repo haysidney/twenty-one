@@ -34,6 +34,14 @@ All debug tooling is `#if DEBUG` - absent in Release builds. Enable via the **De
     { "name": "Bekki", "bet": "500" }
   ],
   "rolls": [1, 10, 7, 6],
+  "bjPayout": 1.5,
+  "charliePayout": "ThreeToTwo",
+  "fiveCardCharlie": "Disabled",
+  "dealerStandsOnSoft17": false,
+  "doubleAfterSplit": true,
+  "hitSplitAces": false,
+  "resplitAces": false,
+  "allowSurrender": false,
   "actions": [
     "StartDeal",
     "BeginPlayerTurns",
@@ -45,6 +53,8 @@ All debug tooling is `#if DEBUG` - absent in Release builds. Enable via the **De
   ]
 }
 ```
+
+Each rule override is optional; omitted fields inherit from the active venue.
 
 **Action strings:**
 
@@ -62,6 +72,7 @@ All debug tooling is `#if DEBUG` - absent in Release builds. Enable via the **De
 | `ConfirmDbl:pi:hi` | "Confirm Dbl" button after Dbl |
 | `Spl:pi:hi` | Player pi hand hi Spl button (sets pendingSplit) |
 | `ConfirmSpl:pi:hi` | "Confirm Spl" button after Spl |
+| `Srn:pi:hi` | Player pi hand hi Surrender button (requires `allowSurrender: true`) |
 | `AdvancePlayer` | "Next Player ↓" / "Next Hand ↓" button |
 
 **Roll order during deal:** dealer card first, then player 0 card 1, player 0 card 2, player 1 card 1, player 1 card 2, etc. Subsequent hit rolls consumed in action order.
