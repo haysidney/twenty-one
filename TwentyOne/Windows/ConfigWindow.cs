@@ -45,6 +45,12 @@ public class ConfigWindow : Window, IDisposable
     private double?   _edgeFlipHSA;
     private double?   _edgeFlipRSA;
     private double?   _edgeFlipSurrender;
+    // Multi-valued knobs: edge if the knob were reverted to its GameState default
+    // (BjPayout=1.5, CharliePayout=EvenMoney, FiveCardCharlie=Disabled). Null when
+    // the current value already matches the default.
+    private double?   _edgeBjPayoutAtDefault;
+    private double?   _edgeFiveCardCharlieAtDefault;
+    private double?   _edgeCharliePayoutAtDefault;
     private EdgeRules _cachedEdgeRules;
 
     private static readonly string[] ChatChannels =
@@ -62,6 +68,8 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.Spacing();
 
+        EnsureEdgeCache();
+
         ImGui.AlignTextToFramePadding();
         ImGui.Text("Blackjack Payout");
         ImGui.SameLine();
@@ -78,6 +86,7 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.SmallButton("6:5##bj65")) { config.BjPayout = 1.2; config.Save(); }
         ImGui.SameLine();
         if (ImGui.SmallButton("1:1##bj11")) { config.BjPayout = 1.0; config.Save(); }
+        DrawDefaultDelta(_edgeBjPayoutAtDefault, "3:2");
 
         ImGui.AlignTextToFramePadding();
         ImGui.Text("Five Card Charlie");
@@ -90,6 +99,7 @@ public class ConfigWindow : Window, IDisposable
             config.FiveCardCharlie = (FiveCardCharlieRule)charlieIdx;
             config.Save();
         }
+        DrawDefaultDelta(_edgeFiveCardCharlieAtDefault, "Disabled");
 
         if (config.FiveCardCharlie != FiveCardCharlieRule.Disabled)
         {
@@ -104,9 +114,8 @@ public class ConfigWindow : Window, IDisposable
                 config.CharliePayout = (PayoutRatio)charliePayoutIdx;
                 config.Save();
             }
+            DrawDefaultDelta(_edgeCharliePayoutAtDefault, "1:1");
         }
-
-        EnsureEdgeCache();
 
         var s17 = config.DealerStandsOnSoft17;
         if (ImGui.Checkbox("Dealer stands on soft 17", ref s17))
@@ -312,6 +321,17 @@ public class ConfigWindow : Window, IDisposable
         _edgeFlipHSA       = EdgeSolver.ComputeHouseEdge(rules with { HitSplitAces         = !rules.HitSplitAces });
         _edgeFlipRSA       = EdgeSolver.ComputeHouseEdge(rules with { ResplitAces          = !rules.ResplitAces });
         _edgeFlipSurrender = EdgeSolver.ComputeHouseEdge(rules with { AllowSurrender       = !rules.AllowSurrender });
+
+        _edgeBjPayoutAtDefault = Math.Abs(rules.BjPayout - 1.5) < 1e-9
+            ? null
+            : EdgeSolver.ComputeHouseEdge(rules with { BjPayout = 1.5 });
+        _edgeFiveCardCharlieAtDefault = rules.FiveCardCharlie == FiveCardCharlieRule.Disabled
+            ? null
+            : EdgeSolver.ComputeHouseEdge(rules with { FiveCardCharlie = FiveCardCharlieRule.Disabled });
+        _edgeCharliePayoutAtDefault = rules.CharliePayout == PayoutRatio.EvenMoney
+            ? null
+            : EdgeSolver.ComputeHouseEdge(rules with { CharliePayout = PayoutRatio.EvenMoney });
+
         _cachedEdgeRules   = rules;
     }
 
@@ -329,6 +349,23 @@ public class ConfigWindow : Window, IDisposable
         ImGui.TextColored(color, $"({delta:+0.00;-0.00}%)");
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Change to the house edge if this rule is toggled.");
+    }
+
+    // Shows the edge cost of a multi-valued knob being at its current (non-default)
+    // setting: positive = current setting raises edge (red, worse for player),
+    // negative = current setting lowers edge (green, better for player).
+    private void DrawDefaultDelta(double? edgeAtDefault, string defaultLabel)
+    {
+        if (!_cachedHouseEdge.HasValue || !edgeAtDefault.HasValue) return;
+        var delta = (_cachedHouseEdge.Value - edgeAtDefault.Value) * 100;
+        if (Math.Abs(delta) < 0.005) return;
+        ImGui.SameLine();
+        var color = delta < 0
+            ? new Vector4(0.65f, 0.85f, 0.65f, 1f)
+            : new Vector4(0.95f, 0.55f, 0.55f, 1f);
+        ImGui.TextColored(color, $"({delta:+0.00;-0.00}%)");
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip($"House edge vs the default value ({defaultLabel}).");
     }
 
     private void DrawHouseEdgeLabel()
