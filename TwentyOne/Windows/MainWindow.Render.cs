@@ -148,6 +148,18 @@ public partial class MainWindow
                     ImGui.SetClipboardText(bankVal.ToString());
             }
 
+            if (bankStat.MaintainBet && parsedBet > 0 && bankVal > parsedBet)
+            {
+                var owe  = bankVal - (long)Math.Floor(parsedBet);
+                var oweW = ImGui.CalcTextSize($"Owe {GameEngine.FormatGil(owe)}").X + ImGui.GetStyle().ItemSpacing.X;
+                ImGui.SameLine();
+                if (ImGui.GetCursorPosX() < bankCellRight - oweW)
+                    ImGui.SetCursorPosX(bankCellRight - oweW);
+                ImGui.TextColored(GameColors.CreditGreen, $"Owe {GameEngine.FormatGil(owe)}");
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip($"Bank is {GameEngine.FormatGil(owe)} over maintained bet - pay this out");
+            }
+
             if (Phase == GamePhase.Betting && shortfall > 0)
             {
                 var amber    = new Vector4(1f, 0.75f, 0.1f, 1f);
@@ -943,7 +955,8 @@ public partial class MainWindow
             if (ImGui.Button("Confirm##bankdepconfirm"))
             {
                 ApplyBank(bmpStat, new BankDeposit(depAmt2));
-                Apply(new AnnounceBankDeposit(bankManagePlayerIndex, depAmt2, bmpStat.Bank));
+                if (!bmpStat.MaintainBet)
+                    Apply(new AnnounceBankDeposit(bankManagePlayerIndex, depAmt2, bmpStat.Bank));
                 bankDepositBuf = string.Empty;
             }
             if (!canDep2) ImGui.EndDisabled();
@@ -960,7 +973,8 @@ public partial class MainWindow
             if (ImGui.Button("Confirm##bankwdconfirm"))
             {
                 ApplyBank(bmpStat, new BankWithdrawal(wdAmt2));
-                Apply(new AnnounceBankWithdraw(bankManagePlayerIndex, wdAmt2, bmpStat.Bank));
+                if (!bmpStat.MaintainBet)
+                    Apply(new AnnounceBankWithdraw(bankManagePlayerIndex, wdAmt2, bmpStat.Bank));
                 bankWithdrawBuf = string.Empty;
             }
             if (!canWd2) ImGui.EndDisabled();
@@ -988,12 +1002,25 @@ public partial class MainWindow
 
             ImGui.Spacing();
 
+            // Maintain Bet toggle
+            var maintainBet = bmpStat.MaintainBet;
+            if (ImGui.Checkbox("Maintain Bet##maintainbet", ref maintainBet))
+            {
+                bmpStat.MaintainBet = maintainBet;
+                config.Save();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Track this player's bank relative to their bet.\nSuppresses deposit/withdraw narration.");
+
+            ImGui.Spacing();
+
             // Clear all
             var ctrlDown = ImGui.GetIO().KeyCtrl;
             if (!ctrlDown) ImGui.BeginDisabled();
             if (ImGui.Button("Clear All##bankClear"))
             {
                 bmpStat.Bank = 0;
+                bmpStat.MaintainBet = false;
                 bmpStat.BankLog.Clear();
                 config.Save();
             }
@@ -1282,9 +1309,10 @@ public partial class MainWindow
         if (ImGui.Button("Yes##bankTradeYes"))
         {
             ApplyBank(btStat, isWd ? new BankWithdrawal(btamt) : new BankDeposit(btamt));
-            Apply(isWd
-                ? new AnnounceBankWithdraw(btpi, btamt, btStat.Bank)
-                : new AnnounceBankDeposit (btpi, btamt, btStat.Bank));
+            if (!btStat.MaintainBet)
+                Apply(isWd
+                    ? new AnnounceBankWithdraw(btpi, btamt, btStat.Bank)
+                    : new AnnounceBankDeposit (btpi, btamt, btStat.Bank));
             pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }

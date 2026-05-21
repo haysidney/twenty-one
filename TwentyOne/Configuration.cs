@@ -28,6 +28,7 @@ public class PlayerStat
     public int     Charlies    { get; set; } = 0;
     public long    TotalWon    { get; set; } = 0;
     public long    Bank        { get; set; } = 0;
+    public bool    MaintainBet { get; set; } = false;
     public List<BankTransactionEntry> BankLog { get; set; } = [];
 }
 
