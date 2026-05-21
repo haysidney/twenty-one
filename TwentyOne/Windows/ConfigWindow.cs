@@ -6,7 +6,6 @@ using System.Text.Json;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using TwentyOne.Game;
-using TwentyOne.Game.Edge;
 
 namespace TwentyOne.Windows;
 
@@ -15,13 +14,15 @@ public class ConfigWindow : Window, IDisposable
     private readonly Configuration config;
     private readonly SessionLedgerWindow sessionLedgerWindow;
     private readonly NarrationEditorWindow narrationEditorWindow;
+    private readonly RulesEditorWindow rulesEditorWindow;
 
-    public ConfigWindow(Configuration config, SessionLedgerWindow sessionLedgerWindow, NarrationEditorWindow narrationEditorWindow)
+    public ConfigWindow(Configuration config, SessionLedgerWindow sessionLedgerWindow, NarrationEditorWindow narrationEditorWindow, RulesEditorWindow rulesEditorWindow)
         : base("Twenty One - Settings##TwentyOneConfig")
     {
-        this.config              = config;
-        this.sessionLedgerWindow = sessionLedgerWindow;
+        this.config                = config;
+        this.sessionLedgerWindow   = sessionLedgerWindow;
         this.narrationEditorWindow = narrationEditorWindow;
+        this.rulesEditorWindow     = rulesEditorWindow;
         Flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize;
     }
 
@@ -39,19 +40,6 @@ public class ConfigWindow : Window, IDisposable
     private bool   _renamePending    = false;
     private bool   _duplicatePending = false;
 
-    private double?   _cachedHouseEdge;
-    // Edge if each knob were reverted to its GameState default. Null when the
-    // current value already matches the default (no delta to show).
-    private double?   _edgeS17AtDefault;
-    private double?   _edgeDASAtDefault;
-    private double?   _edgeHSAAtDefault;
-    private double?   _edgeRSAAtDefault;
-    private double?   _edgeSurrenderAtDefault;
-    private double?   _edgeBjPayoutAtDefault;
-    private double?   _edgeFiveCardCharlieAtDefault;
-    private double?   _edgeCharliePayoutAtDefault;
-    private EdgeRules _cachedEdgeRules;
-
     private static readonly string[] ChatChannels =
     [
         "/say", "/yell", "/shout", "/p", "/a", "/fc",
@@ -62,111 +50,6 @@ public class ConfigWindow : Window, IDisposable
     public override void Draw()
     {
         DrawVenueSelector();
-
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
-
-        EnsureEdgeCache();
-
-        ImGui.AlignTextToFramePadding();
-        ImGui.Text("Blackjack Payout");
-        ImGui.SameLine();
-        var bjMul = (float)config.BjPayout;
-        ImGui.SetNextItemWidth(70);
-        if (ImGui.InputFloat("##bjpayout", ref bjMul, 0f, 0f, "%.2fx"))
-        {
-            config.BjPayout = Math.Clamp(bjMul, 1.0f, 3.0f);
-            config.Save();
-        }
-        ImGui.SameLine();
-        if (ImGui.SmallButton("3:2##bj32")) { config.BjPayout = 1.5; config.Save(); }
-        ImGui.SameLine();
-        if (ImGui.SmallButton("6:5##bj65")) { config.BjPayout = 1.2; config.Save(); }
-        ImGui.SameLine();
-        if (ImGui.SmallButton("1:1##bj11")) { config.BjPayout = 1.0; config.Save(); }
-        DrawDefaultDelta(_edgeBjPayoutAtDefault, "3:2");
-
-        ImGui.AlignTextToFramePadding();
-        ImGui.Text("Five Card Charlie");
-        ImGui.SameLine();
-        var charlieOptions = new[] { "Disabled", "Beats all", "Loses to dealer BJ" };
-        var charlieIdx     = (int)config.FiveCardCharlie;
-        ImGui.SetNextItemWidth(150);
-        if (ImGui.Combo("##fiveCardCharlie", ref charlieIdx, charlieOptions, charlieOptions.Length))
-        {
-            config.FiveCardCharlie = (FiveCardCharlieRule)charlieIdx;
-            config.Save();
-        }
-        DrawDefaultDelta(_edgeFiveCardCharlieAtDefault, "Disabled");
-
-        if (config.FiveCardCharlie != FiveCardCharlieRule.Disabled)
-        {
-            ImGui.AlignTextToFramePadding();
-            ImGui.Text("Charlie Payout");
-            ImGui.SameLine();
-            var charliePayoutOptions = new[] { "3:2", "6:5", "1:1" };
-            var charliePayoutIdx     = (int)config.CharliePayout;
-            ImGui.SetNextItemWidth(70);
-            if (ImGui.Combo("##charliepayout", ref charliePayoutIdx, charliePayoutOptions, charliePayoutOptions.Length))
-            {
-                config.CharliePayout = (PayoutRatio)charliePayoutIdx;
-                config.Save();
-            }
-            DrawDefaultDelta(_edgeCharliePayoutAtDefault, "1:1");
-        }
-
-        var s17 = config.DealerStandsOnSoft17;
-        if (ImGui.Checkbox("Dealer stands on soft 17", ref s17))
-        {
-            config.DealerStandsOnSoft17 = s17;
-            config.Save();
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("When off (default), dealer hits soft 17 (H17). When on, dealer stands on soft 17 (S17).\nApplies to the next round - mid-round changes do not affect the running round.");
-        DrawDefaultDelta(_edgeS17AtDefault, "off");
-
-        var das = config.DoubleAfterSplit;
-        if (ImGui.Checkbox("Allow double after split", ref das))
-        {
-            config.DoubleAfterSplit = das;
-            config.Save();
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("When on (default), the player may double down on a hand created by splitting.\nWhen off, only non-split hands can be doubled.\nApplies to the next round.");
-        DrawDefaultDelta(_edgeDASAtDefault, "on");
-
-        var hsa = config.HitSplitAces;
-        if (ImGui.Checkbox("Allow hitting split aces", ref hsa))
-        {
-            config.HitSplitAces = hsa;
-            config.Save();
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("When off (default), a split-ace hand receives exactly one extra card and auto-stands.\nWhen on, split-ace hands may be hit further.\n21 on a split-ace hand is still treated as Stand, not Blackjack.\nApplies to the next round.");
-        DrawDefaultDelta(_edgeHSAAtDefault, "off");
-
-        var rsa = config.ResplitAces;
-        if (ImGui.Checkbox("Allow resplitting aces", ref rsa))
-        {
-            config.ResplitAces = rsa;
-            config.Save();
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("When on, a pair of aces produced by an earlier split may be split again.\nWhen off (default), split-ace pairs cannot be resplit.\nApplies to the next round.");
-        DrawDefaultDelta(_edgeRSAAtDefault, "off");
-
-        var surrender = config.AllowSurrender;
-        if (ImGui.Checkbox("Allow surrender", ref surrender))
-        {
-            config.AllowSurrender = surrender;
-            config.Save();
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("When on, the player may surrender an initial 2-card hand for half their bet.\nNot available after hit, split, or double.\nApplies to the next round.");
-        DrawDefaultDelta(_edgeSurrenderAtDefault, "off");
-
-        DrawHouseEdgeLabel();
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -296,100 +179,11 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.Spacing();
 
+        if (ImGui.Button("Edit Blackjack Rules\u2026##openRulesEditor"))
+            rulesEditorWindow.Toggle();
+        ImGui.SameLine();
         if (ImGui.Button("Edit Narration Templates\u2026##openNarrationEditor"))
             narrationEditorWindow.Toggle();
-    }
-
-    private void EnsureEdgeCache()
-    {
-        var rules = new EdgeRules(
-            config.BjPayout,
-            config.CharliePayout,
-            config.FiveCardCharlie,
-            config.DealerStandsOnSoft17,
-            config.DoubleAfterSplit,
-            config.HitSplitAces,
-            config.ResplitAces,
-            config.AllowSurrender);
-
-        if (_cachedHouseEdge.HasValue && _cachedEdgeRules.Equals(rules)) return;
-
-        _cachedHouseEdge = EdgeSolver.ComputeHouseEdge(rules);
-
-        _edgeS17AtDefault = !rules.DealerStandsOnSoft17
-            ? null
-            : EdgeSolver.ComputeHouseEdge(rules with { DealerStandsOnSoft17 = false });
-        _edgeDASAtDefault = rules.DoubleAfterSplit
-            ? null
-            : EdgeSolver.ComputeHouseEdge(rules with { DoubleAfterSplit = true });
-        _edgeHSAAtDefault = !rules.HitSplitAces
-            ? null
-            : EdgeSolver.ComputeHouseEdge(rules with { HitSplitAces = false });
-        _edgeRSAAtDefault = !rules.ResplitAces
-            ? null
-            : EdgeSolver.ComputeHouseEdge(rules with { ResplitAces = false });
-        _edgeSurrenderAtDefault = !rules.AllowSurrender
-            ? null
-            : EdgeSolver.ComputeHouseEdge(rules with { AllowSurrender = false });
-
-        _edgeBjPayoutAtDefault = Math.Abs(rules.BjPayout - 1.5) < 1e-9
-            ? null
-            : EdgeSolver.ComputeHouseEdge(rules with { BjPayout = 1.5 });
-        _edgeFiveCardCharlieAtDefault = rules.FiveCardCharlie == FiveCardCharlieRule.Disabled
-            ? null
-            : EdgeSolver.ComputeHouseEdge(rules with { FiveCardCharlie = FiveCardCharlieRule.Disabled });
-        _edgeCharliePayoutAtDefault = rules.CharliePayout == PayoutRatio.EvenMoney
-            ? null
-            : EdgeSolver.ComputeHouseEdge(rules with { CharliePayout = PayoutRatio.EvenMoney });
-
-        _cachedEdgeRules = rules;
-    }
-
-    // Shows the edge effect of a knob being at its current setting vs the default,
-    // from the dealer/house perspective: positive = current setting raises house
-    // edge (green, more house money), negative = current setting lowers house edge
-    // (red, less house money). At default, shows a greyed "(0.00%)".
-    private void DrawDefaultDelta(double? edgeAtDefault, string defaultLabel)
-    {
-        if (!_cachedHouseEdge.HasValue) return;
-        ImGui.SameLine();
-        if (!edgeAtDefault.HasValue)
-        {
-            ImGui.TextDisabled("(0.00%)");
-        }
-        else
-        {
-            var delta = (_cachedHouseEdge.Value - edgeAtDefault.Value) * 100;
-            if (Math.Abs(delta) < 0.005)
-            {
-                ImGui.TextDisabled("(0.00%)");
-            }
-            else
-            {
-                var color = delta > 0
-                    ? new Vector4(0.65f, 0.85f, 0.65f, 1f)   // raises house edge: green
-                    : new Vector4(0.95f, 0.55f, 0.55f, 1f); // lowers house edge: red
-                ImGui.TextColored(color, $"({delta:+0.00;-0.00}%)");
-            }
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip($"House edge vs the default value ({defaultLabel}).");
-    }
-
-    private void DrawHouseEdgeLabel()
-    {
-        if (!_cachedHouseEdge.HasValue) return;
-        var edge = _cachedHouseEdge.Value;
-        var pct  = edge * 100;
-        var color = edge >= 0
-            ? new Vector4(0.65f, 0.85f, 0.65f, 1f)   // house favored: green
-            : new Vector4(0.95f, 0.55f, 0.55f, 1f); // player favored: red
-        var label = edge >= 0
-            ? $"House edge: {pct:F2}%"
-            : $"Player edge: {-pct:F2}%";
-        ImGui.TextColored(color, label);
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Expected house edge under optimal player strategy, infinite-deck draws.");
     }
 
     private void DrawVenueSelector()

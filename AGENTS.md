@@ -149,7 +149,7 @@ Fields in `Configuration` (persisted, outside undo):
 
 `VenueSettings` holds per-venue config: chat, narration templates, dealer name, auto-trade/target, gil tracker, player stats, round history, session tracking, **house rules** (`BjPayout` / `CharliePayout` / `FiveCardCharlie`). Each venue has a stable `Guid Id`.
 
-House rules live in two places by design: canonical on `VenueSettings` (edited via ConfigWindow, persisted per venue) and mirrored on `GameState` (snapshotted with undo entries and round history so historical rounds replay with the rules they were played under). `Configuration.SeedRulesIntoGameState()` copies venue → GameState; `MainWindow.Apply` invokes it after every `NewRound` and `StartDeal` action. Rule edits during the Betting phase are picked up by the seed at `StartDeal`, so they apply to the round about to be dealt. Edits made during Deal or later do **not** affect the running round - the dealer must call `NewRound` for them to take effect.
+House rules live in two places by design: canonical on `VenueSettings` (edited via `RulesEditorWindow`, persisted per venue) and mirrored on `GameState` (snapshotted with undo entries and round history so historical rounds replay with the rules they were played under). `Configuration.SeedRulesIntoGameState()` copies venue → GameState; `MainWindow.Apply` invokes it after every `NewRound` and `StartDeal` action. Rule edits during the Betting phase are picked up by the seed at `StartDeal`, so they apply to the round about to be dealt. Edits made during Deal or later do **not** affect the running round - the dealer must call `NewRound` for them to take effect.
 
 `VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round).
 
@@ -182,7 +182,7 @@ House rules live in two places by design: canonical on `VenueSettings` (edited v
 - Uses fractional payout multipliers (1.5 / 1.2 / 1.0), not the engine's `Math.Ceiling` - difference is negligible at gil bet sizes.
 - Matches engine quirks: dealer BJ beats player 3-card 21; splits require same rank not value; split aces auto-stand; DAS allowed; Charlie at exactly 5+ cards; Charlie LosesToDealerBJ checks 2-card dealer 21 only.
 - Sweep of all 21 rule cells runs in <150 ms.
-- `ConfigWindow.DrawHouseEdgeControl()` exposes a "Calculate House Edge" button that runs the solver against the active rules and displays the result. Result is cached and invalidated when any rule toggle changes.
+- `RulesEditorWindow` displays the live house edge and per-knob "vs default" deltas (cached and invalidated when any rule changes). Opened from `ConfigWindow` via the "Edit Blackjack Rules" button. Also exposes a Ctrl-held "Reset Rules" button that restores every rule to its `GameState` default.
 
 ### Sessions
 

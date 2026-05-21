@@ -73,6 +73,7 @@ public sealed class Plugin : IDalamudPlugin
     private SessionLedgerWindow    SessionLedgerWindow    { get; init; }
     private HistoryWindow          HistoryWindow          { get; init; }
     private NarrationEditorWindow  NarrationEditorWindow  { get; init; }
+    private RulesEditorWindow      RulesEditorWindow      { get; init; }
 #if DEBUG
     private DebugWindow            DebugWindow            { get; init; }
 #endif
@@ -84,7 +85,8 @@ public sealed class Plugin : IDalamudPlugin
 
         SessionLedgerWindow   = new SessionLedgerWindow(Configuration);
         NarrationEditorWindow = new NarrationEditorWindow(Configuration);
-        ConfigWindow          = new ConfigWindow(Configuration, SessionLedgerWindow, NarrationEditorWindow);
+        RulesEditorWindow     = new RulesEditorWindow(Configuration);
+        ConfigWindow          = new ConfigWindow(Configuration, SessionLedgerWindow, NarrationEditorWindow, RulesEditorWindow);
         MainWindow            = new MainWindow(Configuration, ConfigWindow, SessionLedgerWindow, ChatGui, ObjectTable, ClientState);
         HistoryWindow       = new HistoryWindow(Configuration, MainWindow);
         MainWindow.SetHistoryWindow(HistoryWindow);
@@ -99,6 +101,7 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(SessionLedgerWindow);
         WindowSystem.AddWindow(HistoryWindow);
         WindowSystem.AddWindow(NarrationEditorWindow);
+        WindowSystem.AddWindow(RulesEditorWindow);
 #if DEBUG
         WindowSystem.AddWindow(DebugWindow);
 #endif
