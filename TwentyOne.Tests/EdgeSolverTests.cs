@@ -19,8 +19,9 @@ public class EdgeSolverTests
         FiveCardCharlieRule cr = FiveCardCharlieRule.Disabled,
         bool s17 = false,
         bool das = true,
-        bool hsa = false)
-        => new(bj, charlie, cr, s17, das, hsa);
+        bool hsa = false,
+        bool rsa = false)
+        => new(bj, charlie, cr, s17, das, hsa, rsa);
 
     [Fact]
     public void H17_3to2_NoCharlie_EdgeInPublishedRange()
@@ -61,6 +62,17 @@ public class EdgeSolverTests
             Rules(charlie: PayoutRatio.ThreeToTwo, cr: FiveCardCharlieRule.BeatsAll));
         _out.WriteLine($"Charlie off = {off * 100:F4}%, BeatsAll@3:2 = {beat * 100:F4}%");
         Assert.True(beat < off, "Charlie should reduce house edge");
+    }
+
+    [Fact]
+    public void RSA_LowersEdge_VsNoRSA()
+    {
+        var noRSA = EdgeSolver.ComputeHouseEdge(Rules(rsa: false));
+        var rsa   = EdgeSolver.ComputeHouseEdge(Rules(rsa: true));
+        _out.WriteLine($"no-RSA = {noRSA * 100:F4}%, RSA = {rsa * 100:F4}%, delta = {(rsa - noRSA) * 100:F4}%");
+        Assert.True(rsa < noRSA, "Allowing RSA should lower house edge");
+        // Published delta is small, ~-0.05% to -0.08%.
+        Assert.InRange(noRSA - rsa, 0.0002, 0.0020);
     }
 
     [Fact]

@@ -91,6 +91,9 @@ public sealed record class GameState
     // When true, a split-ace hand may be hit beyond its first dealt card. When false
     // (default), split aces auto-stand after receiving their one extra card (standard rule).
     public bool HitSplitAces { get; set; } = false;
+    // When true, a pair of aces produced by an earlier split may be split again. When
+    // false (default), split-ace pairs cannot be resplit (standard rule).
+    public bool ResplitAces { get; set; } = false;
     // FullNames (or Nicknames for manual players) of players who won last round.
     public HashSet<string> LastRoundWinners { get; set; } = [];
     // FullNames (or Nicknames for manual players) of players who pushed last round.

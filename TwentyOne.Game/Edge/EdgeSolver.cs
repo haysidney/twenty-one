@@ -10,7 +10,8 @@ public readonly record struct EdgeRules(
     FiveCardCharlieRule FiveCardCharlie,
     bool DealerStandsOnSoft17 = false,
     bool DoubleAfterSplit = true,
-    bool HitSplitAces = false);
+    bool HitSplitAces = false,
+    bool ResplitAces = false);
 
 public enum OptimalAction
 {
@@ -305,30 +306,45 @@ public static class EdgeSolver
 
             if (card == 1)
             {
-                // Split aces.
-                //   HSA off (default): each new hand gets exactly one more card
-                //     then auto-stands (engine forces state=Stand). No re-split.
-                //   HSA on: the post-deal hand is played normally via EvalHand
-                //     (isFromSplit=true). 21 from this path is not a BJ - matches
-                //     engine logic.
-                double singleEV = 0;
-                for (int c = 1; c <= 13; c++)
+                // Split aces. The next dealt card is forced; HSA / RSA control
+                // what happens after.
+                //   HSA off, RSA off (default): each new hand gets one card and
+                //     auto-stands. No re-split.
+                //   HSA on,  RSA off: the post-deal hand is played normally via
+                //     EvalHand (isFromSplit=true). 21 here is Stand, not BJ.
+                //   HSA off, RSA on:  one card per hand, but a paired ace can be
+                //     re-split. Apply the same fixed-point as non-ace splits to
+                //     the play(ace,ace) branch.
+                //   HSA on,  RSA on:  combine the two - re-split when paired
+                //     aces, otherwise fall through to EvalHand.
+                double PlayAceSecondCard(int c)
                 {
                     var (t, soft) = AddCard(11, true, c);
-                    double playEV;
                     if (_rules.HitSplitAces)
                     {
-                        playEV = t == 21
+                        return t == 21
                             ? StandEV(21, upcard)
                             : EvalHand(t, soft, 2, true, upcard);
                     }
-                    else
-                    {
-                        playEV = StandEV(t, upcard);
-                    }
-                    singleEV += sub * playEV;
+                    return StandEV(t, upcard);
                 }
-                return 2.0 * singleEV;
+
+                if (!_rules.ResplitAces)
+                {
+                    double singleEV = 0;
+                    for (int c = 1; c <= 13; c++)
+                        singleEV += sub * PlayAceSecondCard(c);
+                    return 2.0 * singleEV;
+                }
+
+                double hNeqA = 0;
+                double hEqA  = PlayAceSecondCard(1);
+                for (int c = 2; c <= 13; c++)
+                    hNeqA += sub * PlayAceSecondCard(c);
+                double aNoReSplit = hNeqA + hEqA / 13.0;
+                double aReSplit   = (13.0 / 11.0) * hNeqA;
+                double singleA    = Math.Max(aNoReSplit, aReSplit);
+                return 2.0 * singleA;
             }
 
             int startVal = FaceValue(card);

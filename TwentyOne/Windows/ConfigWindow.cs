@@ -123,6 +123,15 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When off (default), a split-ace hand receives exactly one extra card and auto-stands.\nWhen on, split-ace hands may be hit further.\n21 on a split-ace hand is still treated as Stand, not Blackjack.\nApplies to the next round.");
 
+        var rsa = config.ResplitAces;
+        if (ImGui.Checkbox("Allow resplitting aces", ref rsa))
+        {
+            config.ResplitAces = rsa;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("When on, a pair of aces produced by an earlier split may be split again.\nWhen off (default), split-ace pairs cannot be resplit.\nApplies to the next round.");
+
         DrawHouseEdgeControl();
 
         ImGui.Spacing();
@@ -265,7 +274,8 @@ public class ConfigWindow : Window, IDisposable
             config.FiveCardCharlie,
             config.DealerStandsOnSoft17,
             config.DoubleAfterSplit,
-            config.HitSplitAces);
+            config.HitSplitAces,
+            config.ResplitAces);
 
         if (_cachedHouseEdge.HasValue && !_cachedEdgeRules.Equals(rules))
             _cachedHouseEdge = null;

@@ -78,7 +78,7 @@ just the **aggregation** at the end.
 | **S17** (stand on soft 17) ✓ implemented | Update `DealerRecommendation` to check the rule | Dealer recursion hits less often | Slightly faster | ×2 |
 | **DAS toggle** ✓ implemented | Add `bool DoubleAfterSplit` field; gate `CanDouble` on it when `isFromSplit` | One-line guard in the Double branch of `EvalHand` | Unchanged | ×2 |
 | **HSA** (hit split aces multiple times) ✓ implemented | Remove the forced-stand on split aces; allow normal play after the first card | Replace the ace branch in `EvalSplit` with a call into `EvalHand` (with appropriate flags) | ~10-20% slower per cell | ×2 |
-| **RSA** (re-split aces) | Allow split aces to remain Playing if they pair again | Apply the fixed-point math to the ace branch too | ~5-10% slower per cell | ×2 |
+| **RSA** (re-split aces) ✓ implemented | Allow split aces to remain Playing if they pair again | Apply the fixed-point math to the ace branch too | ~5-10% slower per cell | ×2 |
 | **Surrender** (early or late) | New action with new game phase | New branch in `EvalInitial` for Surrender = -0.5; for late surrender, evaluate vs known dealer non-BJ | Unchanged | ×2 (or ×3 for early/late) |
 | **Peek toggle** (US-style) | New phase, dealer reveals BJ before player turns when upcard is A or 10 | DealerDist for A/10 upcards conditions on "not BJ" if peek is on; payout resolution changes for non-BJ players vs dealer BJ | Unchanged | ×2 |
 | **Charlie at N cards** (currently 5) | Generalize `ComputeHandState` Charlie check | Generalize the Charlie terminal in `EvalHand` | Unchanged | linear in N range |

@@ -1547,7 +1547,7 @@ public class SplitHandTests
     public void CanSplit_SameValue_True()
     {
         var hand = new Hand { Cards = [8, 8], State = HandState.Playing };
-        Assert.True(GameEngine.CanSplit(hand));
+        Assert.True(GameEngine.CanSplit(hand, resplitAces: false));
     }
 
     [Fact]
@@ -1555,7 +1555,7 @@ public class SplitHandTests
     {
         // Q+Q: same rank, split allowed
         var hand = new Hand { Cards = [12, 12], State = HandState.Playing };
-        Assert.True(GameEngine.CanSplit(hand));
+        Assert.True(GameEngine.CanSplit(hand, resplitAces: false));
     }
 
     [Fact]
@@ -1563,14 +1563,38 @@ public class SplitHandTests
     {
         // 10+Q: both worth 10 but different rank, no split
         var hand = new Hand { Cards = [10, 12], State = HandState.Playing };
-        Assert.False(GameEngine.CanSplit(hand));
+        Assert.False(GameEngine.CanSplit(hand, resplitAces: false));
     }
 
     [Fact]
     public void CanSplit_DifferentValues_False()
     {
         var hand = new Hand { Cards = [7, 8], State = HandState.Playing };
-        Assert.False(GameEngine.CanSplit(hand));
+        Assert.False(GameEngine.CanSplit(hand, resplitAces: false));
+    }
+
+    [Fact]
+    public void CanSplit_SplitAcePair_False_WhenRsaDisallowed()
+    {
+        // Pair of aces produced by an earlier split, RSA off.
+        var hand = new Hand { Cards = [1, 1], State = HandState.Playing, IsFromSplit = true };
+        Assert.False(GameEngine.CanSplit(hand, resplitAces: false));
+    }
+
+    [Fact]
+    public void CanSplit_SplitAcePair_True_WhenRsaAllowed()
+    {
+        var hand = new Hand { Cards = [1, 1], State = HandState.Playing, IsFromSplit = true };
+        Assert.True(GameEngine.CanSplit(hand, resplitAces: true));
+    }
+
+    [Fact]
+    public void CanSplit_OriginalAcePair_True_RegardlessOfRsa()
+    {
+        // First-time pair of aces (not from a previous split). Always splittable.
+        var hand = new Hand { Cards = [1, 1], State = HandState.Playing, IsFromSplit = false };
+        Assert.True(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.True(GameEngine.CanSplit(hand, resplitAces: true));
     }
 
     [Fact]
@@ -1653,7 +1677,7 @@ public class SplitHandTests
     {
         // A split hand that ends up with two equal-value cards can split again
         var hand = new Hand { Cards = [8, 8], State = HandState.Playing, IsFromSplit = true };
-        Assert.True(GameEngine.CanSplit(hand));
+        Assert.True(GameEngine.CanSplit(hand, resplitAces: false));
     }
 
     [Fact]

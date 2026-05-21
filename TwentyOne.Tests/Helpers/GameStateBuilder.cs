@@ -24,6 +24,7 @@ internal sealed class GameStateBuilder
     private bool                 _dealerStandsOnSoft17  = false;
     private bool                 _doubleAfterSplit      = true;
     private bool                 _hitSplitAces          = false;
+    private bool                 _resplitAces           = false;
     private bool                 _waitingForNextPlayer;
     private bool                 _waitingForDealer;
     private bool                 _skipDealSummaryOnePlayer = true;
@@ -121,6 +122,12 @@ internal sealed class GameStateBuilder
         return this;
     }
 
+    public GameStateBuilder ResplitAces(bool value = true)
+    {
+        _resplitAces = value;
+        return this;
+    }
+
     public GameStateBuilder WaitingForNextPlayer(bool value = true)
     {
         _waitingForNextPlayer = value;
@@ -166,6 +173,7 @@ internal sealed class GameStateBuilder
             DealerStandsOnSoft17     = _dealerStandsOnSoft17,
             DoubleAfterSplit         = _doubleAfterSplit,
             HitSplitAces             = _hitSplitAces,
+            ResplitAces              = _resplitAces,
             WaitingForNextPlayer     = _waitingForNextPlayer,
             WaitingForDealer         = _waitingForDealer,
             SkipDealSummaryOnePlayer = _skipDealSummaryOnePlayer,

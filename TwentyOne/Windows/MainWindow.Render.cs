@@ -875,7 +875,7 @@ public partial class MainWindow
 
             ImGui.SameLine();
             var canSplit = !hasAnyPending && ctx.IsActiveHand
-                        && GameEngine.CanSplit(hand);
+                        && GameEngine.CanSplit(hand, State.ResplitAces);
             if (!canSplit) ImGui.BeginDisabled();
 #if DEBUG
             if (!gates.Spl) ImGui.BeginDisabled();
@@ -1745,7 +1745,7 @@ public partial class MainWindow
             var ah   = ActiveHandIndex < ap.Hands.Length ? ap.Hands[ActiveHandIndex] : null;
             var name = ap.Hands.Length > 1 ? $"{ap.DisplayName} (Hand {ActiveHandIndex + 1})" : ap.DisplayName;
             var acts = ah != null
-                ? GameEngine.ValidActionsString(ah, GameEngine.CanDouble(ah, ap.Bet, State.DoubleAfterSplit), GameEngine.CanSplit(ah))
+                ? GameEngine.ValidActionsString(ah, GameEngine.CanDouble(ah, ap.Bet, State.DoubleAfterSplit), GameEngine.CanSplit(ah, State.ResplitAces))
                 : string.Empty;
             phaseLabel = $"Phase: Player Actions  ({name}'s turn - {acts})";
         }
