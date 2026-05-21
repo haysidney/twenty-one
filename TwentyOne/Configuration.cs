@@ -9,17 +9,28 @@ namespace TwentyOne;
 [Serializable]
 public class PlayerStatsSession
 {
+    public Guid                                Id          { get; set; } = Guid.NewGuid();
     public DateTime                            Date        { get; set; } = DateTime.Now;
     public string                              LocationKey { get; set; } = "";
     public Dictionary<string, PlayerStatData>  Stats       { get; set; } = [];
     public long                                BankNet     { get; set; } = 0;
-    public List<RoundSummary>                  Rounds      { get; set; } = [];
+    // Full per-round snapshots, including GameState (cards, players, rules) and
+    // the bank deltas. Carrying full RoundHistoryEntry instead of a degraded
+    // summary lets future code re-derive any per-session aggregate from raw data.
+    public List<RoundHistoryEntry>             Rounds      { get; set; } = [];
     // Edge stats locked in at session-archive time: total original bets wagered
     // across the session, and the expected bank gain under the rules that were
-    // actually in effect for each round (sum of bet × edge per round). Both 0
-    // for sessions archived before this field was added.
+    // actually in effect for each round (sum of bet × edge per round). May be
+    // recomputed via the History detail "Recompute" button if the solver changes.
     public long                                TotalWagered       { get; set; } = 0;
     public double                              TheoreticalBankNet { get; set; } = 0;
+    // Per-player bank transaction log as it stood at session-archive time. Keyed
+    // by PlayerStatsKey. Lets a session retain the full deposit/bet/win/withdraw
+    // history even after PlayerStatsStore is cleared for the next session.
+    public Dictionary<string, List<BankTransactionEntry>> PlayerBankLogs { get; set; } = [];
+    // Plugin version that wrote this session. Used to detect stored aggregates
+    // computed by an older solver and trigger recomputation.
+    public string                              PluginVersion { get; set; } = "";
 }
 
 [Serializable]
@@ -84,6 +95,10 @@ public class VenueSettings
     public List<RoundHistoryEntry> RoundHistory { get; set; } = [];
 
     // ── Stats sessions (one per night) ─────────────────────────────────────────
+    // Not persisted in the main config JSON - each session lives in its own
+    // file under {ConfigDirectory}/sessions/{venueId}/. SessionStore loads them
+    // into this list at plugin startup and writes new entries to disk.
+    [JsonIgnore]
     public List<PlayerStatsSession> StatsSessions { get; set; } = [];
 
     // ── Active session tracking ────────────────────────────────────────────────

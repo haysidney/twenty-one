@@ -151,7 +151,17 @@ Fields in `Configuration` (persisted, outside undo):
 
 House rules live in two places by design: canonical on `VenueSettings` (edited via `RulesEditorWindow`, persisted per venue) and mirrored on `GameState` (snapshotted with undo entries and round history so historical rounds replay with the rules they were played under). `Configuration.SeedRulesIntoGameState()` copies venue → GameState; `MainWindow.Apply` invokes it on the `StartDeal` action. Rule edits during the Betting phase are picked up by this seed, so they apply to the round about to be dealt. Edits made during Deal or later do **not** affect the running round - the dealer must call `NewRound` (and then `StartDeal` again) for them to take effect. Rule edits themselves are not on the undo stack - they bypass `GameEngine.Apply` and write directly to `VenueSettings`.
 
-`VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round).
+`VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round). Each entry carries the full `GameState`, bank net, pre- and post-payout player balances, and `StartedAt`/`FinishedAt` timestamps.
+
+### Session persistence
+
+Archived sessions (`PlayerStatsSession`) are **not** stored in the main config JSON. Each session lives in its own file at `{ConfigDirectory}/sessions/{venueId}/{yyyy-MM-dd_HHmmss}-{shortGuid}.json`.
+
+- `SessionStore` (in `TwentyOne/SessionStore.cs`) handles disk I/O: `LoadAll(venueId)`, `Save(venueId, session)`, `Delete(venueId, session)`.
+- `VenueSettings.StatsSessions` is `[JsonIgnore]` and acts as an in-memory cache: populated by `Plugin` at startup from `SessionStore.LoadAll`, appended on `NewSession`.
+- Each `PlayerStatsSession` carries `List<RoundHistoryEntry>` (full per-round snapshots), `PlayerBankLogs` (per-player `BankLog` captured at archive time), `TotalWagered` + `TheoreticalBankNet` (cached edge aggregates), and `PluginVersion` (string from assembly). Storing full snapshots means future solver fixes or new aggregates can be retroactively computed from the raw data.
+- A "Recompute Stats" button in History → Previous Sessions detail re-runs `EdgeStats.Aggregate` and rewrites the session file. Useful after solver fixes or new rule axes.
+- `RoundSummary` (the old degraded per-round type) was removed; winner/loser/push classification is now computed on demand by `HistoryWindow.ClassifyRound` from each `RoundHistoryEntry.Snapshot`.
 
 ### Docs
 

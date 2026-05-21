@@ -106,29 +106,7 @@ public class HistoryWindow : Window
         for (var i = history.Count - 1; i >= 0; i--)
         {
             var entry = history[i];
-            var state = entry.Snapshot;
-
-            var winners = new List<string>();
-            var losers  = new List<string>();
-            var pushes  = new List<string>();
-
-            for (var pi = 0; pi < state.Players.Length; pi++)
-            {
-                var p       = state.Players[pi];
-                var results = Enumerable.Range(0, p.Hands.Length)
-                    .Select(hi => GameEngine.GetPayoutResult(state, pi, hi))
-                    .ToList();
-
-                var anyWin  = results.Any(r => r is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin);
-                var anyLose = results.Any(r => r == PayoutResult.Lose);
-                var allPush = results.All(r => r == PayoutResult.Push);
-
-                if      (anyWin && !anyLose) winners.Add(p.DisplayName);
-                else if (anyLose && !anyWin) losers.Add(p.DisplayName);
-                else if (allPush)            pushes.Add(p.DisplayName);
-                else if (anyWin)             winners.Add(p.DisplayName);
-                else                         losers.Add(p.DisplayName);
-            }
+            var (winners, losers, pushes) = ClassifyRound(entry.Snapshot);
 
             ImGui.TableNextRow();
             ImGui.TableSetColumnIndex(0);
@@ -271,6 +249,18 @@ public class HistoryWindow : Window
         ImGui.TextUnformatted($"{s.Date:dddd, MMMM d, yyyy  HH:mm}");
 
         ImGui.SameLine();
+        if (ImGui.Button("Recompute Stats"))
+        {
+            var recomputed         = EdgeStats.Aggregate(s.Rounds);
+            s.TotalWagered         = recomputed.TotalWagered;
+            s.TheoreticalBankNet   = recomputed.TheoreticalBankNet;
+            s.PluginVersion        = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
+            SessionStore.Save(config.ActiveVenue.Id, s);
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Re-run the solver against this session's round snapshots and overwrite the stored aggregates.\nUseful after solver fixes or new rule axes.");
+
+        ImGui.SameLine();
         const string deleteLabel = "Delete Session";
         var deleteWidth = ImGui.CalcTextSize(deleteLabel).X + ImGui.GetStyle().FramePadding.X * 2;
         var targetX    = ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - deleteWidth;
@@ -278,8 +268,8 @@ public class HistoryWindow : Window
         if (!ctrlHeld) ImGui.BeginDisabled();
         if (ImGui.Button(deleteLabel) && ctrlHeld)
         {
+            SessionStore.Delete(config.ActiveVenue.Id, s);
             sessions.RemoveAt(_selectedSessionIndex);
-            config.Save();
             _selectedSessionIndex = -1;
             if (!ctrlHeld) ImGui.EndDisabled();
             return;
@@ -371,6 +361,7 @@ public class HistoryWindow : Window
         for (var i = s.Rounds.Count - 1; i >= 0; i--)
         {
             var r = s.Rounds[i];
+            var (winners, losers, pushes) = ClassifyRound(r.Snapshot);
             ImGui.TableNextRow();
             ImGui.TableSetColumnIndex(0);
             ImGui.AlignTextToFramePadding();
@@ -378,18 +369,18 @@ public class HistoryWindow : Window
 
             ImGui.TableSetColumnIndex(1);
             ImGui.AlignTextToFramePadding();
-            if (r.Winners.Count > 0)
-                ImGui.TextColored(GameColors.ProfitGreen, string.Join(", ", r.Winners));
+            if (winners.Count > 0)
+                ImGui.TextColored(GameColors.ProfitGreen, string.Join(", ", winners));
 
             ImGui.TableSetColumnIndex(2);
             ImGui.AlignTextToFramePadding();
-            if (r.Losers.Count > 0)
-                ImGui.TextColored(GameColors.BustRed, string.Join(", ", r.Losers));
+            if (losers.Count > 0)
+                ImGui.TextColored(GameColors.BustRed, string.Join(", ", losers));
 
             ImGui.TableSetColumnIndex(3);
             ImGui.AlignTextToFramePadding();
-            if (r.Pushes.Count > 0)
-                ImGui.TextColored(GameColors.PushGrey, string.Join(", ", r.Pushes));
+            if (pushes.Count > 0)
+                ImGui.TextColored(GameColors.PushGrey, string.Join(", ", pushes));
 
             ImGui.TableSetColumnIndex(4);
             ImGui.AlignTextToFramePadding();
@@ -399,16 +390,51 @@ public class HistoryWindow : Window
                 var tip = new System.Text.StringBuilder("Player balance deltas:\n");
                 foreach (var (pkey, pbal) in r.PlayerBanks)
                 {
-                    var prevBal = i + 1 < s.Rounds.Count && s.Rounds[i + 1].PlayerBanks.TryGetValue(pkey, out var pb) ? pb : 0;
-                    var delta   = pbal - prevBal;
-                    var ds      = delta >= 0 ? $"+{GameEngine.FormatGil(delta)}" : GameEngine.FormatGil(delta);
-                    tip.AppendLine($"  {pkey}: {GameEngine.FormatGil(pbal)} ({ds})");
+                    long prevBal;
+                    if (r.PrePayoutPlayerBanks.TryGetValue(pkey, out var pre))
+                        prevBal = pre;
+                    else if (i + 1 < s.Rounds.Count && s.Rounds[i + 1].PlayerBanks.TryGetValue(pkey, out var pb))
+                        prevBal = pb;
+                    else
+                        prevBal = 0;
+                    var delta = pbal - prevBal;
+                    var ds    = delta >= 0 ? $"+{GameEngine.FormatGil(delta)}" : GameEngine.FormatGil(delta);
+                    var name  = r.Snapshot.Players
+                        .FirstOrDefault(pl => (pl.FullName.Length > 0 ? $"{pl.FullName}@{pl.World}" : pl.Nickname) == pkey)
+                        ?.DisplayName ?? pkey;
+                    tip.AppendLine($"  {name}: {GameEngine.FormatGil(pbal)} ({ds})");
                 }
                 ImGui.SetTooltip(tip.ToString().TrimEnd());
             }
         }
 
         ImGui.EndTable();
+    }
+
+    // Splits a round's players into (winners, losers, pushes) by inspecting each
+    // hand's PayoutResult. A player with any winning hand counts as a winner
+    // unless they also had a loss, in which case they're a winner-with-mixed.
+    private static (List<string> Winners, List<string> Losers, List<string> Pushes) ClassifyRound(GameState state)
+    {
+        var winners = new List<string>();
+        var losers  = new List<string>();
+        var pushes  = new List<string>();
+        for (var pi = 0; pi < state.Players.Length; pi++)
+        {
+            var p       = state.Players[pi];
+            var results = Enumerable.Range(0, p.Hands.Length)
+                .Select(hi => GameEngine.GetPayoutResult(state, pi, hi))
+                .ToList();
+            var anyWin  = results.Any(r => r is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin);
+            var anyLose = results.Any(r => r == PayoutResult.Lose);
+            var allPush = results.All(r => r == PayoutResult.Push);
+            if      (anyWin && !anyLose) winners.Add(p.DisplayName);
+            else if (anyLose && !anyWin) losers.Add(p.DisplayName);
+            else if (allPush)            pushes.Add(p.DisplayName);
+            else if (anyWin)             winners.Add(p.DisplayName);
+            else                         losers.Add(p.DisplayName);
+        }
+        return (winners, losers, pushes);
     }
 
     private static void DrawNetCell(long net)

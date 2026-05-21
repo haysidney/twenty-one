@@ -85,6 +85,9 @@ public partial class MainWindow : Window, IDisposable
     // pending trade confirmation for double/split: set when dealer clicks the button, cleared on confirm/cancel
     private (int PlayerIndex, int HandIndex)? pendingDouble;
     private (int PlayerIndex, int HandIndex)? pendingSplit;
+    // Wall-clock time of the most recent StartDeal; copied onto RoundHistoryEntry
+    // at round-completion so each archived round has a started/finished pair.
+    private DateTime currentRoundStartedAt = DateTime.MinValue;
     // chat-stream trade-detection state (partner / received-gil / given-gil) lives in TradeMonitor.
     private readonly TradeMonitor              tradeMonitor = new();
     // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
@@ -219,7 +222,11 @@ public partial class MainWindow : Window, IDisposable
         // time, so rule edits made during the Betting phase apply to the round
         // about to be dealt. Edits during Deal or later do not affect the running
         // round.
-        if (action is StartDeal) config.SeedRulesIntoGameState();
+        if (action is StartDeal)
+        {
+            config.SeedRulesIntoGameState();
+            currentRoundStartedAt = DateTime.Now;
+        }
 
         if (config.AutoTargetEnabled
             && action is BeginPlayerTurns or AdvanceToNextPlayer
@@ -329,6 +336,17 @@ public partial class MainWindow : Window, IDisposable
         var state   = config.GameState;
         var bankNet = 0m;
 
+        // Snapshot pre-payout balances so per-round bank delta is derivable from
+        // the round entry alone (no need to chain adjacent rounds).
+        var prePayoutBanks = new Dictionary<string, long>();
+        foreach (var p in state.Players)
+        {
+            if (p.SittingOut) continue;
+            var k = p.StatsKey();
+            if (config.PlayerStatsStore.TryGetValue(k, out var st))
+                prePayoutBanks[k] = st.Bank;
+        }
+
         for (var pi = 0; pi < state.Players.Length; pi++)
         {
             var p   = state.Players[pi];
@@ -390,11 +408,15 @@ public partial class MainWindow : Window, IDisposable
         var roundNum = config.RoundHistory.Count + 1;
         config.RoundHistory.Add(new RoundHistoryEntry
         {
-            RoundNumber  = roundNum,
-            Snapshot     = state,
-            BankNet      = (long)bankNet,
-            PlayerBanks  = playerBanksSnapshot,
+            RoundNumber          = roundNum,
+            Snapshot             = state,
+            BankNet              = (long)bankNet,
+            PlayerBanks          = playerBanksSnapshot,
+            PrePayoutPlayerBanks = prePayoutBanks,
+            StartedAt            = currentRoundStartedAt,
+            FinishedAt           = DateTime.Now,
         });
+        currentRoundStartedAt = DateTime.MinValue;
 
         var venue = config.ActiveVenue;
         var startedAt   = venue.ActiveSessionStartedAt;

@@ -322,39 +322,9 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     {
         var venue = config.ActiveVenue;
 
-        var roundSummaries = venue.RoundHistory.Select(r =>
-        {
-            var state   = r.Snapshot;
-            var winners = new List<string>();
-            var losers  = new List<string>();
-            var pushes  = new List<string>();
-            for (var pi = 0; pi < state.Players.Length; pi++)
-            {
-                var p       = state.Players[pi];
-                var results = Enumerable.Range(0, p.Hands.Length)
-                    .Select(hi => GameEngine.GetPayoutResult(state, pi, hi))
-                    .ToList();
-                var anyWin  = results.Any(r2 => r2 is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin);
-                var anyLose = results.Any(r2 => r2 == PayoutResult.Lose);
-                var allPush = results.All(r2 => r2 == PayoutResult.Push);
-                if      (anyWin && !anyLose) winners.Add(p.DisplayName);
-                else if (anyLose && !anyWin) losers.Add(p.DisplayName);
-                else if (allPush)            pushes.Add(p.DisplayName);
-                else if (anyWin)             winners.Add(p.DisplayName);
-                else                         losers.Add(p.DisplayName);
-            }
-            return new RoundSummary
-            {
-                RoundNumber = r.RoundNumber,
-                BankNet     = r.BankNet,
-                PlayerBanks = new Dictionary<string, long>(r.PlayerBanks),
-                Winners     = winners,
-                Losers      = losers,
-                Pushes      = pushes,
-            };
-        });
-        var statData = venue.PlayerStatsStore.Select(kv =>
-            KeyValuePair.Create(kv.Key, new PlayerStatData
+        var statData = venue.PlayerStatsStore.ToDictionary(
+            kv => kv.Key,
+            kv => new PlayerStatData
             {
                 DisplayName = kv.Value.DisplayName,
                 GamesPlayed = kv.Value.GamesPlayed,
@@ -364,23 +334,33 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
                 Blackjacks  = kv.Value.Blackjacks,
                 Charlies    = kv.Value.Charlies,
                 TotalWon    = kv.Value.TotalWon,
-            }));
-        var (archivedStats, bankNet, archivedRounds) = SessionManager.BuildArchive(statData, roundSummaries);
+            });
+
+        // Snapshot each player's bank transaction log so it survives the
+        // PlayerStatsStore.Clear() below.
+        var bankLogs = venue.PlayerStatsStore.ToDictionary(
+            kv => kv.Key,
+            kv => new List<BankTransactionEntry>(kv.Value.BankLog));
 
         // Edge stats locked in using each round's snapshot rules - the rules that
         // were actually in effect when each round was played.
         var edgeStats = EdgeStats.Aggregate(venue.RoundHistory);
 
-        venue.StatsSessions.Add(new PlayerStatsSession
+        var session = new PlayerStatsSession
         {
+            Id                 = Guid.NewGuid(),
             Date               = DateTime.Now,
             LocationKey        = venue.ActiveSessionLocationKey ?? "",
-            Stats              = archivedStats,
-            BankNet            = bankNet,
-            Rounds             = archivedRounds,
+            Stats              = statData,
+            BankNet            = venue.RoundHistory.Sum(r => r.BankNet),
+            Rounds             = new List<RoundHistoryEntry>(venue.RoundHistory),
             TotalWagered       = edgeStats.TotalWagered,
             TheoreticalBankNet = edgeStats.TheoreticalBankNet,
-        });
+            PlayerBankLogs     = bankLogs,
+            PluginVersion      = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "",
+        };
+        venue.StatsSessions.Add(session);
+        SessionStore.Save(venue.Id, session);
 
         venue.PlayerStatsStore.Clear();
 

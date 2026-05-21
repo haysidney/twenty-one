@@ -83,6 +83,12 @@ public sealed class Plugin : IDalamudPlugin
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.EnsureVenues();
 
+        // Load each venue's archived sessions from disk. StatsSessions is
+        // [JsonIgnore] on VenueSettings so the per-session JSON files under
+        // {ConfigDirectory}/sessions/ are the canonical store.
+        foreach (var venue in Configuration.Venues)
+            venue.StatsSessions = SessionStore.LoadAll(venue.Id);
+
         SessionLedgerWindow   = new SessionLedgerWindow(Configuration);
         NarrationEditorWindow = new NarrationEditorWindow(Configuration);
         RulesEditorWindow     = new RulesEditorWindow(Configuration);

@@ -5,18 +5,6 @@ using System.Collections.Immutable;
 namespace TwentyOne.Game;
 
 [Serializable]
-public class RoundSummary
-{
-    public int RoundNumber { get; set; }
-    public long BankNet { get; set; }
-    // Key: "{FullName}@{World}" or Nickname - same format as RoundHistoryEntry.PlayerBanks
-    public Dictionary<string, long> PlayerBanks { get; set; } = [];
-    public List<string> Winners { get; set; } = [];
-    public List<string> Losers  { get; set; } = [];
-    public List<string> Pushes  { get; set; } = [];
-}
-
-[Serializable]
 public class RoundHistoryEntry
 {
     public int       RoundNumber { get; set; }
@@ -25,6 +13,14 @@ public class RoundHistoryEntry
     public long      BankNet     { get; set; }
     // Player bank balances after payout (key = PlayerStatKey). Used by history window tooltips.
     public Dictionary<string, long> PlayerBanks { get; set; } = [];
+    // Player bank balances captured just before the round's payout was applied.
+    // Allows per-round bank deltas to be derived without chaining adjacent entries.
+    public Dictionary<string, long> PrePayoutPlayerBanks { get; set; } = [];
+    // Wall-clock times for the round. StartedAt is set when the dealer transitions
+    // out of Betting (StartDeal); FinishedAt at the end of payout settlement.
+    // Both default to DateTime.MinValue for entries logged before this field existed.
+    public DateTime StartedAt  { get; set; } = DateTime.MinValue;
+    public DateTime FinishedAt { get; set; } = DateTime.MinValue;
 }
 
 public enum HandState { Playing, Stand, Bust, Blackjack, Charlie, Surrendered }

@@ -56,37 +56,6 @@ public static class SessionManager
         return false;
     }
 
-    // Builds an archived snapshot from current stats + round history.
-    // Caller is responsible for clearing/resetting live data afterward.
-    public static (Dictionary<string, PlayerStatData> Stats, long BankNet, List<RoundSummary> Rounds)
-        BuildArchive(
-            IEnumerable<KeyValuePair<string, PlayerStatData>> stats,
-            IEnumerable<RoundSummary>                         rounds)
-    {
-        var roundList = rounds.Select(r => new RoundSummary
-        {
-            RoundNumber = r.RoundNumber,
-            BankNet     = r.BankNet,
-            PlayerBanks = new Dictionary<string, long>(r.PlayerBanks),
-        }).ToList();
-
-        var statsCopy = stats.ToDictionary(
-            kv => kv.Key,
-            kv => new PlayerStatData
-            {
-                DisplayName = kv.Value.DisplayName,
-                GamesPlayed = kv.Value.GamesPlayed,
-                GamesWon    = kv.Value.GamesWon,
-                GamesPushed = kv.Value.GamesPushed,
-                GamesLost   = kv.Value.GamesLost,
-                Blackjacks  = kv.Value.Blackjacks,
-                Charlies    = kv.Value.Charlies,
-                TotalWon    = kv.Value.TotalWon,
-            });
-
-        return (statsCopy, roundList.Sum(r => r.BankNet), roundList);
-    }
-
     // Zeroes game-performance stats; preserves Bank/BankLog (handled by caller).
     public static void ResetGameStats(IEnumerable<PlayerStatData> stats)
     {
