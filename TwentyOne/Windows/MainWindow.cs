@@ -501,11 +501,17 @@ public partial class MainWindow : Window, IDisposable
             case TradeMonitor.Outcome.PromptBet pb:
                 pendingPrompt = new PendingPrompt.Bet(pb.Pi, pb.Gil); break;
             case TradeMonitor.Outcome.PromptBankDeposit pbd:
-                pendingPrompt = new PendingPrompt.BankDeposit(pbd.Pi, pbd.Gil); break;
+                if (!TryAutoMaintainBetDeposit(pbd.Pi, pbd.Gil))
+                    pendingPrompt = new PendingPrompt.BankDeposit(pbd.Pi, pbd.Gil);
+                break;
             case TradeMonitor.Outcome.PromptBankWithdraw pbw:
-                pendingPrompt = new PendingPrompt.BankWithdraw(pbw.Pi, pbw.Gil); break;
+                if (!TryAutoMaintainBetWithdraw(pbw.Pi, pbw.Gil))
+                    pendingPrompt = new PendingPrompt.BankWithdraw(pbw.Pi, pbw.Gil);
+                break;
             case TradeMonitor.Outcome.PromptBetOrBank pbob:
-                pendingPrompt = new PendingPrompt.BetOrBank(pbob.Pi, pbob.Gil); break;
+                if (!TryAutoMaintainBetDeposit(pbob.Pi, pbob.Gil))
+                    pendingPrompt = new PendingPrompt.BetOrBank(pbob.Pi, pbob.Gil);
+                break;
         }
 
         // ── Roll detection ────────────────────────────────────────────────────
@@ -529,6 +535,34 @@ public partial class MainWindow : Window, IDisposable
         pendingHit   = null;
         LogRoll(isDealer, pi2, roll);
         deferredRoll = (isDealer, pi2, hi, roll);
+    }
+
+    // Returns true and silently applies if the trade is the exact maintain-bet deposit amount.
+    private bool TryAutoMaintainBetDeposit(int pi, long gil)
+    {
+        if (pi < 0 || pi >= State.Players.Length) return false;
+        var p = State.Players[pi];
+        if (!p.TryGetBankingStat(config, out var stat) || !stat.MaintainBet) return false;
+        if (stat.Bank != 0) return false;
+        var bet = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
+        if (bet <= 0 || gil != bet) return false;
+        ApplyBank(stat, new BankDeposit(gil));
+        config.Save();
+        return true;
+    }
+
+    // Returns true and silently applies if the trade is the exact maintain-bet withdrawal amount.
+    private bool TryAutoMaintainBetWithdraw(int pi, long gil)
+    {
+        if (pi < 0 || pi >= State.Players.Length) return false;
+        var p = State.Players[pi];
+        if (!p.TryGetBankingStat(config, out var stat) || !stat.MaintainBet) return false;
+        var bet = (long)Math.Floor(GameEngine.ParseBet(p.Bet));
+        var owe = stat.Bank - bet;
+        if (owe <= 0 || gil != owe) return false;
+        ApplyBank(stat, new BankWithdrawal(gil));
+        config.Save();
+        return true;
     }
 
     private void ConfirmDoublePayment(int pi, int hi)
