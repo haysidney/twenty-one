@@ -150,12 +150,16 @@ public partial class MainWindow
 
             if (bankStat.MaintainBet && parsedBet > 0 && bankVal > parsedBet)
             {
-                var owe  = bankVal - (long)Math.Floor(parsedBet);
-                var oweW = ImGui.CalcTextSize($"Owe {GameEngine.FormatGil(owe)}").X + ImGui.GetStyle().ItemSpacing.X;
+                var owe     = bankVal - (long)Math.Floor(parsedBet);
+                var oweStr  = $"Owe {GameEngine.FormatGil(owe)}";
+                var fp2     = ImGui.GetStyle().FramePadding.X;
+                var sp2     = ImGui.GetStyle().ItemSpacing.X;
+                var manageW2 = ImGui.CalcTextSize("Manage").X + fp2 * 2;
+                var oweW    = ImGui.CalcTextSize(oweStr).X + sp2;
                 ImGui.SameLine();
-                if (ImGui.GetCursorPosX() < bankCellRight - oweW)
-                    ImGui.SetCursorPosX(bankCellRight - oweW);
-                ImGui.TextColored(GameColors.CreditGreen, $"Owe {GameEngine.FormatGil(owe)}");
+                if (ImGui.GetCursorPosX() < bankCellRight - manageW2 - sp2 - oweW)
+                    ImGui.SetCursorPosX(bankCellRight - manageW2 - sp2 - oweW);
+                ImGui.TextColored(GameColors.CreditGreen, oweStr);
                 if (ImGui.IsItemHovered())
                     ImGui.SetTooltip($"Bank is {GameEngine.FormatGil(owe)} over maintained bet - pay this out");
             }
