@@ -3199,6 +3199,72 @@ public class SurrenderTests
         Assert.False(ns.WaitingForDealer);
         Assert.True(GameEngine.CanGoToPayout(ns));
     }
+
+    [Fact]
+    public void Surrender_FirstOfTwoPlayers_SetsWaitingForNextPlayer()
+    {
+        // Player 0 surrenders. Player 1 still has cards in play, so the engine
+        // should hold on player 0 with WaitingForNextPlayer=true (mirroring Stand).
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .AllowSurrender(true)
+            .Player("Lorah", "100", HandState.Playing, 10, 6)
+            .Player("Bekki", "100", HandState.Playing, 9, 8)
+            .Build();
+        var (ns, _) = GameEngine.Apply(state, new SurrenderHand(0, 0));
+
+        Assert.Equal(HandState.Surrendered, ns.Players[0].Hands[0].State);
+        Assert.Equal(GamePhase.PlayerTurns, ns.Phase);
+        Assert.True(ns.WaitingForNextPlayer);
+        Assert.Equal(0, ns.ActivePlayerIndex); // stays on Lorah until Next Player clicked
+        Assert.False(ns.WaitingForDealer);
+    }
+
+    [Fact]
+    public void Surrender_AdvanceToNextPlayer_MovesToNextPlayingHand()
+    {
+        // After player 0 surrenders, clicking Next Player should advance to player 1.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .AllowSurrender(true)
+            .Player("Lorah", "100", HandState.Playing, 10, 6)
+            .Player("Bekki", "100", HandState.Playing, 9, 8)
+            .Build();
+        var (afterSurrender, _) = GameEngine.Apply(state, new SurrenderHand(0, 0));
+        var (advanced, _)       = GameEngine.Apply(afterSurrender, new AdvanceToNextPlayer());
+
+        Assert.Equal(GamePhase.PlayerTurns, advanced.Phase);
+        Assert.Equal(1, advanced.ActivePlayerIndex);
+        Assert.Equal(0, advanced.ActiveHandIndex);
+        Assert.False(advanced.WaitingForNextPlayer);
+    }
+
+    [Fact]
+    public void Surrender_LastPlayer_TransitionsToDealerTurn()
+    {
+        // Two-player round: player 0 already stood, player 1 surrenders. Engine
+        // should jump straight to DealerTurn. Dealer upcard is 7 (no possible
+        // dealer BJ), so WaitingForDealer must be true so the dealer actually plays
+        // against Bekki's standing hand.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(1, 0)
+            .Dealer(7)
+            .AllowSurrender(true)
+            .Player("Lorah", "100", HandState.Stand,   10, 8)
+            .Player("Bekki", "100", HandState.Playing, 10, 6)
+            .Build();
+        var (ns, _) = GameEngine.Apply(state, new SurrenderHand(1, 0));
+
+        Assert.Equal(HandState.Surrendered, ns.Players[1].Hands[0].State);
+        Assert.Equal(GamePhase.DealerTurn, ns.Phase);
+        Assert.True(ns.WaitingForDealer);
+        Assert.False(ns.WaitingForNextPlayer);
+    }
 }
 
 // Combinations of rules that interact with each other. Each test sets up the
