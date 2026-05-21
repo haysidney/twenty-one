@@ -112,11 +112,17 @@ public static class GameEngine
         if (AllHaveTerminalWin(activePlayers))
             return DealerHoleCardRevealedOrSafe(state);
 
-        if (AllHaveState(activePlayers, HandState.Bust))
+        if (AllAreSettledLoss(activePlayers))
             return true;
 
         return DealerStoodOrBust(state);
     }
+
+    // Hands whose outcomes are already settled and don't depend on the dealer's
+    // final value: Bust loses regardless, Surrender pays half regardless.
+    private static bool AllAreSettledLoss(IReadOnlyList<Player> players) =>
+        players.Count > 0 && players.All(p => p.Hands.All(h =>
+            h.State == HandState.Bust || h.State == HandState.Surrendered));
 
     private static bool AllHaveState(IReadOnlyList<Player> players, HandState hs) =>
         players.Count > 0 && players.All(p => p.Hands.All(h => h.State == hs));
@@ -176,6 +182,13 @@ public static class GameEngine
     public static bool CanStand(Hand hand) =>
         hand.State == HandState.Playing && hand.Cards.Length >= 2;
 
+    // Surrender is allowed on the initial 2-card hand only: not after a hit, not
+    // after a split, not after a double. Available only when AllowSurrender is on.
+    public static bool CanSurrender(Hand hand, bool allowSurrender) =>
+        allowSurrender
+        && hand.Cards.Length == 2 && hand.State == HandState.Playing
+        && !hand.IsFromSplit && !hand.Doubled;
+
     // Deal phase is complete when the dealer has ≥1 card and every player's first hand has ≥2 cards.
     public static bool IsDealComplete(GameState state) =>
         state.DealerHand.Cards.Length >= 1
@@ -208,8 +221,9 @@ public static class GameEngine
     public static PayoutResult GetPayoutResult(GameState state, int playerIndex, int handIndex = 0)
     {
         var hand = state.Players[playerIndex].Hands[handIndex];
-        if (hand.Cards.Length == 0)        return PayoutResult.None;
-        if (hand.State == HandState.Bust) return PayoutResult.Lose;
+        if (hand.Cards.Length == 0)             return PayoutResult.None;
+        if (hand.State == HandState.Surrendered) return PayoutResult.Surrender;
+        if (hand.State == HandState.Bust)       return PayoutResult.Lose;
 
         var dealerVal  = HandValue(state.DealerHand.Cards);
         var dealerBust = state.DealerHand.Cards.Length > 0 && dealerVal > 21;
@@ -260,6 +274,7 @@ public static class GameEngine
             PayoutResult.BjWin      => Math.Ceiling(bet * (decimal)state.BjPayout),
             PayoutResult.CharlieWin => Math.Ceiling(bet * CharlieMultiplier(state.CharliePayout)),
             PayoutResult.Lose       => -bet,
+            PayoutResult.Surrender  => -Math.Ceiling(bet / 2m),
             _                       => 0m,
         };
         return delta == 0 ? null : delta;
@@ -282,6 +297,7 @@ public static class GameEngine
             PayoutResult.BjWin      => bet + Math.Ceiling(bet * (decimal)state.BjPayout),
             PayoutResult.CharlieWin => bet + Math.Ceiling(bet * CharlieMultiplier(state.CharliePayout)),
             PayoutResult.Push       => bet,
+            PayoutResult.Surrender  => bet - Math.Ceiling(bet / 2m),
             _                       => 0m,
         };
     }
@@ -341,8 +357,9 @@ public static class GameEngine
                     return (pi, hi, GamePhase.PlayerTurns);
             }
         }
-        var allBust = players.All(p => p.SittingOut || p.Hands.All(h => h.State == HandState.Bust));
-        return (-1, -1, allBust ? GamePhase.Payout : GamePhase.DealerTurn);
+        var allSettledLoss = players.All(p => p.SittingOut || p.Hands.All(h =>
+            h.State == HandState.Bust || h.State == HandState.Surrendered));
+        return (-1, -1, allSettledLoss ? GamePhase.Payout : GamePhase.DealerTurn);
     }
 
     // ── Narration context ─────────────────────────────────────────────────────
@@ -431,6 +448,7 @@ public static class GameEngine
         [typeof(StandPlayer)]          = (s, a, ctx) => HandleStandPlayer(s, (StandPlayer)a, ctx),
         [typeof(DoubleDown)]           = (s, a, _) => HandleDoubleDown(s, (DoubleDown)a),
         [typeof(SplitHand)]            = (s, a, ctx) => HandleSplitHand(s, (SplitHand)a, ctx),
+        [typeof(SurrenderHand)]        = (s, a, ctx) => HandleSurrenderHand(s, (SurrenderHand)a, ctx),
         [typeof(AnnounceDealerHit)]    = (s, _, ctx) => HandleAnnounceDealerHit(s, ctx),
         [typeof(AnnouncePlayerHit)]    = (s, a, ctx) => HandleAnnouncePlayerHit(s, (AnnouncePlayerHit)a, ctx),
         [typeof(AnnouncePlayerTurn)]   = (s, a, ctx) => HandleAnnouncePlayerTurn(s, (AnnouncePlayerTurn)a, ctx),
@@ -687,6 +705,61 @@ public static class GameEngine
             ActiveHandIndex = newActiveHi,
             WaitingForNextPlayer = newWaitingForNextPlayer,
             WaitingForDealer = newWaitingForDealer,
+        };
+    }
+
+    private static GameState HandleSurrenderHand(GameState state, SurrenderHand a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var pi   = a.PlayerIndex;
+        var hi   = a.HandIndex;
+        var hand = state.Players[pi].Hands[hi];
+        if (!CanSurrender(hand, state.AllowSurrender)) return state;
+
+        var newHand    = hand with { State = HandState.Surrendered };
+        var newPlayers = WithPlayer(state.Players, pi, WithHand(state.Players[pi], hi, newHand));
+        var newPhase                 = state.Phase;
+        var newActivePi              = state.ActivePlayerIndex;
+        var newActiveHi              = state.ActiveHandIndex;
+        var newWaitingForNextPlayer  = false;
+        var newWaitingForDealer      = false;
+
+        if (state.Phase == GamePhase.PlayerTurns)
+        {
+            var multiHand   = state.Players[pi].Hands.Length > 1;
+            var displayName = multiHand
+                ? $"{state.Players[pi].DisplayName} (Hand {hi + 1})"
+                : state.Players[pi].DisplayName;
+            ctx.Narrate(t.PlayerSurrender, ("name", displayName));
+
+            if (pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
+            {
+                var (peekPi, peekHi, peekPhase) = AdvanceFrom(pi, hi, newPlayers);
+                if (peekPhase is GamePhase.DealerTurn or GamePhase.Payout)
+                {
+                    newPhase            = GamePhase.DealerTurn;
+                    var provisional     = state with { Players = newPlayers, Phase = GamePhase.DealerTurn };
+                    newWaitingForDealer = !CanGoToPayout(provisional);
+                }
+                else if (peekPhase != GamePhase.PlayerTurns)
+                {
+                    (newActivePi, newActiveHi, newPhase) = (peekPi, peekHi, peekPhase);
+                }
+                else
+                {
+                    newWaitingForNextPlayer = true;
+                }
+            }
+        }
+
+        return state with
+        {
+            Players              = newPlayers,
+            Phase                = newPhase,
+            ActivePlayerIndex    = newActivePi,
+            ActiveHandIndex      = newActiveHi,
+            WaitingForNextPlayer = newWaitingForNextPlayer,
+            WaitingForDealer     = newWaitingForDealer,
         };
     }
 
@@ -1095,6 +1168,7 @@ public static class GameEngine
                 PayoutResult.CharlieWin => t.PayoutCharlieWin,
                 PayoutResult.Lose       => t.PayoutLose,
                 PayoutResult.Push       => t.PayoutPush,
+                PayoutResult.Surrender  => t.PayoutSurrender,
                 _                       => null,
             };
             if (template == null) continue;

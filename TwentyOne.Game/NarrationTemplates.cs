@@ -42,6 +42,8 @@ public class NarrationTemplates
     // {name} {cards}
     public List<List<string>> PlayerBJMovingAlong { get; set; } = [["{name} has a blackjack so we'll just move along ♥"]];
     public List<List<string>> PlayerStand       { get; set; } = [["{name} stands. {cards} = {score}"]];
+    // Surrender - sent when the player surrenders their initial 2-card hand (-0.5x bet).
+    public List<List<string>> PlayerSurrender   { get; set; } = [["{name} surrenders - half their bet returned."]];
 
     // Double down - sent when the card lands and the hand is auto-stood
     // {name} may include "(Hand N)" for split hands
@@ -118,6 +120,7 @@ public class NarrationTemplates
     public List<List<string>> PayoutCharlieWin { get; set; } = [["{name}: Five Card Charlie! (bet: {bet}) {amount}"]];
     public List<List<string>> PayoutLose       { get; set; } = [["{name}: Lose (bet: {bet}) {amount}"]];
     public List<List<string>> PayoutPush       { get; set; } = [["{name}: Push (bet: {bet})"]];
+    public List<List<string>> PayoutSurrender  { get; set; } = [["{name}: Surrendered (bet: {bet}) {amount}"]];
 
     // Newtonsoft.Json reuses existing List instances and appends to them.
     // Clear all lists before deserialization so defaults don't accumulate on reload.

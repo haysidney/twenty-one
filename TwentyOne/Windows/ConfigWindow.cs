@@ -44,6 +44,7 @@ public class ConfigWindow : Window, IDisposable
     private double?   _edgeFlipDAS;
     private double?   _edgeFlipHSA;
     private double?   _edgeFlipRSA;
+    private double?   _edgeFlipSurrender;
     private EdgeRules _cachedEdgeRules;
 
     private static readonly string[] ChatChannels =
@@ -146,6 +147,16 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When on, a pair of aces produced by an earlier split may be split again.\nWhen off (default), split-ace pairs cannot be resplit.\nApplies to the next round.");
         DrawFlipDelta(_edgeFlipRSA);
+
+        var surrender = config.AllowSurrender;
+        if (ImGui.Checkbox("Allow surrender", ref surrender))
+        {
+            config.AllowSurrender = surrender;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("When on, the player may surrender an initial 2-card hand for half their bet.\nNot available after hit, split, or double.\nApplies to the next round.");
+        DrawFlipDelta(_edgeFlipSurrender);
 
         DrawHouseEdgeLabel();
 
@@ -290,16 +301,18 @@ public class ConfigWindow : Window, IDisposable
             config.DealerStandsOnSoft17,
             config.DoubleAfterSplit,
             config.HitSplitAces,
-            config.ResplitAces);
+            config.ResplitAces,
+            config.AllowSurrender);
 
         if (_cachedHouseEdge.HasValue && _cachedEdgeRules.Equals(rules)) return;
 
-        _cachedHouseEdge  = EdgeSolver.ComputeHouseEdge(rules);
-        _edgeFlipS17      = EdgeSolver.ComputeHouseEdge(rules with { DealerStandsOnSoft17 = !rules.DealerStandsOnSoft17 });
-        _edgeFlipDAS      = EdgeSolver.ComputeHouseEdge(rules with { DoubleAfterSplit     = !rules.DoubleAfterSplit });
-        _edgeFlipHSA      = EdgeSolver.ComputeHouseEdge(rules with { HitSplitAces         = !rules.HitSplitAces });
-        _edgeFlipRSA      = EdgeSolver.ComputeHouseEdge(rules with { ResplitAces          = !rules.ResplitAces });
-        _cachedEdgeRules  = rules;
+        _cachedHouseEdge   = EdgeSolver.ComputeHouseEdge(rules);
+        _edgeFlipS17       = EdgeSolver.ComputeHouseEdge(rules with { DealerStandsOnSoft17 = !rules.DealerStandsOnSoft17 });
+        _edgeFlipDAS       = EdgeSolver.ComputeHouseEdge(rules with { DoubleAfterSplit     = !rules.DoubleAfterSplit });
+        _edgeFlipHSA       = EdgeSolver.ComputeHouseEdge(rules with { HitSplitAces         = !rules.HitSplitAces });
+        _edgeFlipRSA       = EdgeSolver.ComputeHouseEdge(rules with { ResplitAces          = !rules.ResplitAces });
+        _edgeFlipSurrender = EdgeSolver.ComputeHouseEdge(rules with { AllowSurrender       = !rules.AllowSurrender });
+        _cachedEdgeRules   = rules;
     }
 
     // Shows "(±X.XX%)" next to a toggle, colored green if flipping helps the player

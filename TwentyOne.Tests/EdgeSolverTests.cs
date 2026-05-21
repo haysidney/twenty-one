@@ -21,8 +21,9 @@ public class EdgeSolverTests
         bool s17 = false,
         bool das = true,
         bool hsa = false,
-        bool rsa = false)
-        => new(bj, charlie, cr, s17, das, hsa, rsa);
+        bool rsa = false,
+        bool surrender = false)
+        => new(bj, charlie, cr, s17, das, hsa, rsa, surrender);
 
     [Fact]
     public void H17_3to2_NoCharlie_EdgeInPublishedRange()
@@ -79,6 +80,36 @@ public class EdgeSolverTests
             Rules(charlie: PayoutRatio.ThreeToTwo, cr: FiveCardCharlieRule.BeatsAll));
         _out.WriteLine($"Charlie off = {off * 100:F4}%, BeatsAll@3:2 = {beat * 100:F4}%");
         Assert.True(beat < off, "Charlie should reduce house edge");
+    }
+
+    [Fact]
+    public void Surrender_LowersEdge()
+    {
+        var noSur = EdgeSolver.ComputeHouseEdge(Rules(surrender: false));
+        var sur   = EdgeSolver.ComputeHouseEdge(Rules(surrender: true));
+        _out.WriteLine($"no-surrender = {noSur * 100:F4}%, surrender = {sur * 100:F4}%, delta = {(sur - noSur) * 100:F4}%");
+        Assert.True(sur < noSur, "Allowing surrender should lower house edge");
+        // Early surrender vs no surrender is sizeable (~-0.2% to -0.7% depending on
+        // rule mix). Late surrender would be smaller (~-0.07%) but our ENHC model
+        // gives the player the half-bet even against dealer BJ.
+        Assert.InRange(noSur - sur, 0.001, 0.010);
+    }
+
+    [Fact]
+    public void Surrender_HardSixteen_VsTen_OptimalIsSurrender()
+    {
+        // 16 vs T is the classic surrender cell - the canonical "surrender if
+        // possible, else hit" decision.
+        var act = EdgeSolver.GetOptimalAction(10, 6, 10, Rules(surrender: true));
+        Assert.Equal(OptimalAction.Surrender, act);
+    }
+
+    [Fact]
+    public void Surrender_Twelve_VsTwo_NotSurrender()
+    {
+        // 12 vs 2 - hitting is better than surrender even though the cell is close.
+        var act = EdgeSolver.GetOptimalAction(2, 10, 2, Rules(surrender: true));
+        Assert.NotEqual(OptimalAction.Surrender, act);
     }
 
     [Fact]

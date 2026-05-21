@@ -222,6 +222,7 @@ public class NarrationEditorWindow : Window
             NtListRow("Blackjack##ntPBJ",       "{name}  {cards}",  Defaults.PlayerBJ,            ctrlHeld, t.PlayerBJ);
             NtListRow("BJ moving along##ntPBJMA", "{name}  {cards}", Defaults.PlayerBJMovingAlong, ctrlHeld, t.PlayerBJMovingAlong);
             NtListRow("Stand##ntPS",       "{name}  {cards}  {score}",                                          Defaults.PlayerStand,       ctrlHeld, t.PlayerStand);
+            NtListRow("Surrender##ntPSR",  "{name}",                                                            Defaults.PlayerSurrender,   ctrlHeld, t.PlayerSurrender);
             NtListRow("Charlie##ntPC",     "{name}  {card}  {cards}  {score}",                                  Defaults.PlayerCharlie,     ctrlHeld, t.PlayerCharlie);
 
             ImGui.EndTabItem();
@@ -274,6 +275,7 @@ public class NarrationEditorWindow : Window
             NtListRow("Charlie##ntPCW",    "{name}  {bet}  {amount}", Defaults.PayoutCharlieWin, ctrlHeld, t.PayoutCharlieWin);
             NtListRow("Lose##ntPL",        "{name}  {bet}  {amount}", Defaults.PayoutLose,       ctrlHeld, t.PayoutLose);
             NtListRow("Push##ntPPush",     "{name}  {bet}",           Defaults.PayoutPush,       ctrlHeld, t.PayoutPush);
+            NtListRow("Surrender##ntPSur", "{name}  {bet}  {amount}", Defaults.PayoutSurrender,  ctrlHeld, t.PayoutSurrender);
             NtListRow("Split win##ntPSW",  "{name}  {amount}",        Defaults.PayoutSplitCombined, ctrlHeld, t.PayoutSplitCombined);
 
             ImGui.EndTabItem();

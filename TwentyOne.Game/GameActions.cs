@@ -29,6 +29,7 @@ public record AddPlayerCard(int PlayerIndex, int HandIndex, int Card) : GameActi
 public record StandPlayer(int PlayerIndex, int HandIndex) : GameAction;
 public record DoubleDown(int PlayerIndex, int HandIndex) : GameAction;
 public record SplitHand(int PlayerIndex, int HandIndex) : GameAction;
+public record SurrenderHand(int PlayerIndex, int HandIndex) : GameAction;
 
 // Deal announcements (narration only, no state change)
 public record AnnounceDealerDeal : Announcement;

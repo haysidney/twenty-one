@@ -2937,6 +2937,7 @@ public class GameActionPushesUndoTests
         new object[] { new StandPlayer(0, 0) },
         new object[] { new DoubleDown(0, 0) },
         new object[] { new SplitHand(0, 0) },
+        new object[] { new SurrenderHand(0, 0) },
         new object[] { new StartDeal() },
         new object[] { new BeginPlayerTurns() },
         new object[] { new AdvanceToNextPlayer() },
@@ -2954,6 +2955,140 @@ public class GameActionPushesUndoTests
     public void StateChangingActions_PushUndo(GameAction action)
     {
         Assert.True(action.PushesUndo);
+    }
+}
+
+public class SurrenderTests
+{
+    private static GameState SurrenderableState(bool allowSurrender = true) =>
+        new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .AllowSurrender(allowSurrender)
+            .Player("Lorah", "100", HandState.Playing, 10, 6)
+            .Build();
+
+    [Fact]
+    public void CanSurrender_2CardInitialHand_True()
+    {
+        var hand = new Hand { Cards = [10, 6], State = HandState.Playing };
+        Assert.True(GameEngine.CanSurrender(hand, allowSurrender: true));
+    }
+
+    [Fact]
+    public void CanSurrender_OptionOff_False()
+    {
+        var hand = new Hand { Cards = [10, 6], State = HandState.Playing };
+        Assert.False(GameEngine.CanSurrender(hand, allowSurrender: false));
+    }
+
+    [Fact]
+    public void CanSurrender_AfterHit_False()
+    {
+        var hand = new Hand { Cards = [10, 6, 2], State = HandState.Playing };
+        Assert.False(GameEngine.CanSurrender(hand, allowSurrender: true));
+    }
+
+    [Fact]
+    public void CanSurrender_FromSplit_False()
+    {
+        var hand = new Hand { Cards = [10, 6], State = HandState.Playing, IsFromSplit = true };
+        Assert.False(GameEngine.CanSurrender(hand, allowSurrender: true));
+    }
+
+    [Fact]
+    public void CanSurrender_AfterDouble_False()
+    {
+        var hand = new Hand { Cards = [10, 6], State = HandState.Playing, Doubled = true, Bet = "200" };
+        Assert.False(GameEngine.CanSurrender(hand, allowSurrender: true));
+    }
+
+    [Fact]
+    public void Apply_Surrender_MarksHandSurrendered()
+    {
+        var state = SurrenderableState();
+        var (ns, _) = GameEngine.Apply(state, new SurrenderHand(0, 0));
+        Assert.Equal(HandState.Surrendered, ns.Players[0].Hands[0].State);
+    }
+
+    [Fact]
+    public void Apply_Surrender_NoOp_WhenSurrenderDisallowed()
+    {
+        var state = SurrenderableState(allowSurrender: false);
+        var (ns, _) = GameEngine.Apply(state, new SurrenderHand(0, 0));
+        Assert.Equal(HandState.Playing, ns.Players[0].Hands[0].State);
+    }
+
+    [Fact]
+    public void Surrender_Payout_LosesHalfBet()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands = [new Hand { Cards = [10, 6], State = HandState.Surrendered }],
+            })
+            .Build();
+        Assert.Equal(PayoutResult.Surrender, GameEngine.GetPayoutResult(state, 0));
+        Assert.Equal(-50m, GameEngine.PayoutDelta(state, 0));
+        // Bank gets half back at settlement.
+        Assert.Equal(50m, GameEngine.PayoutTotalOwed(state, 0));
+    }
+
+    [Fact]
+    public void Surrender_LosesHalf_EvenAgainstDealerBJ()
+    {
+        // ENHC: surrender takes priority, half bet forfeit regardless of dealer BJ.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .Dealer(HandState.Blackjack, 1, 10)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands = [new Hand { Cards = [10, 6], State = HandState.Surrendered }],
+            })
+            .Build();
+        Assert.Equal(PayoutResult.Surrender, GameEngine.GetPayoutResult(state, 0));
+        Assert.Equal(-50m, GameEngine.PayoutDelta(state, 0));
+    }
+
+    [Fact]
+    public void Surrender_OddBet_RoundsUpForHouseFavor()
+    {
+        // 101 / 2 = 50.5; Math.Ceiling makes the player forfeit 51, keeping 50.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Payout)
+            .Dealer(HandState.Stand, 10, 7)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "101",
+                Hands = [new Hand { Cards = [10, 6], State = HandState.Surrendered }],
+            })
+            .Build();
+        Assert.Equal(-51m, GameEngine.PayoutDelta(state, 0));
+        Assert.Equal(50m,  GameEngine.PayoutTotalOwed(state, 0));
+    }
+
+    [Fact]
+    public void Surrender_AllPlayersSurrender_GoesStraightToPayout()
+    {
+        // After the last player surrenders, AdvanceFrom finds no Playing hands and
+        // every hand is settled-loss. The transition should go to DealerTurn with
+        // WaitingForDealer=false so the dealer can click "Go to Payout".
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(10)
+            .AllowSurrender(true)
+            .Player("Lorah", "100", HandState.Playing, 10, 6)
+            .Build();
+        var (ns, _) = GameEngine.Apply(state, new SurrenderHand(0, 0));
+        Assert.Equal(GamePhase.DealerTurn, ns.Phase);
+        Assert.False(ns.WaitingForDealer);
+        Assert.True(GameEngine.CanGoToPayout(ns));
     }
 }
 

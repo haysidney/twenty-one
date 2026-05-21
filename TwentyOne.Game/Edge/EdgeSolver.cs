@@ -11,7 +11,8 @@ public readonly record struct EdgeRules(
     bool DealerStandsOnSoft17 = false,
     bool DoubleAfterSplit = true,
     bool HitSplitAces = false,
-    bool ResplitAces = false);
+    bool ResplitAces = false,
+    bool AllowSurrender = false);
 
 public enum OptimalAction
 {
@@ -19,6 +20,7 @@ public enum OptimalAction
     Hit,
     Double,
     Split,
+    Surrender,
 }
 
 /// <summary>
@@ -173,8 +175,8 @@ public static class EdgeSolver
             return total;
         }
 
-        // Top-level decision for an initial 2-card hand. Considers Split in
-        // addition to whatever EvalHand chooses.
+        // Top-level decision for an initial 2-card hand. Considers Split and
+        // Surrender in addition to whatever EvalHand chooses.
         private double EvalInitial(int c1, int c2, int upcard)
         {
             var (t1, s1) = AddCard(0,  false, c1);
@@ -184,12 +186,14 @@ public static class EdgeSolver
 
             double best = EvalHand(t, s, 2, false, upcard);
 
-            // Split eligibility matches GameEngine.CanSplit: same rank.
             if (c1 == c2)
             {
                 double splitEV = EvalSplit(c1, upcard);
                 if (splitEV > best) best = splitEV;
             }
+            // Early surrender (ENHC): half the bet is forfeited regardless of dealer
+            // outcome - including dealer BJ - so the EV is a flat -0.5.
+            if (_rules.AllowSurrender && best < -0.5) best = -0.5;
             return best;
         }
 
@@ -256,11 +260,12 @@ public static class EdgeSolver
             var (t,  soft)  = AddCard(t1, soft1, c2);
             return action switch
             {
-                OptimalAction.Stand  => t == 21 ? BjEV(upcard) : StandEV(t, upcard),
-                OptimalAction.Hit    => HitEVInternal(t, soft, 2, false, upcard),
-                OptimalAction.Double => DoubleEVInternal(t, soft, upcard),
-                OptimalAction.Split  => c1 == c2 ? EvalSplit(c1, upcard) : double.NaN,
-                _                    => double.NaN,
+                OptimalAction.Stand     => t == 21 ? BjEV(upcard) : StandEV(t, upcard),
+                OptimalAction.Hit       => HitEVInternal(t, soft, 2, false, upcard),
+                OptimalAction.Double    => DoubleEVInternal(t, soft, upcard),
+                OptimalAction.Split     => c1 == c2 ? EvalSplit(c1, upcard) : double.NaN,
+                OptimalAction.Surrender => _rules.AllowSurrender ? -0.5 : double.NaN,
+                _                       => double.NaN,
             };
         }
 
@@ -283,8 +288,9 @@ public static class EdgeSolver
             if (c1 == c2)
             {
                 double splitEV = EvalSplit(c1, upcard);
-                if (splitEV > bestEV) best = OptimalAction.Split;
+                if (splitEV > bestEV) { best = OptimalAction.Split; bestEV = splitEV; }
             }
+            if (_rules.AllowSurrender && -0.5 > bestEV) best = OptimalAction.Surrender;
             return best;
         }
 

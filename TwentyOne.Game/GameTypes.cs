@@ -27,10 +27,10 @@ public class RoundHistoryEntry
     public Dictionary<string, long> PlayerBanks { get; set; } = [];
 }
 
-public enum HandState { Playing, Stand, Bust, Blackjack, Charlie }
+public enum HandState { Playing, Stand, Bust, Blackjack, Charlie, Surrendered }
 public enum GamePhase { Betting, Deal, PlayerTurns, DealerTurn, Payout }
 public enum PayoutRatio { ThreeToTwo, SixToFive, EvenMoney }
-public enum PayoutResult { None, Win, BjWin, CharlieWin, Lose, Push }
+public enum PayoutResult { None, Win, BjWin, CharlieWin, Lose, Push, Surrender }
 public enum FiveCardCharlieRule { Disabled, BeatsAll, LosesToDealerBJ }
 
 [Serializable]
@@ -96,6 +96,11 @@ public sealed record class GameState
     // When true, a pair of aces produced by an earlier split may be split again. When
     // false (default), split-ace pairs cannot be resplit (standard rule).
     public bool ResplitAces { get; set; } = false;
+    // When true, the player may surrender an initial 2-card hand for a -0.5x bet
+    // payout. Available only on the original hand (not after hit or split). Because
+    // the engine is ENHC (no peek), this is effectively early surrender: half the bet
+    // is forfeited even when the dealer ends up with Blackjack.
+    public bool AllowSurrender { get; set; } = false;
     // FullNames (or Nicknames for manual players) of players who won last round.
     public HashSet<string> LastRoundWinners { get; set; } = [];
     // FullNames (or Nicknames for manual players) of players who pushed last round.

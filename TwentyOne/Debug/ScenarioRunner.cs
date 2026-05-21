@@ -104,6 +104,9 @@ public sealed class ScenarioRunner
                     case "Stand":
                         cb.Apply(new StandPlayer(pi, hi));
                         break;
+                    case "Srn":
+                        cb.Apply(new SurrenderHand(pi, hi));
+                        break;
                     case "Dbl":
                     {
                         var dblBet     = GameEngine.GetEffectiveBet(p, hand);

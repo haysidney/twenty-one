@@ -97,6 +97,7 @@ public class VenueSettings
     public bool                DoubleAfterSplit     { get; set; } = true;
     public bool                HitSplitAces         { get; set; } = false;
     public bool                ResplitAces          { get; set; } = false;
+    public bool                AllowSurrender       { get; set; } = false;
 }
 
 [Serializable]
@@ -167,6 +168,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public bool                DoubleAfterSplit     { get => ActiveVenue.DoubleAfterSplit;     set => ActiveVenue.DoubleAfterSplit = value; }
     [JsonIgnore] public bool                HitSplitAces         { get => ActiveVenue.HitSplitAces;         set => ActiveVenue.HitSplitAces = value; }
     [JsonIgnore] public bool                ResplitAces          { get => ActiveVenue.ResplitAces;          set => ActiveVenue.ResplitAces = value; }
+    [JsonIgnore] public bool                AllowSurrender       { get => ActiveVenue.AllowSurrender;       set => ActiveVenue.AllowSurrender = value; }
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 
@@ -185,6 +187,7 @@ public class Configuration : IPluginConfiguration
         GameState.DoubleAfterSplit     = ActiveVenue.DoubleAfterSplit;
         GameState.HitSplitAces         = ActiveVenue.HitSplitAces;
         GameState.ResplitAces          = ActiveVenue.ResplitAces;
+        GameState.AllowSurrender       = ActiveVenue.AllowSurrender;
     }
 
     /// <summary>

@@ -47,11 +47,12 @@ public partial class MainWindow
     private static (string Label, Vector4 Color) PayoutDisplay(GameState state, int playerIndex, int handIndex) =>
         GameEngine.GetPayoutResult(state, playerIndex, handIndex) switch
         {
-            PayoutResult.Win        => ("Win",     GameColors.ProfitGreen),
-            PayoutResult.BjWin      => ("BJ Win",  GameColors.BlackjackGold),
-            PayoutResult.CharlieWin => ("Charlie", GameColors.ProfitGreen),
-            PayoutResult.Lose       => ("Lose",    GameColors.BustRed),
-            PayoutResult.Push       => ("Push",    GameColors.StandGrey),
+            PayoutResult.Win        => ("Win",       GameColors.ProfitGreen),
+            PayoutResult.BjWin      => ("BJ Win",    GameColors.BlackjackGold),
+            PayoutResult.CharlieWin => ("Charlie",   GameColors.ProfitGreen),
+            PayoutResult.Lose       => ("Lose",      GameColors.BustRed),
+            PayoutResult.Push       => ("Push",      GameColors.StandGrey),
+            PayoutResult.Surrender  => ("Surrender", GameColors.StandGrey),
             _                       => (string.Empty, default),
         };
 
@@ -410,6 +411,7 @@ public partial class MainWindow
                 {
                     PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin => eb + d,
                     PayoutResult.Push                                                  => eb,
+                    PayoutResult.Surrender                                             => eb + d, // d is negative (-bet/2), so eb + d = bet/2 returned
                     _                                                                  => 0m,
                 };
                 if (totalOwed > 0)
@@ -600,6 +602,7 @@ public partial class MainWindow
                 {
                     PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin => eb + d,
                     PayoutResult.Push                                                  => eb,
+                    PayoutResult.Surrender                                             => eb + d, // d is negative (-bet/2), so eb + d = bet/2 returned
                     _                                                                  => 0m,
                 };
             }
@@ -899,6 +902,21 @@ public partial class MainWindow
             if (!gates.Spl) ImGui.EndDisabled();
 #endif
             if (!canSplit) ImGui.EndDisabled();
+
+            if (State.AllowSurrender)
+            {
+                ImGui.SameLine();
+                var canSurrender = !hasAnyPending && ctx.IsActiveHand
+                                && GameEngine.CanSurrender(hand, State.AllowSurrender);
+                if (!canSurrender) ImGui.BeginDisabled();
+                if (ImGui.SmallButton($"Srn##{pi}_{hi}"))
+                {
+                    Apply(new SurrenderHand(pi, hi));
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Surrender: forfeit half the bet.");
+                if (!canSurrender) ImGui.EndDisabled();
+            }
 
             if (ctx.IsFirstHand && !ctx.MultiHand)
             {
