@@ -22,6 +22,8 @@ public class HistoryWindow : Window
 
     private int _selectedSessionIndex = -1;
 
+    private readonly EdgeStatsCache _roundsEdgeCache = new();
+
     public HistoryWindow(Configuration config, MainWindow mainWindow)
         : base("History##TwentyOneHistory")
     {
@@ -84,7 +86,7 @@ public class HistoryWindow : Window
 
         // Theoretical edge uses each round's snapshot rules - the forensic view
         // of "what should have happened given the rules in effect at the time".
-        var stats = EdgeStats.Aggregate(history);
+        var stats = _roundsEdgeCache.Get(history);
         EdgeStatsDisplay.Draw(stats, history.Count,
             "Expected bank gain per gil wagered, computed using the rules in effect for each round.");
 

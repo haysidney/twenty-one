@@ -204,6 +204,8 @@ Archived sessions (`PlayerStatsSession`) are **not** stored in the main config J
 
 `EdgeStatsDisplay` (in `TwentyOne/Windows/EdgeStatsDisplay.cs`) is the shared ImGui render block used by all three views.
 
+The two live views (Session Ledger, History > Rounds This Session) cache their `EdgeStats.Aggregate` result via `EdgeStatsCache` (in `TwentyOne/Windows/EdgeStatsCache.cs`). The cache is keyed on `(EdgeRules?, RoundHistory.Count, last RoundNumber)` so it invalidates on rules edit, new round, history clear, or venue switch. Without it, the solver re-runs every frame the window is open. Any new per-frame edge display should reuse this helper.
+
 ### Sessions
 
 `SessionManager` (in `TwentyOne.Game/SessionManager.cs`) - pure static class:
