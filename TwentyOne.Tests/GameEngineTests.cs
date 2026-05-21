@@ -1355,21 +1355,42 @@ public class DoubleDownTests
     public void CanDouble_TwoCards_NumericBet_True()
     {
         var hand = new Hand { Cards = [5, 6], State = HandState.Playing };
-        Assert.True(GameEngine.CanDouble(hand, "100"));
+        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true));
     }
 
     [Fact]
     public void CanDouble_AlreadyDoubled_False()
     {
         var hand = new Hand { Cards = [5, 6], State = HandState.Playing, Doubled = true, Bet = "200" };
-        Assert.False(GameEngine.CanDouble(hand, "100"));
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true));
     }
 
     [Fact]
     public void CanDouble_ThreeCards_False()
     {
         var hand = new Hand { Cards = [5, 3, 6], State = HandState.Playing };
-        Assert.False(GameEngine.CanDouble(hand, "100"));
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true));
+    }
+
+    [Fact]
+    public void CanDouble_FromSplit_True_WhenDoubleAfterSplitAllowed()
+    {
+        var hand = new Hand { Cards = [5, 6], State = HandState.Playing, IsFromSplit = true };
+        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: true));
+    }
+
+    [Fact]
+    public void CanDouble_FromSplit_False_WhenDoubleAfterSplitDisallowed()
+    {
+        var hand = new Hand { Cards = [5, 6], State = HandState.Playing, IsFromSplit = true };
+        Assert.False(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false));
+    }
+
+    [Fact]
+    public void CanDouble_NotFromSplit_True_WhenDoubleAfterSplitDisallowed()
+    {
+        var hand = new Hand { Cards = [5, 6], State = HandState.Playing, IsFromSplit = false };
+        Assert.True(GameEngine.CanDouble(hand, "100", doubleAfterSplit: false));
     }
 
     [Fact]

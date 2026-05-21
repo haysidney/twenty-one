@@ -17,8 +17,9 @@ public class EdgeSolverTests
         PayoutRatio bj = PayoutRatio.ThreeToTwo,
         PayoutRatio charlie = PayoutRatio.ThreeToTwo,
         FiveCardCharlieRule cr = FiveCardCharlieRule.Disabled,
-        bool s17 = false)
-        => new(bj, charlie, cr, s17);
+        bool s17 = false,
+        bool das = true)
+        => new(bj, charlie, cr, s17, das);
 
     [Fact]
     public void H17_3to2_NoCharlie_EdgeInPublishedRange()
@@ -59,6 +60,17 @@ public class EdgeSolverTests
             Rules(charlie: PayoutRatio.ThreeToTwo, cr: FiveCardCharlieRule.BeatsAll));
         _out.WriteLine($"Charlie off = {off * 100:F4}%, BeatsAll@3:2 = {beat * 100:F4}%");
         Assert.True(beat < off, "Charlie should reduce house edge");
+    }
+
+    [Fact]
+    public void NoDAS_IncreasesEdge_VsDAS()
+    {
+        var das    = EdgeSolver.ComputeHouseEdge(Rules(das: true));
+        var noDAS  = EdgeSolver.ComputeHouseEdge(Rules(das: false));
+        _out.WriteLine($"DAS = {das * 100:F4}%, no-DAS = {noDAS * 100:F4}%, delta = {(noDAS - das) * 100:F4}%");
+        // Published delta is ~+0.14% (no-DAS is worse for the player).
+        Assert.True(noDAS > das, "Disallowing DAS should raise the house edge");
+        Assert.InRange(noDAS - das, 0.0005, 0.0025);
     }
 
     [Fact]

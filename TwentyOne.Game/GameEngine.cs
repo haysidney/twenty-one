@@ -146,9 +146,11 @@ public static class GameEngine
         hand.Bet.Length > 0 ? ParseBet(hand.Bet) : ParseBet(player.Bet);
 
     // Double is allowed on any 2-card Playing hand that hasn't already been doubled,
-    // provided the effective bet is numeric.
-    public static bool CanDouble(Hand hand, string playerBet) =>
+    // provided the effective bet is numeric. When doubleAfterSplit is false, the
+    // hand must not originate from a split.
+    public static bool CanDouble(Hand hand, string playerBet, bool doubleAfterSplit) =>
         hand.Cards.Length == 2 && hand.State == HandState.Playing && !hand.Doubled
+        && (doubleAfterSplit || !hand.IsFromSplit)
         && (hand.Bet.Length > 0 ? ParseBet(hand.Bet) : ParseBet(playerBet)) > 0;
 
     // Split is allowed on any 2-card Playing hand where both cards share the same rank.
@@ -354,14 +356,14 @@ public static class GameEngine
             if (!string.IsNullOrWhiteSpace(text)) Effects.Add(new SendChat(text));
         }
 
-        public void NarratePlayerTurn(int pi, int hi, ImmutableArray<Player> players, Hand dealerHand)
+        public void NarratePlayerTurn(int pi, int hi, ImmutableArray<Player> players, Hand dealerHand, bool doubleAfterSplit)
         {
             if (pi < 0 || pi >= players.Length) return;
             var player = players[pi];
             if (hi < 0 || hi >= player.Hands.Length) return;
             var hand = player.Hands[hi];
             if (hand.Cards.Length < 2) return;
-            var cd = CanDouble(hand, player.Bet);
+            var cd = CanDouble(hand, player.Bet, doubleAfterSplit);
             var cs = CanSplit(hand);
             var actions = ValidActionsString(hand, cd, cs);
             var name = player.Hands.Length > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
@@ -554,7 +556,7 @@ public static class GameEngine
                 }
                 else if (prevCardCount == 1)
                 {
-                    ctx.NarratePlayerTurn(pi, hi, newPlayers, state.DealerHand);
+                    ctx.NarratePlayerTurn(pi, hi, newPlayers, state.DealerHand, state.DoubleAfterSplit);
                 }
             }
         }
@@ -605,7 +607,7 @@ public static class GameEngine
                 ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
             if (newHand.State == HandState.Playing && pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
             {
-                var cd2 = CanDouble(newHand, state.Players[pi].Bet);
+                var cd2 = CanDouble(newHand, state.Players[pi].Bet, state.DoubleAfterSplit);
                 var cs2 = CanSplit(newHand);
                 ctx.Narrate(t.PlayerAfterHit,
                     ("name",    displayName),
@@ -731,7 +733,7 @@ public static class GameEngine
 
     private static GameState HandleAnnouncePlayerTurn(GameState state, AnnouncePlayerTurn a, NarrationContext ctx)
     {
-        ctx.NarratePlayerTurn(a.PlayerIndex, a.HandIndex, state.Players, state.DealerHand);
+        ctx.NarratePlayerTurn(a.PlayerIndex, a.HandIndex, state.Players, state.DealerHand, state.DoubleAfterSplit);
         return state;
     }
 
@@ -924,7 +926,7 @@ public static class GameEngine
         var waitDealer = nextPhase == GamePhase.DealerTurn && !CanGoToPayout(provisionalDealer);
         var waitNext   = false;
         if (nextPhase == GamePhase.PlayerTurns)
-            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
+            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand, state.DoubleAfterSplit);
         if (waitDealer) nextPhase = GamePhase.DealerTurn;
         return state with
         {
@@ -983,7 +985,7 @@ public static class GameEngine
             };
         }
         else
-            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand);
+            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand, state.DoubleAfterSplit);
 
         return state with
         {

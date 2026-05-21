@@ -105,6 +105,15 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When off (default), dealer hits soft 17 (H17). When on, dealer stands on soft 17 (S17).\nApplies to the next round - mid-round changes do not affect the running round.");
 
+        var das = config.DoubleAfterSplit;
+        if (ImGui.Checkbox("Allow double after split", ref das))
+        {
+            config.DoubleAfterSplit = das;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("When on (default), the player may double down on a hand created by splitting.\nWhen off, only non-split hands can be doubled.\nApplies to the next round.");
+
         DrawHouseEdgeControl();
 
         ImGui.Spacing();
@@ -245,7 +254,8 @@ public class ConfigWindow : Window, IDisposable
             config.BjPayout,
             config.CharliePayout,
             config.FiveCardCharlie,
-            config.DealerStandsOnSoft17);
+            config.DealerStandsOnSoft17,
+            config.DoubleAfterSplit);
 
         if (_cachedHouseEdge.HasValue && !_cachedEdgeRules.Equals(rules))
             _cachedHouseEdge = null;

@@ -8,7 +8,8 @@ public readonly record struct EdgeRules(
     PayoutRatio BjPayout,
     PayoutRatio CharliePayout,
     FiveCardCharlieRule FiveCardCharlie,
-    bool DealerStandsOnSoft17 = false);
+    bool DealerStandsOnSoft17 = false,
+    bool DoubleAfterSplit = true);
 
 public enum OptimalAction
 {
@@ -208,7 +209,7 @@ public static class EdgeSolver
             double hitEV = HitEVInternal(total, isSoft, numCards, isFromSplit, upcard);
             if (hitEV > best) best = hitEV;
 
-            if (numCards == 2)
+            if (numCards == 2 && (_rules.DoubleAfterSplit || !isFromSplit))
             {
                 double doubled = DoubleEVInternal(total, isSoft, upcard);
                 if (doubled > best) best = doubled;

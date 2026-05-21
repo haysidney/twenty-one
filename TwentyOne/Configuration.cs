@@ -94,6 +94,7 @@ public class VenueSettings
     public PayoutRatio         CharliePayout        { get; set; } = PayoutRatio.EvenMoney;
     public FiveCardCharlieRule FiveCardCharlie      { get; set; } = FiveCardCharlieRule.Disabled;
     public bool                DealerStandsOnSoft17 { get; set; } = false;
+    public bool                DoubleAfterSplit     { get; set; } = true;
 }
 
 [Serializable]
@@ -161,6 +162,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public PayoutRatio         CharliePayout        { get => ActiveVenue.CharliePayout;        set => ActiveVenue.CharliePayout = value; }
     [JsonIgnore] public FiveCardCharlieRule FiveCardCharlie      { get => ActiveVenue.FiveCardCharlie;      set => ActiveVenue.FiveCardCharlie = value; }
     [JsonIgnore] public bool                DealerStandsOnSoft17 { get => ActiveVenue.DealerStandsOnSoft17; set => ActiveVenue.DealerStandsOnSoft17 = value; }
+    [JsonIgnore] public bool                DoubleAfterSplit     { get => ActiveVenue.DoubleAfterSplit;     set => ActiveVenue.DoubleAfterSplit = value; }
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 
@@ -176,6 +178,7 @@ public class Configuration : IPluginConfiguration
         GameState.CharliePayout        = ActiveVenue.CharliePayout;
         GameState.FiveCardCharlie      = ActiveVenue.FiveCardCharlie;
         GameState.DealerStandsOnSoft17 = ActiveVenue.DealerStandsOnSoft17;
+        GameState.DoubleAfterSplit     = ActiveVenue.DoubleAfterSplit;
     }
 
     /// <summary>

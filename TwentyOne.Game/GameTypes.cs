@@ -85,6 +85,9 @@ public sealed record class GameState
     public FiveCardCharlieRule FiveCardCharlie { get; set; } = FiveCardCharlieRule.Disabled;
     // When true, dealer stands on soft 17 (S17). When false (default), dealer hits soft 17 (H17).
     public bool DealerStandsOnSoft17 { get; set; } = false;
+    // When true (default), the player may double after splitting. When false, doubling
+    // is restricted to non-split hands.
+    public bool DoubleAfterSplit { get; set; } = true;
     // FullNames (or Nicknames for manual players) of players who won last round.
     public HashSet<string> LastRoundWinners { get; set; } = [];
     // FullNames (or Nicknames for manual players) of players who pushed last round.
