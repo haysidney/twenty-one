@@ -2653,6 +2653,19 @@ public class BankLedgerTests
         Assert.Equal(1000, bal);
     }
 
+    [Fact]
+    public void Surrender_IncreasesBalance_AndLabelsCorrectly()
+    {
+        // After a surrender of bet 100: deal-start BankBet(100) leaves bank at 900,
+        // settlement BankSurrender(50) refunds half. Net: bank = 950 (-50 vs start).
+        var (afterBet, _) = Apply(1000, new BankBet(100));
+        Assert.Equal(900, afterBet);
+        var (afterRefund, entry) = Apply(afterBet, new BankSurrender(50));
+        Assert.Equal(950, afterRefund);
+        Assert.Equal(BankTransactionKind.Surrender, entry.Kind);
+        Assert.Equal(50, entry.Amount);
+    }
+
     // ── Debits - normal ────────────────────────────────────────────────────────
 
     [Fact]

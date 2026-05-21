@@ -1072,7 +1072,7 @@ public partial class MainWindow
                 {
                     var entry    = log[li];
                     // BetAdjust stores a signed delta: negative means bet decreased → bank refunded.
-                    var isCredit = entry.Kind is BankTransactionKind.Deposit or BankTransactionKind.Win
+                    var isCredit = entry.Kind is BankTransactionKind.Deposit or BankTransactionKind.Win or BankTransactionKind.Surrender
                                 || (entry.Kind == BankTransactionKind.BetAdjust && entry.Amount < 0);
                     ImGui.TableNextRow();
                     ImGui.TableSetColumnIndex(0); ImGui.TextUnformatted(entry.Timestamp.ToString("HH:mm"));
@@ -1085,6 +1085,7 @@ public partial class MainWindow
                         BankTransactionKind.DoubleDown => "Double",
                         BankTransactionKind.Split      => "Split",
                         BankTransactionKind.BetAdjust  => "Bet Adj",
+                        BankTransactionKind.Surrender  => "Surrender",
                         _                              => "?"
                     });
                     ImGui.TableSetColumnIndex(2);

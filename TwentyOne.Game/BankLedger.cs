@@ -2,7 +2,7 @@ using System;
 
 namespace TwentyOne.Game;
 
-public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split, BetAdjust }
+public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split, BetAdjust, Surrender }
 
 [Serializable]
 public class BankTransactionEntry
@@ -25,6 +25,10 @@ public record BankSplit(long Amount)      : IBankTransaction;
 // Signed delta: positive deducts from bank (bet increased), negative refunds (bet decreased).
 // The recorded Amount keeps the sign so the audit log shows the direction.
 public record BankBetAdjust(long Delta)   : IBankTransaction;
+// Half-bet refund at settlement when the player surrendered. Amount is the gil
+// returned to the bank (bet - ceil(bet/2)); the half-loss was already debited
+// by the original BankBet at deal start.
+public record BankSurrender(long Amount)  : IBankTransaction;
 
 public static class BankLedger
 {
@@ -44,6 +48,7 @@ public static class BankLedger
             BankDoubleDown d => (Math.Max(0, balance - d.Amount), BankTransactionKind.DoubleDown, d.Amount),
             BankSplit      s => (Math.Max(0, balance - s.Amount), BankTransactionKind.Split,      s.Amount),
             BankBetAdjust  a => (Math.Max(0, balance - a.Delta),  BankTransactionKind.BetAdjust,  a.Delta),
+            BankSurrender  s => (balance + s.Amount,              BankTransactionKind.Surrender,  s.Amount),
             _                => throw new ArgumentOutOfRangeException(nameof(tx)),
         };
 

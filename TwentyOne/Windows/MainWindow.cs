@@ -371,7 +371,16 @@ public partial class MainWindow : Window, IDisposable
                 net2 += GameEngine.PayoutTotalOwed(state, pi2, hi2);
             var winAmt2 = (long)Math.Round(net2);
             if (winAmt2 > 0)
-                ApplyBank(stat2, new BankWin(winAmt2));
+            {
+                // Surrender is mutually exclusive with split (CanSurrender requires
+                // !IsFromSplit), so a surrendered player has exactly one hand.
+                var isSurrender = p2.Hands.Length == 1
+                               && p2.Hands[0].State == HandState.Surrendered;
+                IBankTransaction tx = isSurrender
+                    ? new BankSurrender(winAmt2)
+                    : new BankWin(winAmt2);
+                ApplyBank(stat2, tx);
+            }
             playerBanksSnapshot[key2] = stat2.Bank;
         }
 
