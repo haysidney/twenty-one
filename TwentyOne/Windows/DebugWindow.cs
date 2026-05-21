@@ -231,20 +231,19 @@ public class DebugWindow : Window
         _playlistIndex = _playlist.IndexOf(path);
         _playlistFile  = Path.GetFileName(path);
 
-        // Build initial GameState: Betting phase with players set. Each rule
-        // override falls back to the active venue (so a scenario inherits the
-        // dealer's current rules unless it pins one explicitly).
-        var state = new GameState
-        {
-            BjPayout             = file.BjPayout             ?? config.BjPayout,
-            FiveCardCharlie      = file.FiveCardCharlie      ?? config.FiveCardCharlie,
-            CharliePayout        = file.CharliePayout        ?? config.CharliePayout,
-            DealerStandsOnSoft17 = file.DealerStandsOnSoft17 ?? config.DealerStandsOnSoft17,
-            DoubleAfterSplit     = file.DoubleAfterSplit     ?? config.DoubleAfterSplit,
-            HitSplitAces         = file.HitSplitAces         ?? config.HitSplitAces,
-            ResplitAces          = file.ResplitAces          ?? config.ResplitAces,
-            AllowSurrender       = file.AllowSurrender       ?? config.AllowSurrender,
-        };
+        // Build initial GameState: Betting phase with players set. Scenarios use
+        // the type defaults (3:2, EvenMoney, Disabled, H17, DAS-on, others off)
+        // for any rule the JSON does not pin explicitly, so a scenario is
+        // reproducible regardless of the dealer's current venue rules.
+        var state = new GameState();
+        if (file.BjPayout.HasValue)             state.BjPayout             = file.BjPayout.Value;
+        if (file.CharliePayout.HasValue)        state.CharliePayout        = file.CharliePayout.Value;
+        if (file.FiveCardCharlie.HasValue)      state.FiveCardCharlie      = file.FiveCardCharlie.Value;
+        if (file.DealerStandsOnSoft17.HasValue) state.DealerStandsOnSoft17 = file.DealerStandsOnSoft17.Value;
+        if (file.DoubleAfterSplit.HasValue)     state.DoubleAfterSplit     = file.DoubleAfterSplit.Value;
+        if (file.HitSplitAces.HasValue)         state.HitSplitAces         = file.HitSplitAces.Value;
+        if (file.ResplitAces.HasValue)          state.ResplitAces          = file.ResplitAces.Value;
+        if (file.AllowSurrender.HasValue)       state.AllowSurrender       = file.AllowSurrender.Value;
         foreach (var sp in file.Players ?? [])
         {
             (state, _) = GameEngine.Apply(state, new AddPlayer(sp.Name));

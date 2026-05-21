@@ -54,7 +54,7 @@ All debug tooling is `#if DEBUG` - absent in Release builds. Enable via the **De
 }
 ```
 
-Each rule override is optional; omitted fields inherit from the active venue.
+Each rule override is optional; omitted fields use the standard defaults (3:2 BJ, EvenMoney Charlie, Charlie disabled, H17, DAS-on, no HSA / RSA / Surrender). Scenarios are intentionally insulated from the active venue's rules so they stay reproducible.
 
 **Action strings:**
 
