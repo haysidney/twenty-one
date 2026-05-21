@@ -12,7 +12,8 @@ public readonly record struct EdgeRules(
     bool DoubleAfterSplit = true,
     bool HitSplitAces = false,
     bool ResplitAces = false,
-    bool AllowSurrender = false);
+    bool AllowSurrender = false,
+    ResplitCap ResplitCap = ResplitCap.Max4);
 
 public enum OptimalAction
 {
@@ -372,10 +373,37 @@ public static class EdgeSolver
                 if (c == card) hEq = playEV;
                 else           hNeq += sub * playEV;
             }
-            double sNoReSplit = hNeq + hEq / 13.0;
-            double sReSplit   = (13.0 / 11.0) * hNeq;
-            double single     = Math.Max(sNoReSplit, sReSplit);
+
+            // Unlimited resplits: closed-form fixed-point of S = H_neq + (1/13)*max(H_eq, 2S).
+            // Bounded cap: unroll the recursion. Top-level budget = cap-2 additional splits
+            // per subtree (initial split consumed 1, 2 hands now exist). The recursion is
+            // a tree-model approximation - children of a split each get budget-1 rather than
+            // sharing a single pool - which over-counts only when both branches hit pairs at
+            // the same depth (probability scales with (1/13)^depth, negligible at any cap).
+            int? capHands = Game.GameEngine.ResplitCapHands(_rules.ResplitCap);
+            double single;
+            if (capHands is null)
+            {
+                double sNoReSplit = hNeq + hEq / 13.0;
+                double sReSplit   = (13.0 / 11.0) * hNeq;
+                single = Math.Max(sNoReSplit, sReSplit);
+            }
+            else
+            {
+                single = EvalSplitBounded(capHands.Value - 2, hNeq, hEq, sub);
+            }
             return 2.0 * single;
+        }
+
+        // EV of one freshly-split (non-ace) hand with `budget` additional splits allowed
+        // for this subtree. hNeq/hEq are the precomputed play EVs for "drew a non-matching
+        // card" and "drew a matching card", respectively.
+        private static double EvalSplitBounded(int budget, double hNeq, double hEq, double sub)
+        {
+            if (budget <= 0) return hNeq + hEq * sub;
+            double splitAgain = 2.0 * EvalSplitBounded(budget - 1, hNeq, hEq, sub);
+            double decision   = Math.Max(hEq, splitAgain);
+            return hNeq + sub * decision;
         }
 
         // ── Outcome EV given player terminal state ─────────────────────────────

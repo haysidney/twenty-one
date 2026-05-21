@@ -41,6 +41,7 @@ All debug tooling is `#if DEBUG` - absent in Release builds. Enable via the **De
   "doubleAfterSplit": true,
   "hitSplitAces": false,
   "resplitAces": false,
+  "resplitCap": "Max4",
   "allowSurrender": false,
   "actions": [
     "StartDeal",
@@ -54,7 +55,7 @@ All debug tooling is `#if DEBUG` - absent in Release builds. Enable via the **De
 }
 ```
 
-Each rule override is optional; omitted fields use the standard defaults (3:2 BJ, EvenMoney Charlie, Charlie disabled, H17, DAS-on, no HSA / RSA / Surrender). Scenarios are intentionally insulated from the active venue's rules so they stay reproducible.
+Each rule override is optional; omitted fields use the standard defaults (3:2 BJ, EvenMoney Charlie, Charlie disabled, H17, DAS-on, no HSA / RSA / Surrender, ResplitCap Max4). Scenarios are intentionally insulated from the active venue's rules so they stay reproducible.
 
 **Action strings:**
 
@@ -309,7 +310,7 @@ The old `GameEngine.With(...)` optional-parameter helper has been removed.
 - Double Down and Split require additional funds before they take effect. The UI tracks this as `pendingDouble`/`pendingSplit` (not in `GameState`). Clicking Dbl/Spl fires `AnnounceDouble`/`AnnounceSplit` (which picks a bank-covers or trade-required narration template based on current bank balance) and optionally opens the trade window. The actual `DoubleDown`/`SplitHand` action fires only after the dealer clicks Confirm. Bank deduction via `BankLedger` happens at Confirm time so any mid-round deposits land first.
 - Bet adjustment during the Deal phase (between Start Deal and Begin Player Turns): the dealer can click "Adjust" next to a player's bet to change it after cards have started dealing. `MainWindow.TryAdjustBet` computes the delta vs. the prior bet, validates bank can cover an increase (shortfall blocks the commit), applies a single `BankBetAdjust(delta)` ledger entry, then dispatches an `AdjustBet` action. The `AdjustBet` action has `PushesUndo => false` - bank entries are append-only, so a state-only revert would diverge from the ledger. Only allowed in `GamePhase.Deal`; sitting-out players are ignored. Cleared on `NewRound` and `BeginPlayerTurns`.
 - `AnnounceDouble` and `AnnounceSplit` are excluded from the undo stack (like `AnnounceBettingOpen`).
-- Split rules: re-splits allowed (no limit); 21 on a split hand (`IsFromSplit=true`) is Playing/Stand, never Blackjack; split aces receive exactly one card then auto-stand (standard casino rule, see ToDo.txt for variant note).
+- Split rules: re-splits are bounded by `ResplitCap` (default Max4 - i.e., up to 4 hands total). Aces are exempt from the numeric cap and gated solely by `ResplitAces`. 21 on a split hand (`IsFromSplit=true`) is Playing/Stand, never Blackjack; split aces receive exactly one card then auto-stand (standard casino rule, see ToDo.txt for variant note).
 - Payout is calculated per-hand. `Hand.Bet` holds the effective bet when a hand has been doubled (empty = inherit `Player.Bet`).
 - `WaitingForDealer` must never be set unconditionally when transitioning to `DealerTurn`. Always derive it as `!CanGoToPayout(provisionalDealerState)`. This ensures special cases (all-bust, all-BJ, all-Charlie, or mixed terminal winning hands with safe upcard) skip the "Begin Dealer Turn" prompt and show "Go to Payout" directly. `CanGoToPayout` is the single source of truth for whether the dealer still needs to act.
 - All-bust: `AdvanceFrom` returns `GamePhase.Payout`; the engine maps this to `DealerTurn` with `WaitingForDealer=false`. The dealer Hit button and recommendation label are suppressed when all hands are bust. `CanGoToPayout` returns `true` immediately for all-bust.

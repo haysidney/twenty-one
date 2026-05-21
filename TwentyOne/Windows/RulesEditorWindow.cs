@@ -32,6 +32,7 @@ public class RulesEditorWindow : Window
     private double?   _edgeBjPayoutAtDefault;
     private double?   _edgeFiveCardCharlieAtDefault;
     private double?   _edgeCharliePayoutAtDefault;
+    private double?   _edgeResplitCapAtDefault;
     private EdgeRules _cachedEdgeRules;
 
     public override void Draw()
@@ -131,6 +132,21 @@ public class RulesEditorWindow : Window
             ImGui.SetTooltip("When on, a pair of aces produced by an earlier split may be split again.\nWhen off (default), split-ace pairs cannot be resplit.");
         DrawDefaultDelta(_edgeRSAAtDefault, "off");
 
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text("Resplit cap");
+        ImGui.SameLine();
+        var capOptions = new[] { "Max 2 hands", "Max 3 hands", "Max 4 hands", "Unlimited" };
+        var capIdx     = (int)config.ResplitCap;
+        ImGui.SetNextItemWidth(140);
+        if (ImGui.Combo("##resplitcap", ref capIdx, capOptions, capOptions.Length))
+        {
+            config.ResplitCap = (ResplitCap)capIdx;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Maximum number of hands a non-ace pair may be split into.\nAces ignore this cap and follow the Resplit aces toggle.");
+        DrawDefaultDelta(_edgeResplitCapAtDefault, "Max 4 hands");
+
         var surrender = config.AllowSurrender;
         if (ImGui.Checkbox("Allow surrender", ref surrender))
         {
@@ -159,6 +175,7 @@ public class RulesEditorWindow : Window
             config.DoubleAfterSplit     = defaults.DoubleAfterSplit;
             config.HitSplitAces         = defaults.HitSplitAces;
             config.ResplitAces          = defaults.ResplitAces;
+            config.ResplitCap           = defaults.ResplitCap;
             config.AllowSurrender       = defaults.AllowSurrender;
             config.Save();
         }
@@ -177,7 +194,8 @@ public class RulesEditorWindow : Window
             config.DoubleAfterSplit,
             config.HitSplitAces,
             config.ResplitAces,
-            config.AllowSurrender);
+            config.AllowSurrender,
+            config.ResplitCap);
 
         if (_cachedHouseEdge.HasValue && _cachedEdgeRules.Equals(rules)) return;
 
@@ -208,6 +226,9 @@ public class RulesEditorWindow : Window
         _edgeCharliePayoutAtDefault = rules.CharliePayout == PayoutRatio.EvenMoney
             ? null
             : EdgeSolver.ComputeHouseEdge(rules with { CharliePayout = PayoutRatio.EvenMoney });
+        _edgeResplitCapAtDefault = rules.ResplitCap == ResplitCap.Max4
+            ? null
+            : EdgeSolver.ComputeHouseEdge(rules with { ResplitCap = ResplitCap.Max4 });
 
         _cachedEdgeRules = rules;
     }

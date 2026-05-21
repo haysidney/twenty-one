@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TwentyOne.Game;
+using TwentyOne.Game.Edge;
 using TwentyOne.Tests.Helpers;
 using Xunit;
 
@@ -1049,6 +1050,7 @@ public class VenueRulesDontLeakTests
         .DoubleAfterSplit(false)
         .HitSplitAces()
         .ResplitAces()
+        .ResplitCap(ResplitCap.Max2)
         .AllowSurrender()
         .Phase(GamePhase.PlayerTurns)
         .ActiveHand(0, 0)
@@ -1064,6 +1066,7 @@ public class VenueRulesDontLeakTests
         Assert.Equal(a.DoubleAfterSplit,     b.DoubleAfterSplit);
         Assert.Equal(a.HitSplitAces,         b.HitSplitAces);
         Assert.Equal(a.ResplitAces,          b.ResplitAces);
+        Assert.Equal(a.ResplitCap,           b.ResplitCap);
         Assert.Equal(a.AllowSurrender,       b.AllowSurrender);
     }
 
@@ -1644,7 +1647,7 @@ public class SplitHandTests
     public void CanSplit_SameValue_True()
     {
         var hand = new Hand { Cards = [8, 8], State = HandState.Playing };
-        Assert.True(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.True(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: false, ResplitCap.Unlimited));
     }
 
     [Fact]
@@ -1652,7 +1655,7 @@ public class SplitHandTests
     {
         // Q+Q: same rank, split allowed
         var hand = new Hand { Cards = [12, 12], State = HandState.Playing };
-        Assert.True(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.True(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: false, ResplitCap.Unlimited));
     }
 
     [Fact]
@@ -1660,14 +1663,14 @@ public class SplitHandTests
     {
         // 10+Q: both worth 10 but different rank, no split
         var hand = new Hand { Cards = [10, 12], State = HandState.Playing };
-        Assert.False(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.False(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: false, ResplitCap.Unlimited));
     }
 
     [Fact]
     public void CanSplit_DifferentValues_False()
     {
         var hand = new Hand { Cards = [7, 8], State = HandState.Playing };
-        Assert.False(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.False(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: false, ResplitCap.Unlimited));
     }
 
     [Fact]
@@ -1675,14 +1678,14 @@ public class SplitHandTests
     {
         // Pair of aces produced by an earlier split, RSA off.
         var hand = new Hand { Cards = [1, 1], State = HandState.Playing, IsFromSplit = true };
-        Assert.False(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.False(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: false, ResplitCap.Unlimited));
     }
 
     [Fact]
     public void CanSplit_SplitAcePair_True_WhenRsaAllowed()
     {
         var hand = new Hand { Cards = [1, 1], State = HandState.Playing, IsFromSplit = true };
-        Assert.True(GameEngine.CanSplit(hand, resplitAces: true));
+        Assert.True(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: true, ResplitCap.Unlimited));
     }
 
     [Fact]
@@ -1690,8 +1693,8 @@ public class SplitHandTests
     {
         // First-time pair of aces (not from a previous split). Always splittable.
         var hand = new Hand { Cards = [1, 1], State = HandState.Playing, IsFromSplit = false };
-        Assert.True(GameEngine.CanSplit(hand, resplitAces: false));
-        Assert.True(GameEngine.CanSplit(hand, resplitAces: true));
+        Assert.True(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: false, ResplitCap.Unlimited));
+        Assert.True(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: true, ResplitCap.Unlimited));
     }
 
     [Fact]
@@ -1774,7 +1777,7 @@ public class SplitHandTests
     {
         // A split hand that ends up with two equal-value cards can split again
         var hand = new Hand { Cards = [8, 8], State = HandState.Playing, IsFromSplit = true };
-        Assert.True(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.True(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: false, ResplitCap.Unlimited));
     }
 
     [Fact]
@@ -3298,7 +3301,7 @@ public class RuleInteractionTests
         var ns = BuildSplitAcePair(hsa: false, rsa: false);
         var hand = ns.Players[0].Hands[0];
         Assert.Equal(HandState.Stand, hand.State);
-        Assert.False(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.False(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: false, ResplitCap.Unlimited));
         Assert.False(GameEngine.CanHit(hand, hitSplitAces: false));
     }
 
@@ -3308,7 +3311,7 @@ public class RuleInteractionTests
         var ns = BuildSplitAcePair(hsa: true, rsa: false);
         var hand = ns.Players[0].Hands[0];
         Assert.Equal(HandState.Playing, hand.State);
-        Assert.False(GameEngine.CanSplit(hand, resplitAces: false));
+        Assert.False(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: false, ResplitCap.Unlimited));
         Assert.True(GameEngine.CanHit(hand, hitSplitAces: true));
         Assert.True(GameEngine.CanStand(hand));
     }
@@ -3319,7 +3322,7 @@ public class RuleInteractionTests
         var ns = BuildSplitAcePair(hsa: false, rsa: true);
         var hand = ns.Players[0].Hands[0];
         Assert.Equal(HandState.Playing, hand.State);
-        Assert.True(GameEngine.CanSplit(hand, resplitAces: true));
+        Assert.True(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: true, ResplitCap.Unlimited));
         Assert.False(GameEngine.CanHit(hand, hitSplitAces: false));
         Assert.True(GameEngine.CanStand(hand));
     }
@@ -3330,7 +3333,7 @@ public class RuleInteractionTests
         var ns = BuildSplitAcePair(hsa: true, rsa: true);
         var hand = ns.Players[0].Hands[0];
         Assert.Equal(HandState.Playing, hand.State);
-        Assert.True(GameEngine.CanSplit(hand, resplitAces: true));
+        Assert.True(GameEngine.CanSplit(hand, new Player { Hands = [hand] }, resplitAces: true, ResplitCap.Unlimited));
         Assert.True(GameEngine.CanHit(hand, hitSplitAces: true));
         Assert.True(GameEngine.CanStand(hand));
     }
@@ -3425,5 +3428,109 @@ public class RuleInteractionTests
             .Build();
         Assert.False(GameEngine.CanHitDealer(state));
         Assert.True(GameEngine.CanGoToPayout(state));
+    }
+}
+
+public class ResplitCapTests
+{
+    // Helper: build a player who already holds `handCount` Playing pair hands of
+    // the same rank. Used to test the cap independently of the deal sequence.
+    private static Player PairPlayer(int rank, int handCount, bool fromSplit = true)
+    {
+        var hands = new Hand[handCount];
+        for (var i = 0; i < handCount; i++)
+            hands[i] = new Hand { Cards = [rank, rank], State = HandState.Playing, IsFromSplit = fromSplit };
+        return new Player { Nickname = "Lorah", Bet = "100", Hands = [..hands] };
+    }
+
+    [Theory]
+    [InlineData(ResplitCap.Max2, 2, false)]
+    [InlineData(ResplitCap.Max3, 2, true)]
+    [InlineData(ResplitCap.Max3, 3, false)]
+    [InlineData(ResplitCap.Max4, 3, true)]
+    [InlineData(ResplitCap.Max4, 4, false)]
+    [InlineData(ResplitCap.Unlimited, 8, true)]
+    public void NonAce_CapBlocksAtLimit(ResplitCap cap, int existingHands, bool expectCanSplit)
+    {
+        var player = PairPlayer(rank: 8, handCount: existingHands);
+        var hand   = player.Hands[0];
+        Assert.Equal(expectCanSplit,
+            GameEngine.CanSplit(hand, player, resplitAces: false, cap));
+    }
+
+    [Theory]
+    [InlineData(ResplitCap.Max2)]
+    [InlineData(ResplitCap.Max3)]
+    [InlineData(ResplitCap.Max4)]
+    public void Aces_IgnoreCap_WhenRsaOn(ResplitCap cap)
+    {
+        // Player already has 8 ace hands - far above any numeric cap. With RSA on,
+        // splitting must still be allowed: aces are governed only by ResplitAces.
+        var player = PairPlayer(rank: 1, handCount: 8);
+        var hand   = player.Hands[0];
+        Assert.True(GameEngine.CanSplit(hand, player, resplitAces: true, cap));
+    }
+
+    [Theory]
+    [InlineData(ResplitCap.Max2)]
+    [InlineData(ResplitCap.Max4)]
+    [InlineData(ResplitCap.Unlimited)]
+    public void Aces_RsaOff_NoResplitRegardlessOfCap(ResplitCap cap)
+    {
+        // A from-split ace pair with RSA off: never splittable, regardless of cap.
+        var player = PairPlayer(rank: 1, handCount: 2);
+        var hand   = player.Hands[0];
+        Assert.False(GameEngine.CanSplit(hand, player, resplitAces: false, cap));
+    }
+
+    [Fact]
+    public void OriginalAcePair_AlwaysSplittable_RegardlessOfCap()
+    {
+        // First-time ace pair (not from a previous split): always splittable, even
+        // with a strict cap and RSA off.
+        var player = new Player
+        {
+            Nickname = "Lorah", Bet = "100",
+            Hands = [new Hand { Cards = [1, 1], State = HandState.Playing, IsFromSplit = false }],
+        };
+        Assert.True(GameEngine.CanSplit(player.Hands[0], player, resplitAces: false, ResplitCap.Max2));
+    }
+
+    // Solver: edge should be monotonically non-increasing (in house-favor terms)
+    // as the cap loosens. Tighter cap removes player options, so house edge rises.
+    [Fact]
+    public void SolverEdge_MonotonicWithCap()
+    {
+        EdgeRules Make(ResplitCap cap) => new(
+            BjPayout: 1.5,
+            CharliePayout: PayoutRatio.EvenMoney,
+            FiveCardCharlie: FiveCardCharlieRule.Disabled,
+            ResplitCap: cap);
+
+        var e2 = EdgeSolver.ComputeHouseEdge(Make(ResplitCap.Max2));
+        var e3 = EdgeSolver.ComputeHouseEdge(Make(ResplitCap.Max3));
+        var e4 = EdgeSolver.ComputeHouseEdge(Make(ResplitCap.Max4));
+        var eu = EdgeSolver.ComputeHouseEdge(Make(ResplitCap.Unlimited));
+
+        Assert.True(e2 >= e3, $"Max2 ({e2}) should be >= Max3 ({e3})");
+        Assert.True(e3 >= e4, $"Max3 ({e3}) should be >= Max4 ({e4})");
+        Assert.True(e4 >= eu, $"Max4 ({e4}) should be >= Unlimited ({eu})");
+    }
+
+    // Solver: the difference between Max4 and Unlimited is small (<0.05% on
+    // standard rules). Sanity check that the tree-model approximation isn't blowing up.
+    [Fact]
+    public void SolverEdge_Max4_CloseToUnlimited()
+    {
+        var rules = new EdgeRules(
+            BjPayout: 1.5,
+            CharliePayout: PayoutRatio.EvenMoney,
+            FiveCardCharlie: FiveCardCharlieRule.Disabled);
+
+        var e4 = EdgeSolver.ComputeHouseEdge(rules with { ResplitCap = ResplitCap.Max4 });
+        var eu = EdgeSolver.ComputeHouseEdge(rules with { ResplitCap = ResplitCap.Unlimited });
+
+        Assert.True(Math.Abs(e4 - eu) < 0.001,
+            $"Max4 ({e4:P4}) should be within 0.1% of Unlimited ({eu:P4})");
     }
 }

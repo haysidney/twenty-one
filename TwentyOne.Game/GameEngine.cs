@@ -160,13 +160,32 @@ public static class GameEngine
         && (hand.Bet.Length > 0 ? ParseBet(hand.Bet) : ParseBet(playerBet)) > 0;
 
     // Split is allowed on any 2-card Playing hand where both cards share the same rank.
-    // Re-splits (splitting a split hand) are supported. Re-splitting aces requires the
-    // resplitAces flag: a pair of aces from a previous split cannot be split again
-    // unless RSA is enabled.
-    public static bool CanSplit(Hand hand, bool resplitAces) =>
-        hand.Cards.Length == 2 && hand.State == HandState.Playing
-        && hand.Cards[0] == hand.Cards[1]
-        && (resplitAces || !(hand.IsFromSplit && hand.Cards[0] == 1));
+    // Re-splits are supported up to the ResplitCap (counts total player hands). Aces
+    // are exempt from the numeric cap and gated solely by ResplitAces: a pair of aces
+    // from a previous split cannot be split again unless RSA is enabled.
+    public static bool CanSplit(Hand hand, Player player, bool resplitAces, ResplitCap cap)
+    {
+        if (hand.State != HandState.Playing) return false;
+        if (hand.Cards.Length != 2) return false;
+        if (hand.Cards[0] != hand.Cards[1]) return false;
+
+        // Aces: governed solely by RSA, no numeric cap.
+        if (hand.Cards[0] == 1)
+            return resplitAces || !hand.IsFromSplit;
+
+        // Non-aces: numeric cap counts total hands the player already has.
+        var limit = ResplitCapHands(cap);
+        return limit is null || player.Hands.Length < limit.Value;
+    }
+
+    // Hand-count limit for the cap. Null = unlimited.
+    public static int? ResplitCapHands(ResplitCap cap) => cap switch
+    {
+        ResplitCap.Max2 => 2,
+        ResplitCap.Max3 => 3,
+        ResplitCap.Max4 => 4,
+        _               => null,
+    };
 
     // Hit is allowed on a Playing hand that already has ≥2 cards (1-card split hands
     // are auto-hit). When hitSplitAces is false, a split-ace hand (IsFromSplit with
@@ -385,7 +404,7 @@ public static class GameEngine
             if (!string.IsNullOrWhiteSpace(text)) Effects.Add(new SendChat(text));
         }
 
-        public void NarratePlayerTurn(int pi, int hi, ImmutableArray<Player> players, Hand dealerHand, bool doubleAfterSplit, bool resplitAces)
+        public void NarratePlayerTurn(int pi, int hi, ImmutableArray<Player> players, Hand dealerHand, bool doubleAfterSplit, bool resplitAces, ResplitCap resplitCap)
         {
             if (pi < 0 || pi >= players.Length) return;
             var player = players[pi];
@@ -393,7 +412,7 @@ public static class GameEngine
             var hand = player.Hands[hi];
             if (hand.Cards.Length < 2) return;
             var cd = CanDouble(hand, player.Bet, doubleAfterSplit);
-            var cs = CanSplit(hand, resplitAces);
+            var cs = CanSplit(hand, player, resplitAces, resplitCap);
             var actions = ValidActionsString(hand, cd, cs);
             var name = player.Hands.Length > 1 ? $"{player.DisplayName} (Hand {hi + 1})" : player.DisplayName;
             Narrate(Templates.PlayerTurnStart,
@@ -589,7 +608,7 @@ public static class GameEngine
                 }
                 else if (prevCardCount == 1)
                 {
-                    ctx.NarratePlayerTurn(pi, hi, newPlayers, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces);
+                    ctx.NarratePlayerTurn(pi, hi, newPlayers, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap);
                 }
             }
         }
@@ -641,7 +660,7 @@ public static class GameEngine
             if (newHand.State == HandState.Playing && pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
             {
                 var cd2 = CanDouble(newHand, state.Players[pi].Bet, state.DoubleAfterSplit);
-                var cs2 = CanSplit(newHand, state.ResplitAces);
+                var cs2 = CanSplit(newHand, state.Players[pi], state.ResplitAces, state.ResplitCap);
                 ctx.Narrate(t.PlayerAfterHit,
                     ("name",    displayName),
                     ("cards",   cards),
@@ -821,7 +840,7 @@ public static class GameEngine
 
     private static GameState HandleAnnouncePlayerTurn(GameState state, AnnouncePlayerTurn a, NarrationContext ctx)
     {
-        ctx.NarratePlayerTurn(a.PlayerIndex, a.HandIndex, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces);
+        ctx.NarratePlayerTurn(a.PlayerIndex, a.HandIndex, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap);
         return state;
     }
 
@@ -1014,7 +1033,7 @@ public static class GameEngine
         var waitDealer = nextPhase == GamePhase.DealerTurn && !CanGoToPayout(provisionalDealer);
         var waitNext   = false;
         if (nextPhase == GamePhase.PlayerTurns)
-            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces);
+            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap);
         if (waitDealer) nextPhase = GamePhase.DealerTurn;
         return state with
         {
@@ -1073,7 +1092,7 @@ public static class GameEngine
             };
         }
         else
-            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces);
+            ctx.NarratePlayerTurn(nextPi, nextHi, state.Players, state.DealerHand, state.DoubleAfterSplit, state.ResplitAces, state.ResplitCap);
 
         return state with
         {

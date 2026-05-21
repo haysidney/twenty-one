@@ -56,8 +56,17 @@ Solutions:
 Pick the max; return 2*S as the total split EV.
 ```
 
-Aces split don't go through this - they auto-stand after one card per the
-engine rule.
+For a finite `ResplitCap`, the closed form is replaced with a depth-bounded
+recursion (`EvalSplitBounded`). The top-level call seeds budget = `cap - 2`
+(initial split consumed 1, 2 hands now exist) and each further split decrements
+the subtree's budget. This is a tree-model approximation - children of a split
+get `budget - 1` rather than sharing a pool - which can over-count splits at
+deeper levels with probability `(1/13)^depth`, well under 0.01% at any
+realistic cap.
+
+Aces split don't go through either branch - they auto-stand after one card per
+the engine rule. The cap also does not apply to aces; they remain gated solely
+by `ResplitAces`.
 
 ### Multipliers and payouts
 
@@ -82,7 +91,7 @@ just the **aggregation** at the end.
 | **Surrender** ✓ implemented (effectively early surrender, since ENHC has no peek) | New action `SurrenderHand`, new `HandState.Surrendered`, new `PayoutResult.Surrender` | Surrender option added to `EvalInitial` at -0.5 EV | Unchanged | ×2 |
 | **Peek toggle** (US-style) | New phase, dealer reveals BJ before player turns when upcard is A or 10 | DealerDist for A/10 upcards conditions on "not BJ" if peek is on; payout resolution changes for non-BJ players vs dealer BJ | Unchanged | ×2 |
 | **Charlie at N cards** (currently 5) | Generalize `ComputeHandState` Charlie check | Generalize the Charlie terminal in `EvalHand` | Unchanged | linear in N range |
-| **Player splits limited to N hands** (currently unlimited) | Track and enforce in `CanSplit` | Replace the fixed-point with a depth-bounded recursion | Tiny | linear in N |
+| **Player splits limited to N hands** ✓ implemented as `ResplitCap` (Max2/Max3/Max4/Unlimited; default Max4). Aces are exempt from the numeric cap and gated by `ResplitAces`. | Cap counts total `player.Hands.Length`; `CanSplit` refuses once at the limit. | Bounded form unrolls `EvalSplitBounded(budget=cap-2)`; Unlimited uses the closed-form fixed-point. Tree-model approximation - each subtree gets `budget-1` rather than sharing a pool - over-counts only at probability `(1/13)^depth`, negligible at any cap. | Tiny | ×4 |
 
 Adding all of S17, DAS toggle, HSA, RSA, peek, surrender = 21 base cells × 64
 combinations = ~1300 cells. At ~50ms per cell that's ~65 seconds for a full

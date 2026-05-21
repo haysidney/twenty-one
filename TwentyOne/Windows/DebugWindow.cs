@@ -28,6 +28,7 @@ public class DebugScenarioFile
     public bool?                     DoubleAfterSplit     { get; set; }
     public bool?                     HitSplitAces         { get; set; }
     public bool?                     ResplitAces          { get; set; }
+    public ResplitCap?               ResplitCap           { get; set; }
     public bool?                     AllowSurrender       { get; set; }
 }
 
@@ -243,6 +244,7 @@ public class DebugWindow : Window
         if (file.DoubleAfterSplit.HasValue)     state.DoubleAfterSplit     = file.DoubleAfterSplit.Value;
         if (file.HitSplitAces.HasValue)         state.HitSplitAces         = file.HitSplitAces.Value;
         if (file.ResplitAces.HasValue)          state.ResplitAces          = file.ResplitAces.Value;
+        if (file.ResplitCap.HasValue)           state.ResplitCap           = file.ResplitCap.Value;
         if (file.AllowSurrender.HasValue)       state.AllowSurrender       = file.AllowSurrender.Value;
         foreach (var sp in file.Players ?? [])
         {

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using TwentyOne.Game;
+using ResplitCapEnum = TwentyOne.Game.ResplitCap;
 
 namespace TwentyOne.Tests.Helpers;
 
@@ -25,6 +26,7 @@ internal sealed class GameStateBuilder
     private bool                 _doubleAfterSplit      = true;
     private bool                 _hitSplitAces          = false;
     private bool                 _resplitAces           = false;
+    private ResplitCapEnum       _resplitCap            = ResplitCapEnum.Max4;
     private bool                 _allowSurrender        = false;
     private bool                 _waitingForNextPlayer;
     private bool                 _waitingForDealer;
@@ -129,6 +131,12 @@ internal sealed class GameStateBuilder
         return this;
     }
 
+    public GameStateBuilder ResplitCap(ResplitCapEnum cap)
+    {
+        _resplitCap = cap;
+        return this;
+    }
+
     public GameStateBuilder AllowSurrender(bool value = true)
     {
         _allowSurrender = value;
@@ -181,6 +189,7 @@ internal sealed class GameStateBuilder
             DoubleAfterSplit         = _doubleAfterSplit,
             HitSplitAces             = _hitSplitAces,
             ResplitAces              = _resplitAces,
+            ResplitCap               = _resplitCap,
             AllowSurrender           = _allowSurrender,
             WaitingForNextPlayer     = _waitingForNextPlayer,
             WaitingForDealer         = _waitingForDealer,
