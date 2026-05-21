@@ -120,7 +120,7 @@ nix develop --command dotnet test TwentyOne.Tests/TwentyOne.Tests.csproj
 
 ### Actions
 
-All state mutations go through `GameEngine.Apply` via a `GameAction` discriminated union. Do not mutate `config.GameState` directly except for settings intentionally outside undo (e.g. `BjPayout` via `config.SetGameRule`).
+All state mutations go through `GameEngine.Apply` via a `GameAction` discriminated union. Do not mutate `config.GameState` directly except via `config.SetGameRule` (reserved for non-undoable GameState fields like `SkipDealSummaryOnePlayer`) or `config.SeedRulesIntoGameState` (copies house rules from the active venue at NewRound time).
 
 ### Undo
 
@@ -136,7 +136,9 @@ All state mutations go through `GameEngine.Apply` via a `GameAction` discriminat
 Fields in `Configuration` (persisted, outside undo):
 - `GameState`, `UndoStack`, `NarrationLog`, `Venues` / `ActiveVenueIndex`, `VenueMemory`
 
-`VenueSettings` holds per-venue config: chat, narration templates, dealer name, auto-trade/target, gil tracker, player stats, round history, session tracking. Each venue has a stable `Guid Id`.
+`VenueSettings` holds per-venue config: chat, narration templates, dealer name, auto-trade/target, gil tracker, player stats, round history, session tracking, **house rules** (`BjPayout` / `CharliePayout` / `FiveCardCharlie`). Each venue has a stable `Guid Id`.
+
+House rules live in two places by design: canonical on `VenueSettings` (edited via ConfigWindow, persisted per venue) and mirrored on `GameState` (snapshotted with undo entries and round history so historical rounds replay with the rules they were played under). `Configuration.SeedRulesIntoGameState()` copies venue → GameState; `MainWindow.Apply` invokes it after every `NewRound` action. Mid-round edits to venue rules do **not** affect the running round - the dealer must call `NewRound` for changes to take effect.
 
 `VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round).
 
@@ -268,7 +270,7 @@ The old `GameEngine.With(...)` optional-parameter helper has been removed.
 ## Design Decisions
 
 - Dealer hits on soft 17.
-- `BjPayout` (3:2 / 6:5 / 1:1) is a venue setting stored in `GameState` so it is snapshotted with each undo entry. It is changed directly (not via `Apply`) since payout changes are not undoable game actions.
+- `BjPayout` (3:2 / 6:5 / 1:1) is canonical on `VenueSettings`, mirrored on `GameState` so it is snapshotted with each undo entry. Edited via the `config.BjPayout` proxy (writes to the active venue); seeded into the live `GameState` by `Configuration.SeedRulesIntoGameState()` on every `NewRound`. Mid-round edits do not affect the running round.
 - `Player.Hands` supports multiple hands for splits. `GameState.ActiveHandIndex` tracks which hand is currently active alongside `ActivePlayerIndex`. `AdvanceFrom` iterates all `(player, hand)` pairs in order.
 - Double Down and Split require additional funds before they take effect. The UI tracks this as `pendingDouble`/`pendingSplit` (not in `GameState`). Clicking Dbl/Spl fires `AnnounceDouble`/`AnnounceSplit` (which picks a bank-covers or trade-required narration template based on current bank balance) and optionally opens the trade window. The actual `DoubleDown`/`SplitHand` action fires only after the dealer clicks Confirm. Bank deduction via `BankLedger` happens at Confirm time so any mid-round deposits land first.
 - Bet adjustment during the Deal phase (between Start Deal and Begin Player Turns): the dealer can click "Adjust" next to a player's bet to change it after cards have started dealing. `MainWindow.TryAdjustBet` computes the delta vs. the prior bet, validates bank can cover an increase (shortfall blocks the commit), applies a single `BankBetAdjust(delta)` ledger entry, then dispatches an `AdjustBet` action. The `AdjustBet` action has `PushesUndo => false` - bank entries are append-only, so a state-only revert would diverge from the ledger. Only allowed in `GamePhase.Deal`; sitting-out players are ignored. Cleared on `NewRound` and `BeginPlayerTurns`.

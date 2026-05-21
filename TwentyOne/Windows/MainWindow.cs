@@ -215,6 +215,9 @@ public partial class MainWindow : Window, IDisposable
         var (newState, effects) = GameEngine.Apply(config.GameState, action, config.NarrationTemplates, config.DealerName);
         config.GameState = newState;
 
+        // Per-venue rule snapshot: a fresh round picks up the latest venue rules.
+        if (action is NewRound) config.SeedRulesIntoGameState();
+
         if (config.AutoTargetEnabled
             && action is BeginPlayerTurns or AdvanceToNextPlayer
             && newState.Phase == GamePhase.PlayerTurns

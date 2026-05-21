@@ -84,6 +84,15 @@ public class VenueSettings
     // Set on first GoToPayout; null = no session started yet this night.
     public DateTime? ActiveSessionStartedAt   { get; set; }
     public string?   ActiveSessionLocationKey { get; set; }
+
+    // ── House rules ────────────────────────────────────────────────────────────
+    // Canonical home for the rules that apply to the next round. The current
+    // GameState mirrors these so undo snapshots and history viewer mode stay
+    // faithful to the rules at time of recording. Configuration.SeedRulesIntoGameState
+    // copies these into GameState on NewRound.
+    public PayoutRatio         BjPayout        { get; set; } = PayoutRatio.ThreeToTwo;
+    public PayoutRatio         CharliePayout   { get; set; } = PayoutRatio.EvenMoney;
+    public FiveCardCharlieRule FiveCardCharlie { get; set; } = FiveCardCharlieRule.Disabled;
 }
 
 [Serializable]
@@ -145,7 +154,26 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public List<RoundHistoryEntry> RoundHistory { get => ActiveVenue.RoundHistory; set => ActiveVenue.RoundHistory = value; }
     [JsonIgnore] public List<PlayerStatsSession> StatsSessions { get => ActiveVenue.StatsSessions; set => ActiveVenue.StatsSessions = value; }
 
+    // House rules - canonical on VenueSettings. Editing these does NOT affect the
+    // current GameState; SeedRulesIntoGameState picks them up at NewRound time.
+    [JsonIgnore] public PayoutRatio         BjPayout        { get => ActiveVenue.BjPayout;        set => ActiveVenue.BjPayout = value; }
+    [JsonIgnore] public PayoutRatio         CharliePayout   { get => ActiveVenue.CharliePayout;   set => ActiveVenue.CharliePayout = value; }
+    [JsonIgnore] public FiveCardCharlieRule FiveCardCharlie { get => ActiveVenue.FiveCardCharlie; set => ActiveVenue.FiveCardCharlie = value; }
+
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
+
+    /// <summary>
+    /// Copies the active venue's house rules into the current GameState. Called
+    /// by MainWindow.Apply after a NewRound action so each new round uses the
+    /// latest venue rules. Mid-round edits to venue rules do not affect the
+    /// already-running round.
+    /// </summary>
+    public void SeedRulesIntoGameState()
+    {
+        GameState.BjPayout        = ActiveVenue.BjPayout;
+        GameState.CharliePayout   = ActiveVenue.CharliePayout;
+        GameState.FiveCardCharlie = ActiveVenue.FiveCardCharlie;
+    }
 
     /// <summary>
     /// Mutate <see cref="GameState"/> directly and persist. Reserved for "house rule"

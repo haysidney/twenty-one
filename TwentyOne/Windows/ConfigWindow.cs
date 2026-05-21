@@ -61,30 +61,39 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Text("Blackjack Payout");
         ImGui.SameLine();
         var bjOptions = new[] { "3:2", "6:5", "1:1" };
-        var bjIdx     = (int)config.GameState.BjPayout;
+        var bjIdx     = (int)config.BjPayout;
         ImGui.SetNextItemWidth(70);
         if (ImGui.Combo("##bjpayout", ref bjIdx, bjOptions, bjOptions.Length))
-            config.SetGameRule(s => s.BjPayout = (PayoutRatio)bjIdx);
+        {
+            config.BjPayout = (PayoutRatio)bjIdx;
+            config.Save();
+        }
 
         ImGui.AlignTextToFramePadding();
         ImGui.Text("Five Card Charlie");
         ImGui.SameLine();
         var charlieOptions = new[] { "Disabled", "Beats all", "Loses to dealer BJ" };
-        var charlieIdx     = (int)config.GameState.FiveCardCharlie;
+        var charlieIdx     = (int)config.FiveCardCharlie;
         ImGui.SetNextItemWidth(150);
         if (ImGui.Combo("##fiveCardCharlie", ref charlieIdx, charlieOptions, charlieOptions.Length))
-            config.SetGameRule(s => s.FiveCardCharlie = (FiveCardCharlieRule)charlieIdx);
+        {
+            config.FiveCardCharlie = (FiveCardCharlieRule)charlieIdx;
+            config.Save();
+        }
 
-        if (config.GameState.FiveCardCharlie != FiveCardCharlieRule.Disabled)
+        if (config.FiveCardCharlie != FiveCardCharlieRule.Disabled)
         {
             ImGui.AlignTextToFramePadding();
             ImGui.Text("Charlie Payout");
             ImGui.SameLine();
             var charliePayoutOptions = new[] { "3:2", "6:5", "1:1" };
-            var charliePayoutIdx     = (int)config.GameState.CharliePayout;
+            var charliePayoutIdx     = (int)config.CharliePayout;
             ImGui.SetNextItemWidth(70);
             if (ImGui.Combo("##charliepayout", ref charliePayoutIdx, charliePayoutOptions, charliePayoutOptions.Length))
-                config.SetGameRule(s => s.CharliePayout = (PayoutRatio)charliePayoutIdx);
+            {
+                config.CharliePayout = (PayoutRatio)charliePayoutIdx;
+                config.Save();
+            }
         }
 
         DrawHouseEdgeControl();
@@ -224,9 +233,9 @@ public class ConfigWindow : Window, IDisposable
     private void DrawHouseEdgeControl()
     {
         var rules = new EdgeRules(
-            config.GameState.BjPayout,
-            config.GameState.CharliePayout,
-            config.GameState.FiveCardCharlie);
+            config.BjPayout,
+            config.CharliePayout,
+            config.FiveCardCharlie);
 
         if (_cachedHouseEdge.HasValue && !_cachedEdgeRules.Equals(rules))
             _cachedHouseEdge = null;
