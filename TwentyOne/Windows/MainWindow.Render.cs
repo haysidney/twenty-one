@@ -1146,7 +1146,8 @@ public partial class MainWindow
                 config.PlayerStatsStore[bobKey] = bobStat;
             }
             ApplyBank(bobStat, new BankDeposit(b.Gil));
-            Apply(new AnnounceBankDeposit(b.Pi, b.Gil, bobStat.Bank));
+            if (!bobStat.MaintainBet)
+                Apply(new AnnounceBankDeposit(b.Pi, b.Gil, bobStat.Bank));
             pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
