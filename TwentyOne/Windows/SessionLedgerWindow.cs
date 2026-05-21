@@ -9,6 +9,7 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using TwentyOne.Game;
+using TwentyOne.Game.Edge;
 
 namespace TwentyOne.Windows;
 
@@ -199,6 +200,21 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.Spacing();
 
+        // Edge stats: theoretical uses the currently configured rules ("what does
+        // this session look like under my current rule set?"). Realized is purely
+        // observational - bank net per gil wagered.
+        var currentRules = new EdgeRules(
+            config.BjPayout, config.CharliePayout, config.FiveCardCharlie,
+            config.DealerStandsOnSoft17, config.DoubleAfterSplit,
+            config.HitSplitAces, config.ResplitAces, config.AllowSurrender);
+        var liveStats = EdgeStats.Aggregate(config.RoundHistory, currentRules);
+        EdgeStatsDisplay.Draw(liveStats, config.RoundHistory.Count,
+            "Expected bank gain per gil wagered under your currently configured rules.\nRecomputed across this session's rounds with the current rule set applied.");
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
         // Player stats controls
         if (ImGui.Button("History") && _historyWindow != null)
         {
@@ -351,13 +367,19 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             }));
         var (archivedStats, bankNet, archivedRounds) = SessionManager.BuildArchive(statData, roundSummaries);
 
+        // Edge stats locked in using each round's snapshot rules - the rules that
+        // were actually in effect when each round was played.
+        var edgeStats = EdgeStats.Aggregate(venue.RoundHistory);
+
         venue.StatsSessions.Add(new PlayerStatsSession
         {
-            Date        = DateTime.Now,
-            LocationKey = venue.ActiveSessionLocationKey ?? "",
-            Stats       = archivedStats,
-            BankNet     = bankNet,
-            Rounds      = archivedRounds,
+            Date               = DateTime.Now,
+            LocationKey        = venue.ActiveSessionLocationKey ?? "",
+            Stats              = archivedStats,
+            BankNet            = bankNet,
+            Rounds             = archivedRounds,
+            TotalWagered       = edgeStats.TotalWagered,
+            TheoreticalBankNet = edgeStats.TheoreticalBankNet,
         });
 
         venue.PlayerStatsStore.Clear();

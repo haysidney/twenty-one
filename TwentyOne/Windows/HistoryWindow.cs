@@ -8,6 +8,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using TwentyOne.Game;
+using TwentyOne.Game.Edge;
 
 namespace TwentyOne.Windows;
 
@@ -80,6 +81,14 @@ public class HistoryWindow : Window
             ImGui.TextUnformatted("No rounds recorded yet.");
             return;
         }
+
+        // Theoretical edge uses each round's snapshot rules - the forensic view
+        // of "what should have happened given the rules in effect at the time".
+        var stats = EdgeStats.Aggregate(history);
+        EdgeStatsDisplay.Draw(stats, history.Count,
+            "Expected bank gain per gil wagered, computed using the rules in effect for each round.");
+
+        ImGui.Spacing();
 
         var flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
                   | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable
@@ -334,6 +343,13 @@ public class HistoryWindow : Window
         ImGui.TextUnformatted("Net (all players):");
         ImGui.SameLine();
         DrawNetCell(grandTotal);
+
+        // Edge stats locked in at archive time using each round's snapshot rules.
+        // Pre-feature sessions have TotalWagered = 0 and show "-".
+        ImGui.Spacing();
+        var sessionStats = new AggregateStats(s.TotalWagered, s.BankNet, s.TheoreticalBankNet);
+        EdgeStatsDisplay.Draw(sessionStats, s.Rounds.Count,
+            "Expected bank gain per gil wagered, computed using the rules that were in effect when this session was played.");
 
         if (s.Rounds.Count == 0) return;
 

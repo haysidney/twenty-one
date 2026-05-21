@@ -184,6 +184,16 @@ House rules live in two places by design: canonical on `VenueSettings` (edited v
 - Sweep of all 21 rule cells runs in <150 ms.
 - `RulesEditorWindow` displays the live house edge and per-knob "vs default" deltas (cached and invalidated when any rule changes). Opened from `ConfigWindow` via the "Edit Blackjack Rules" button. Also exposes a Ctrl-held "Reset Rules" button that restores every rule to its `GameState` default.
 
+### EdgeStats (realized vs theoretical comparison)
+
+`TwentyOne.Game/Edge/EdgeStats.cs` - aggregates a sequence of `RoundHistoryEntry` into `AggregateStats(TotalWagered, RealizedBankNet, TheoreticalBankNet)`. Theoretical is computed by running `EdgeSolver` once per distinct rule set encountered (cached per-call) and summing `bet × edge` per round. With an `overrideRules` parameter, every round is evaluated under those rules instead of its snapshot rules.
+
+- **Session Ledger** displays this live using the venue's *current* rules ("what should this session look like under my current rule set?").
+- **History > Rounds This Session** uses each round's snapshot rules ("what should have happened given the rules in effect at the time").
+- **History > Previous Sessions detail** displays the snapshot-rule version, locked in at session-archive time. `PlayerStatsSession` stores `TotalWagered` and `TheoreticalBankNet` so the figure stays stable even if venue rules change later. Pre-feature sessions have `TotalWagered = 0` and render as "-".
+
+`EdgeStatsDisplay` (in `TwentyOne/Windows/EdgeStatsDisplay.cs`) is the shared ImGui render block used by all three views.
+
 ### Sessions
 
 `SessionManager` (in `TwentyOne.Game/SessionManager.cs`) - pure static class:

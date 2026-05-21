@@ -14,6 +14,12 @@ public class PlayerStatsSession
     public Dictionary<string, PlayerStatData>  Stats       { get; set; } = [];
     public long                                BankNet     { get; set; } = 0;
     public List<RoundSummary>                  Rounds      { get; set; } = [];
+    // Edge stats locked in at session-archive time: total original bets wagered
+    // across the session, and the expected bank gain under the rules that were
+    // actually in effect for each round (sum of bet × edge per round). Both 0
+    // for sessions archived before this field was added.
+    public long                                TotalWagered       { get; set; } = 0;
+    public double                              TheoreticalBankNet { get; set; } = 0;
 }
 
 [Serializable]
