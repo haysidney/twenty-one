@@ -215,11 +215,11 @@ public partial class MainWindow : Window, IDisposable
         var (newState, effects) = GameEngine.Apply(config.GameState, action, config.NarrationTemplates, config.DealerName);
         config.GameState = newState;
 
-        // Per-venue rule snapshot: a fresh round picks up the latest venue rules.
-        // StartDeal also re-seeds so rule changes made during Betting take effect
-        // on the round about to start (the round hasn't really "started" until cards
-        // are dealt).
-        if (action is NewRound or StartDeal) config.SeedRulesIntoGameState();
+        // Per-venue rule snapshot: copy venue rules onto GameState at StartDeal
+        // time, so rule edits made during the Betting phase apply to the round
+        // about to be dealt. Edits during Deal or later do not affect the running
+        // round.
+        if (action is StartDeal) config.SeedRulesIntoGameState();
 
         if (config.AutoTargetEnabled
             && action is BeginPlayerTurns or AdvanceToNextPlayer

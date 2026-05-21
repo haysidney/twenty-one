@@ -161,8 +161,8 @@ public class Configuration : IPluginConfiguration
 
     // House rules - canonical on VenueSettings. Editing these does NOT affect a
     // round that has already started (Deal phase or later). SeedRulesIntoGameState
-    // copies the latest venue rules onto GameState at NewRound and StartDeal time,
-    // so Bet-phase edits land on the round about to be dealt.
+    // copies the latest venue rules onto GameState at StartDeal time, so Bet-phase
+    // edits land on the round about to be dealt.
     [JsonIgnore] public double              BjPayout             { get => ActiveVenue.BjPayout;             set => ActiveVenue.BjPayout = value; }
     [JsonIgnore] public PayoutRatio         CharliePayout        { get => ActiveVenue.CharliePayout;        set => ActiveVenue.CharliePayout = value; }
     [JsonIgnore] public FiveCardCharlieRule FiveCardCharlie      { get => ActiveVenue.FiveCardCharlie;      set => ActiveVenue.FiveCardCharlie = value; }
@@ -176,9 +176,9 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>
     /// Copies the active venue's house rules into the current GameState. Called by
-    /// MainWindow.Apply after NewRound and StartDeal so each round uses the latest
-    /// venue rules - including changes the dealer made during the Betting phase.
-    /// Edits during Deal phase or later do not affect the already-running round.
+    /// MainWindow.Apply on the StartDeal action so each round uses the latest venue
+    /// rules - including changes the dealer made during the Betting phase. Edits
+    /// made during Deal phase or later do not affect the already-running round.
     /// </summary>
     public void SeedRulesIntoGameState()
     {
