@@ -6,6 +6,7 @@ using System.Text.Json;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using TwentyOne.Game;
+using TwentyOne.Game.Edge;
 
 namespace TwentyOne.Windows;
 
@@ -37,6 +38,9 @@ public class ConfigWindow : Window, IDisposable
     private string _renameBuffer     = string.Empty;
     private bool   _renamePending    = false;
     private bool   _duplicatePending = false;
+
+    private double?   _cachedHouseEdge;
+    private EdgeRules _cachedEdgeRules;
 
     private static readonly string[] ChatChannels =
     [
@@ -82,6 +86,8 @@ public class ConfigWindow : Window, IDisposable
             if (ImGui.Combo("##charliepayout", ref charliePayoutIdx, charliePayoutOptions, charliePayoutOptions.Length))
                 config.SetGameRule(s => s.CharliePayout = (PayoutRatio)charliePayoutIdx);
         }
+
+        DrawHouseEdgeControl();
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -213,6 +219,39 @@ public class ConfigWindow : Window, IDisposable
 
         if (ImGui.Button("Edit Narration Templates\u2026##openNarrationEditor"))
             narrationEditorWindow.Toggle();
+    }
+
+    private void DrawHouseEdgeControl()
+    {
+        var rules = new EdgeRules(
+            config.GameState.BjPayout,
+            config.GameState.CharliePayout,
+            config.GameState.FiveCardCharlie);
+
+        if (_cachedHouseEdge.HasValue && !_cachedEdgeRules.Equals(rules))
+            _cachedHouseEdge = null;
+
+        if (ImGui.Button("Calculate House Edge##calcEdge"))
+        {
+            _cachedHouseEdge = EdgeSolver.ComputeHouseEdge(rules);
+            _cachedEdgeRules = rules;
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Computes the expected house edge for the current rule set,\nassuming optimal player strategy and infinite-deck draws.");
+
+        if (_cachedHouseEdge.HasValue)
+        {
+            ImGui.SameLine();
+            var edge = _cachedHouseEdge.Value;
+            var pct  = edge * 100;
+            var color = edge >= 0
+                ? new Vector4(0.65f, 0.85f, 0.65f, 1f)   // house favored: green
+                : new Vector4(0.95f, 0.55f, 0.55f, 1f); // player favored: red
+            var label = edge >= 0
+                ? $"House edge: {pct:F2}%"
+                : $"Player edge: {-pct:F2}%";
+            ImGui.TextColored(color, label);
+        }
     }
 
     private void DrawVenueSelector()

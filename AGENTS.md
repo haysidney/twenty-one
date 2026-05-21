@@ -140,6 +140,18 @@ Fields in `Configuration` (persisted, outside undo):
 
 `VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round).
 
+### EdgeSolver (house-edge calculator)
+
+`TwentyOne.Game/Edge/EdgeSolver.cs` - pure exact EV solver. Computes the expected house edge for a given `(BjPayout, CharliePayout, FiveCardCharlie)` triple under optimal player strategy with infinite-deck draws. No Dalamud dependency, fully unit-tested.
+
+- Entry point: `EdgeSolver.ComputeHouseEdge(EdgeRules rules) -> double` (positive = house favored, negative = player favored).
+- Computes dealer outcome distribution per upcard, then player EV via memoized recursion over `(total, isSoft, numCards, isFromSplit, upcard)`.
+- Splits use a closed-form fixed-point to handle unlimited re-splits without infinite recursion: `S = max(H_neq + H_eq/13, (13/11) * H_neq)`.
+- Uses fractional payout multipliers (1.5 / 1.2 / 1.0), not the engine's `Math.Ceiling` - difference is negligible at gil bet sizes.
+- Matches engine quirks: dealer BJ beats player 3-card 21; splits require same rank not value; split aces auto-stand; DAS allowed; Charlie at exactly 5+ cards; Charlie LosesToDealerBJ checks 2-card dealer 21 only.
+- Sweep of all 21 rule cells runs in <150 ms.
+- `ConfigWindow.DrawHouseEdgeControl()` exposes a "Calculate House Edge" button that runs the solver against the active rules and displays the result. Result is cached and invalidated when any rule toggle changes.
+
 ### Sessions
 
 `SessionManager` (in `TwentyOne.Game/SessionManager.cs`) - pure static class:
