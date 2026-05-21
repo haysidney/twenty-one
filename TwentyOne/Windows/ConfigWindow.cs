@@ -40,6 +40,10 @@ public class ConfigWindow : Window, IDisposable
     private bool   _duplicatePending = false;
 
     private double?   _cachedHouseEdge;
+    private double?   _edgeFlipS17;
+    private double?   _edgeFlipDAS;
+    private double?   _edgeFlipHSA;
+    private double?   _edgeFlipRSA;
     private EdgeRules _cachedEdgeRules;
 
     private static readonly string[] ChatChannels =
@@ -101,6 +105,8 @@ public class ConfigWindow : Window, IDisposable
             }
         }
 
+        EnsureEdgeCache();
+
         var s17 = config.DealerStandsOnSoft17;
         if (ImGui.Checkbox("Dealer stands on soft 17", ref s17))
         {
@@ -109,6 +115,7 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When off (default), dealer hits soft 17 (H17). When on, dealer stands on soft 17 (S17).\nApplies to the next round - mid-round changes do not affect the running round.");
+        DrawFlipDelta(_edgeFlipS17);
 
         var das = config.DoubleAfterSplit;
         if (ImGui.Checkbox("Allow double after split", ref das))
@@ -118,6 +125,7 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When on (default), the player may double down on a hand created by splitting.\nWhen off, only non-split hands can be doubled.\nApplies to the next round.");
+        DrawFlipDelta(_edgeFlipDAS);
 
         var hsa = config.HitSplitAces;
         if (ImGui.Checkbox("Allow hitting split aces", ref hsa))
@@ -127,6 +135,7 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When off (default), a split-ace hand receives exactly one extra card and auto-stands.\nWhen on, split-ace hands may be hit further.\n21 on a split-ace hand is still treated as Stand, not Blackjack.\nApplies to the next round.");
+        DrawFlipDelta(_edgeFlipHSA);
 
         var rsa = config.ResplitAces;
         if (ImGui.Checkbox("Allow resplitting aces", ref rsa))
@@ -136,8 +145,9 @@ public class ConfigWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("When on, a pair of aces produced by an earlier split may be split again.\nWhen off (default), split-ace pairs cannot be resplit.\nApplies to the next round.");
+        DrawFlipDelta(_edgeFlipRSA);
 
-        DrawHouseEdgeControl();
+        DrawHouseEdgeLabel();
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -271,7 +281,7 @@ public class ConfigWindow : Window, IDisposable
             narrationEditorWindow.Toggle();
     }
 
-    private void DrawHouseEdgeControl()
+    private void EnsureEdgeCache()
     {
         var rules = new EdgeRules(
             config.BjPayout,
@@ -282,30 +292,46 @@ public class ConfigWindow : Window, IDisposable
             config.HitSplitAces,
             config.ResplitAces);
 
-        if (_cachedHouseEdge.HasValue && !_cachedEdgeRules.Equals(rules))
-            _cachedHouseEdge = null;
+        if (_cachedHouseEdge.HasValue && _cachedEdgeRules.Equals(rules)) return;
 
-        if (ImGui.Button("Calculate House Edge##calcEdge"))
-        {
-            _cachedHouseEdge = EdgeSolver.ComputeHouseEdge(rules);
-            _cachedEdgeRules = rules;
-        }
+        _cachedHouseEdge  = EdgeSolver.ComputeHouseEdge(rules);
+        _edgeFlipS17      = EdgeSolver.ComputeHouseEdge(rules with { DealerStandsOnSoft17 = !rules.DealerStandsOnSoft17 });
+        _edgeFlipDAS      = EdgeSolver.ComputeHouseEdge(rules with { DoubleAfterSplit     = !rules.DoubleAfterSplit });
+        _edgeFlipHSA      = EdgeSolver.ComputeHouseEdge(rules with { HitSplitAces         = !rules.HitSplitAces });
+        _edgeFlipRSA      = EdgeSolver.ComputeHouseEdge(rules with { ResplitAces          = !rules.ResplitAces });
+        _cachedEdgeRules  = rules;
+    }
+
+    // Shows "(±X.XX%)" next to a toggle, colored green if flipping helps the player
+    // (lowers edge), red if flipping hurts the player. Hidden if the delta is zero.
+    private void DrawFlipDelta(double? flipped)
+    {
+        if (!_cachedHouseEdge.HasValue || !flipped.HasValue) return;
+        var delta = (flipped.Value - _cachedHouseEdge.Value) * 100;
+        if (Math.Abs(delta) < 0.005) return; // would round to "(0.00%)"
+        ImGui.SameLine();
+        var color = delta < 0
+            ? new Vector4(0.65f, 0.85f, 0.65f, 1f)   // flipping lowers edge: green
+            : new Vector4(0.95f, 0.55f, 0.55f, 1f); // flipping raises edge: red
+        ImGui.TextColored(color, $"({delta:+0.00;-0.00}%)");
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Computes the expected house edge for the current rule set,\nassuming optimal player strategy and infinite-deck draws.");
+            ImGui.SetTooltip("Change to the house edge if this rule is toggled.");
+    }
 
-        if (_cachedHouseEdge.HasValue)
-        {
-            ImGui.SameLine();
-            var edge = _cachedHouseEdge.Value;
-            var pct  = edge * 100;
-            var color = edge >= 0
-                ? new Vector4(0.65f, 0.85f, 0.65f, 1f)   // house favored: green
-                : new Vector4(0.95f, 0.55f, 0.55f, 1f); // player favored: red
-            var label = edge >= 0
-                ? $"House edge: {pct:F2}%"
-                : $"Player edge: {-pct:F2}%";
-            ImGui.TextColored(color, label);
-        }
+    private void DrawHouseEdgeLabel()
+    {
+        if (!_cachedHouseEdge.HasValue) return;
+        var edge = _cachedHouseEdge.Value;
+        var pct  = edge * 100;
+        var color = edge >= 0
+            ? new Vector4(0.65f, 0.85f, 0.65f, 1f)   // house favored: green
+            : new Vector4(0.95f, 0.55f, 0.55f, 1f); // player favored: red
+        var label = edge >= 0
+            ? $"House edge: {pct:F2}%"
+            : $"Player edge: {-pct:F2}%";
+        ImGui.TextColored(color, label);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Expected house edge under optimal player strategy, infinite-deck draws.");
     }
 
     private void DrawVenueSelector()
