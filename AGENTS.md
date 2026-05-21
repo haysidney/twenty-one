@@ -154,6 +154,10 @@ Fields in `Configuration` (persisted, outside undo):
   refactors can distinguish "real bug" from "known borderline." Re-run the
   checks here any time the solver, engine payout resolution, or rule enum
   changes.
+- `docs/edge-solver-extending.md` - architectural reference for the solver
+  (memoization, split fixed-point) and a rule-by-rule cost table for adding
+  new rule axes (S17, DAS toggle, HSA, RSA, peek, surrender, continuous
+  payouts). Read before plumbing a new rule into `EdgeRules`.
 
 ### EdgeSolver (house-edge calculator)
 
