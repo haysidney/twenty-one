@@ -99,32 +99,40 @@ public class DealerRecommendationTests
     [Fact]
     public void Under17_ReturnsHit()
     {
-        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(10, 6)));
+        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(10, 6), standsOnSoft17: false));
+        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(10, 6), standsOnSoft17: true));
     }
 
     [Fact]
     public void Hard17_ReturnsStand()
     {
-        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(10, 7)));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(10, 7), standsOnSoft17: false));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(10, 7), standsOnSoft17: true));
     }
 
     [Fact]
-    public void Soft17_ReturnsHit()
+    public void Soft17_H17_ReturnsHit()
     {
-        // A+6 = soft 17 → dealer must hit
-        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(1, 6)));
+        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(1, 6), standsOnSoft17: false));
+    }
+
+    [Fact]
+    public void Soft17_S17_ReturnsStand()
+    {
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 6), standsOnSoft17: true));
     }
 
     [Fact]
     public void Soft18_ReturnsStand()
     {
-        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 7)));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 7), standsOnSoft17: false));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 7), standsOnSoft17: true));
     }
 
     [Fact]
     public void EmptyHand_ReturnsEmpty()
     {
-        Assert.Equal(string.Empty, GameEngine.DealerRecommendation(new Hand()));
+        Assert.Equal(string.Empty, GameEngine.DealerRecommendation(new Hand(), standsOnSoft17: false));
     }
 }
 
@@ -1764,6 +1772,31 @@ public class SplitHandTests
     public void CanHitDealer_FalseDuringDealerTurnWhenShouldStand()
     {
         var state = new GameStateBuilder().Phase(GamePhase.DealerTurn).Dealer(10, 8).Build();
+        Assert.False(GameEngine.CanHitDealer(state));
+    }
+
+    [Fact]
+    public void CanHitDealer_Soft17_HitsUnderH17()
+    {
+        // A+6 = soft 17. With H17 (default), dealer must hit.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(1, 6)
+            .Player("Lorah", "100", HandState.Stand, 10, 8)
+            .Build();
+        Assert.True(GameEngine.CanHitDealer(state));
+    }
+
+    [Fact]
+    public void CanHitDealer_Soft17_StandsUnderS17()
+    {
+        // A+6 = soft 17. With S17 on, dealer stands.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Dealer(1, 6)
+            .DealerStandsOnSoft17()
+            .Player("Lorah", "100", HandState.Stand, 10, 8)
+            .Build();
         Assert.False(GameEngine.CanHitDealer(state));
     }
 

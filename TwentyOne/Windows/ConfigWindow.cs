@@ -96,6 +96,15 @@ public class ConfigWindow : Window, IDisposable
             }
         }
 
+        var s17 = config.DealerStandsOnSoft17;
+        if (ImGui.Checkbox("Dealer stands on soft 17", ref s17))
+        {
+            config.DealerStandsOnSoft17 = s17;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("When off (default), dealer hits soft 17 (H17). When on, dealer stands on soft 17 (S17).\nApplies to the next round - mid-round changes do not affect the running round.");
+
         DrawHouseEdgeControl();
 
         ImGui.Spacing();
@@ -235,7 +244,8 @@ public class ConfigWindow : Window, IDisposable
         var rules = new EdgeRules(
             config.BjPayout,
             config.CharliePayout,
-            config.FiveCardCharlie);
+            config.FiveCardCharlie,
+            config.DealerStandsOnSoft17);
 
         if (_cachedHouseEdge.HasValue && !_cachedEdgeRules.Equals(rules))
             _cachedHouseEdge = null;

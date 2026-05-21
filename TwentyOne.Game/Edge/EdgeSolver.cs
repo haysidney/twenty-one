@@ -7,7 +7,8 @@ namespace TwentyOne.Game.Edge;
 public readonly record struct EdgeRules(
     PayoutRatio BjPayout,
     PayoutRatio CharliePayout,
-    FiveCardCharlieRule FiveCardCharlie);
+    FiveCardCharlieRule FiveCardCharlie,
+    bool DealerStandsOnSoft17 = false);
 
 public enum OptimalAction
 {
@@ -126,7 +127,7 @@ public static class EdgeSolver
                 dist[OBust] += prob;
                 return;
             }
-            bool hit = total < 17 || (total == 17 && isSoft);
+            bool hit = total < 17 || (total == 17 && isSoft && !_rules.DealerStandsOnSoft17);
             if (!hit)
             {
                 int bucket = total switch

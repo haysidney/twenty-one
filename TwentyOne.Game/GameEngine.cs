@@ -84,12 +84,13 @@ public static class GameEngine
         return HandState.Playing;
     }
 
-    public static string DealerRecommendation(Hand hand)
+    public static string DealerRecommendation(Hand hand, bool standsOnSoft17)
     {
         if (hand.Cards.Length == 0) return string.Empty;
         var val = HandValue(hand.Cards);
         if (val > 21) return string.Empty;
-        return (val < 17 || (val == 17 && IsSoft(hand.Cards))) ? "HIT" : "STAND";
+        var hitsSoft17 = !standsOnSoft17;
+        return (val < 17 || (val == 17 && hitsSoft17 && IsSoft(hand.Cards))) ? "HIT" : "STAND";
     }
 
     public static bool CanGoToPayout(GameState state)
@@ -135,7 +136,7 @@ public static class GameEngine
     {
         var dc = state.DealerHand.Cards;
         return dc.Length > 0
-            && (HandValue(dc) > 21 || DealerRecommendation(state.DealerHand) == "STAND");
+            && (HandValue(dc) > 21 || DealerRecommendation(state.DealerHand, state.DealerStandsOnSoft17) == "STAND");
     }
 
     // ── Action eligibility helpers (public for UI use) ────────────────────────
@@ -173,7 +174,7 @@ public static class GameEngine
         if (state.Phase != GamePhase.DealerTurn || state.WaitingForDealer) return false;
         return !state.IsAllBust()
             && !CanGoToPayout(state)
-            && DealerRecommendation(state.DealerHand) == "HIT"
+            && DealerRecommendation(state.DealerHand, state.DealerStandsOnSoft17) == "HIT"
             && HandValue(state.DealerHand.Cards) <= 21;
     }
 
@@ -463,14 +464,14 @@ public static class GameEngine
     {
         var newHand = AddCardToHand(state.DealerHand, a.Card);
         if (state.Phase == GamePhase.DealerTurn)
-            NarrateDealerCard(ctx, a.Card, newHand);
+            NarrateDealerCard(ctx, a.Card, newHand, state.DealerStandsOnSoft17);
         var newStateD = state with { DealerHand = newHand };
         if (state.Phase == GamePhase.Deal && IsDealComplete(newStateD))
             ctx.NarrateDealSummary(newStateD);
         return newStateD;
     }
 
-    private static void NarrateDealerCard(NarrationContext ctx, int card, Hand newHand)
+    private static void NarrateDealerCard(NarrationContext ctx, int card, Hand newHand, bool standsOnSoft17)
     {
         var t = ctx.Templates;
         var dealerName = ctx.DealerName;
@@ -488,7 +489,7 @@ public static class GameEngine
         {
             ctx.Narrate(t.DealerHit,
                 ("dealer", dealerName), ("card", cardLbl), ("cards", cards), ("score", score));
-            if (DealerRecommendation(newHand) == "STAND")
+            if (DealerRecommendation(newHand, standsOnSoft17) == "STAND")
                 ctx.Narrate(t.DealerStand,
                     ("dealer", dealerName), ("cards", cards), ("score", score));
         }

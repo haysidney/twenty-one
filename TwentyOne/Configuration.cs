@@ -90,9 +90,10 @@ public class VenueSettings
     // GameState mirrors these so undo snapshots and history viewer mode stay
     // faithful to the rules at time of recording. Configuration.SeedRulesIntoGameState
     // copies these into GameState on NewRound.
-    public PayoutRatio         BjPayout        { get; set; } = PayoutRatio.ThreeToTwo;
-    public PayoutRatio         CharliePayout   { get; set; } = PayoutRatio.EvenMoney;
-    public FiveCardCharlieRule FiveCardCharlie { get; set; } = FiveCardCharlieRule.Disabled;
+    public PayoutRatio         BjPayout             { get; set; } = PayoutRatio.ThreeToTwo;
+    public PayoutRatio         CharliePayout        { get; set; } = PayoutRatio.EvenMoney;
+    public FiveCardCharlieRule FiveCardCharlie      { get; set; } = FiveCardCharlieRule.Disabled;
+    public bool                DealerStandsOnSoft17 { get; set; } = false;
 }
 
 [Serializable]
@@ -156,9 +157,10 @@ public class Configuration : IPluginConfiguration
 
     // House rules - canonical on VenueSettings. Editing these does NOT affect the
     // current GameState; SeedRulesIntoGameState picks them up at NewRound time.
-    [JsonIgnore] public PayoutRatio         BjPayout        { get => ActiveVenue.BjPayout;        set => ActiveVenue.BjPayout = value; }
-    [JsonIgnore] public PayoutRatio         CharliePayout   { get => ActiveVenue.CharliePayout;   set => ActiveVenue.CharliePayout = value; }
-    [JsonIgnore] public FiveCardCharlieRule FiveCardCharlie { get => ActiveVenue.FiveCardCharlie; set => ActiveVenue.FiveCardCharlie = value; }
+    [JsonIgnore] public PayoutRatio         BjPayout             { get => ActiveVenue.BjPayout;             set => ActiveVenue.BjPayout = value; }
+    [JsonIgnore] public PayoutRatio         CharliePayout        { get => ActiveVenue.CharliePayout;        set => ActiveVenue.CharliePayout = value; }
+    [JsonIgnore] public FiveCardCharlieRule FiveCardCharlie      { get => ActiveVenue.FiveCardCharlie;      set => ActiveVenue.FiveCardCharlie = value; }
+    [JsonIgnore] public bool                DealerStandsOnSoft17 { get => ActiveVenue.DealerStandsOnSoft17; set => ActiveVenue.DealerStandsOnSoft17 = value; }
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 
@@ -170,9 +172,10 @@ public class Configuration : IPluginConfiguration
     /// </summary>
     public void SeedRulesIntoGameState()
     {
-        GameState.BjPayout        = ActiveVenue.BjPayout;
-        GameState.CharliePayout   = ActiveVenue.CharliePayout;
-        GameState.FiveCardCharlie = ActiveVenue.FiveCardCharlie;
+        GameState.BjPayout             = ActiveVenue.BjPayout;
+        GameState.CharliePayout        = ActiveVenue.CharliePayout;
+        GameState.FiveCardCharlie      = ActiveVenue.FiveCardCharlie;
+        GameState.DealerStandsOnSoft17 = ActiveVenue.DealerStandsOnSoft17;
     }
 
     /// <summary>

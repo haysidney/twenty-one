@@ -16,8 +16,9 @@ public class EdgeSolverTests
     private static EdgeRules Rules(
         PayoutRatio bj = PayoutRatio.ThreeToTwo,
         PayoutRatio charlie = PayoutRatio.ThreeToTwo,
-        FiveCardCharlieRule cr = FiveCardCharlieRule.Disabled)
-        => new(bj, charlie, cr);
+        FiveCardCharlieRule cr = FiveCardCharlieRule.Disabled,
+        bool s17 = false)
+        => new(bj, charlie, cr, s17);
 
     [Fact]
     public void H17_3to2_NoCharlie_EdgeInPublishedRange()
@@ -58,6 +59,18 @@ public class EdgeSolverTests
             Rules(charlie: PayoutRatio.ThreeToTwo, cr: FiveCardCharlieRule.BeatsAll));
         _out.WriteLine($"Charlie off = {off * 100:F4}%, BeatsAll@3:2 = {beat * 100:F4}%");
         Assert.True(beat < off, "Charlie should reduce house edge");
+    }
+
+    [Fact]
+    public void S17_LowersEdge_VsH17()
+    {
+        var h17 = EdgeSolver.ComputeHouseEdge(Rules(s17: false));
+        var s17 = EdgeSolver.ComputeHouseEdge(Rules(s17: true));
+        _out.WriteLine($"H17 = {h17 * 100:F4}%, S17 = {s17 * 100:F4}%, delta = {(s17 - h17) * 100:F4}%");
+        // Standard published S17 vs H17 delta is ~-0.22%. Allow a wider band for
+        // infinite-deck + ENHC.
+        Assert.True(s17 < h17, "S17 should lower house edge vs H17");
+        Assert.InRange(h17 - s17, 0.0015, 0.0035);
     }
 
     [Fact]

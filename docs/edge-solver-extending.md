@@ -75,7 +75,7 @@ just the **aggregation** at the end.
 
 | Rule | Engine work | Solver work | Per-cell speed | Rule space |
 |---|---|---|---|---|
-| **S17** (stand on soft 17) | Update `DealerRecommendation` to check the rule | Dealer recursion hits less often | Slightly faster | ×2 |
+| **S17** (stand on soft 17) ✓ implemented | Update `DealerRecommendation` to check the rule | Dealer recursion hits less often | Slightly faster | ×2 |
 | **DAS toggle** (currently always allowed) | Add `bool DoubleAfterSplit` field; gate `CanDouble` on it when `isFromSplit` | One-line guard in the Double branch of `EvalHand` | Unchanged | ×2 |
 | **HSA** (hit split aces multiple times) | Remove the forced-stand on split aces; allow normal play after the first card | Replace the ace branch in `EvalSplit` with a call into `EvalHand` (with appropriate flags) | ~10-20% slower per cell | ×2 |
 | **RSA** (re-split aces) | Allow split aces to remain Playing if they pair again | Apply the fixed-point math to the ace branch too | ~5-10% slower per cell | ×2 |

@@ -83,6 +83,8 @@ public sealed record class GameState
     public PayoutRatio BjPayout { get; set; } = PayoutRatio.ThreeToTwo;
     public PayoutRatio CharliePayout { get; set; } = PayoutRatio.EvenMoney;
     public FiveCardCharlieRule FiveCardCharlie { get; set; } = FiveCardCharlieRule.Disabled;
+    // When true, dealer stands on soft 17 (S17). When false (default), dealer hits soft 17 (H17).
+    public bool DealerStandsOnSoft17 { get; set; } = false;
     // FullNames (or Nicknames for manual players) of players who won last round.
     public HashSet<string> LastRoundWinners { get; set; } = [];
     // FullNames (or Nicknames for manual players) of players who pushed last round.
