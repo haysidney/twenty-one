@@ -148,6 +148,12 @@ Fields in `Configuration` (persisted, outside undo):
   (ENHC) style, walks through how it differs from peek rules, and documents the
   ~0.11% house-edge impact. Read this before considering any changes to dealer
   BJ resolution (`GameEngine.cs:213`).
+- `docs/edge-solver-verification.md` - records the methodology and reference
+  numbers used to verify `EdgeSolver` against Wizard of Odds and the standard
+  H17 DAS chart. Documents the 6 expected strategy-chart deviations so future
+  refactors can distinguish "real bug" from "known borderline." Re-run the
+  checks here any time the solver, engine payout resolution, or rule enum
+  changes.
 
 ### EdgeSolver (house-edge calculator)
 
