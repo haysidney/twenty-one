@@ -501,7 +501,8 @@ public partial class MainWindow : Window, IDisposable
             case TradeMonitor.Outcome.PromptBet pb:
                 pendingPrompt = new PendingPrompt.Bet(pb.Pi, pb.Gil); break;
             case TradeMonitor.Outcome.PromptBankDeposit pbd:
-                if (!TryAutoMaintainBetDeposit(pbd.Pi, pbd.Gil))
+                if (!TryAutoDoubleOrSplitDeposit(pbd.Pi, pbd.Gil)
+                    && !TryAutoMaintainBetDeposit(pbd.Pi, pbd.Gil))
                     pendingPrompt = new PendingPrompt.BankDeposit(pbd.Pi, pbd.Gil);
                 break;
             case TradeMonitor.Outcome.PromptBankWithdraw pbw:
@@ -561,6 +562,25 @@ public partial class MainWindow : Window, IDisposable
         var owe = stat.Bank - bet;
         if (owe <= 0 || gil != owe) return false;
         ApplyBank(stat, new BankWithdrawal(gil));
+        config.Save();
+        return true;
+    }
+
+    // Returns true and silently deposits if a double/split is pending for this player
+    // and the trade equals either the full bet or the exact shortfall to cover it.
+    private bool TryAutoDoubleOrSplitDeposit(int pi, long gil)
+    {
+        if (pi < 0 || pi >= State.Players.Length) return false;
+        var pending = pendingDouble ?? pendingSplit;
+        if (pending is null || pending.Value.PlayerIndex != pi) return false;
+        var p = State.Players[pi];
+        if (!p.TryGetBankingStat(config, out var stat)) return false;
+        var hand = p.Hands[pending.Value.HandIndex];
+        var bet  = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
+        if (bet <= 0) return false;
+        var shortfall = bet - stat.Bank;
+        if (gil != bet && (shortfall <= 0 || gil != shortfall)) return false;
+        ApplyBank(stat, new BankDeposit(gil));
         config.Save();
         return true;
     }
