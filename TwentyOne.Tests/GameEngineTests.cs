@@ -3621,3 +3621,63 @@ public class DoubleRestrictionTests
         Assert.True(d1011 >= d911, $"Hard10To11 ({d1011}) >= Hard9To11 ({d911})");
     }
 }
+
+public class ActionLogTests
+{
+    [Fact]
+    public void Format_PhaseTransitions()
+    {
+        Assert.Equal("StartDeal",        ActionLog.Format(new StartDeal()));
+        Assert.Equal("BeginPlayerTurns", ActionLog.Format(new BeginPlayerTurns()));
+        Assert.Equal("BeginDealerTurn",  ActionLog.Format(new BeginDealerTurn()));
+        Assert.Equal("GoToPayout",       ActionLog.Format(new GoToPayout()));
+        Assert.Equal("AdvancePlayer",    ActionLog.Format(new AdvanceToNextPlayer()));
+    }
+
+    [Fact]
+    public void Format_CardActions()
+    {
+        Assert.Equal("Deal:D:7",     ActionLog.Format(new AddDealerCard(7)));
+        Assert.Equal("Deal:0:0:10",  ActionLog.Format(new AddPlayerCard(0, 0, 10)));
+        Assert.Equal("Deal:2:1:1",   ActionLog.Format(new AddPlayerCard(2, 1, 1)));
+    }
+
+    [Fact]
+    public void Format_PlayerDecisions()
+    {
+        Assert.Equal("Stand:0:0", ActionLog.Format(new StandPlayer(0, 0)));
+        Assert.Equal("Dbl:1:0",   ActionLog.Format(new DoubleDown(1, 0)));
+        Assert.Equal("Spl:0:1",   ActionLog.Format(new SplitHand(0, 1)));
+        Assert.Equal("Srn:0:0",   ActionLog.Format(new SurrenderHand(0, 0)));
+    }
+
+    [Fact]
+    public void Format_AdjustBet()
+    {
+        Assert.Equal("AdjustBet:0:500", ActionLog.Format(new AdjustBet(0, "500")));
+    }
+
+    [Fact]
+    public void Format_Skips_Announcements()
+    {
+        Assert.Null(ActionLog.Format(new AnnounceDealerDeal()));
+        Assert.Null(ActionLog.Format(new AnnouncePlayerDeal(0)));
+        Assert.Null(ActionLog.Format(new AnnounceDealerHit()));
+        Assert.Null(ActionLog.Format(new AnnouncePlayerHit(0, 0)));
+        Assert.Null(ActionLog.Format(new AnnounceDouble(0, 0)));
+        Assert.Null(ActionLog.Format(new AnnounceBettingOpen()));
+    }
+
+    [Fact]
+    public void Format_Skips_RosterAndRoundEnd()
+    {
+        // Roster mutations happen in Betting phase, before StartDeal opens the log.
+        Assert.Null(ActionLog.Format(new AddPlayer("Lorah")));
+        Assert.Null(ActionLog.Format(new RemovePlayer(0)));
+        Assert.Null(ActionLog.Format(new SetPlayerBet(0, "100")));
+        Assert.Null(ActionLog.Format(new RenamePlayer(0, "L")));
+        Assert.Null(ActionLog.Format(new ToggleSittingOut(0)));
+        // NewRound closes the current round; the next round's log starts at StartDeal.
+        Assert.Null(ActionLog.Format(new NewRound()));
+    }
+}

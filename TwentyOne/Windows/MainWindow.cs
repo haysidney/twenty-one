@@ -88,6 +88,9 @@ public partial class MainWindow : Window, IDisposable
     // Wall-clock time of the most recent StartDeal; copied onto RoundHistoryEntry
     // at round-completion so each archived round has a started/finished pair.
     private DateTime currentRoundStartedAt = DateTime.MinValue;
+    // Engine-action sequence for the round currently in progress. Reset on
+    // StartDeal, flushed onto the RoundHistoryEntry by UpdatePlayerStats.
+    private List<string> currentRoundActions = [];
     // chat-stream trade-detection state (partner / received-gil / given-gil) lives in TradeMonitor.
     private readonly TradeMonitor              tradeMonitor = new();
     // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
@@ -226,7 +229,12 @@ public partial class MainWindow : Window, IDisposable
         {
             config.SeedRulesIntoGameState();
             currentRoundStartedAt = DateTime.Now;
+            currentRoundActions.Clear();
         }
+
+        // Append to the round action log (skips Announcements and non-round actions).
+        var logEntry = ActionLog.Format(action);
+        if (logEntry != null) currentRoundActions.Add(logEntry);
 
         if (config.AutoTargetEnabled
             && action is BeginPlayerTurns or AdvanceToNextPlayer
@@ -415,8 +423,10 @@ public partial class MainWindow : Window, IDisposable
             PrePayoutPlayerBanks = prePayoutBanks,
             StartedAt            = currentRoundStartedAt,
             FinishedAt           = DateTime.Now,
+            Actions              = new List<string>(currentRoundActions),
         });
         currentRoundStartedAt = DateTime.MinValue;
+        currentRoundActions.Clear();
 
         var venue = config.ActiveVenue;
         var startedAt   = venue.ActiveSessionStartedAt;

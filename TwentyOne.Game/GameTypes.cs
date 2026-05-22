@@ -21,6 +21,12 @@ public class RoundHistoryEntry
     // Both default to DateTime.MinValue for entries logged before this field existed.
     public DateTime StartedAt  { get; set; } = DateTime.MinValue;
     public DateTime FinishedAt { get; set; } = DateTime.MinValue;
+    // Sequence of engine-level actions that produced this round, in order. Each
+    // entry is a short tag produced by ActionLog.Format - e.g. "StartDeal",
+    // "Deal:D:7", "Deal:0:0:10", "Stand:0:0", "Dbl:1:0", "BeginDealerTurn",
+    // "GoToPayout". Empty for entries logged before this field existed.
+    // Announcements (narration-only actions) are not included.
+    public List<string> Actions { get; set; } = [];
 }
 
 public enum HandState { Playing, Stand, Bust, Blackjack, Charlie, Surrendered }

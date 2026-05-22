@@ -153,7 +153,7 @@ Fields in `Configuration` (persisted, outside undo):
 
 House rules live in two places by design: canonical on `VenueSettings` (edited via `RulesEditorWindow`, persisted per venue) and mirrored on `GameState` (snapshotted with undo entries and round history so historical rounds replay with the rules they were played under). `Configuration.SeedRulesIntoGameState()` copies venue → GameState; `MainWindow.Apply` invokes it on the `StartDeal` action. Rule edits during the Betting phase are picked up by this seed, so they apply to the round about to be dealt. Edits made during Deal or later do **not** affect the running round - the dealer must call `NewRound` (and then `StartDeal` again) for them to take effect. Rule edits themselves are not on the undo stack - they bypass `GameEngine.Apply` and write directly to `VenueSettings`.
 
-`VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round). Each entry carries the full `GameState`, bank net, pre- and post-payout player balances, and `StartedAt`/`FinishedAt` timestamps.
+`VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round). Each entry carries the full `GameState`, bank net, pre- and post-payout player balances, `StartedAt`/`FinishedAt` timestamps, and the engine-action sequence (`Actions`) produced by `ActionLog.Format` - e.g. `["StartDeal", "Deal:D:7", "Deal:0:0:10", ..., "Stand:0:0", "BeginDealerTurn", "Deal:D:6", "GoToPayout"]`. Announcements (narration-only actions) are not logged. Undo doesn't pop log entries: the list is a faithful record of every `Apply` call that happened during the round, including any that were later reverted.
 
 ### Session persistence
 
