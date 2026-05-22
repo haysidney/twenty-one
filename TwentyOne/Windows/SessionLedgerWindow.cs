@@ -24,10 +24,11 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     private string tipBuf           = string.Empty;
     private string serviceAmountBuf = string.Empty;
     private string serviceNoteBuf   = string.Empty;
-    // In-flight buffers for editing existing service charges. Keyed by list
-    // index; cleared whenever a charge is removed (indexes shift after delete).
-    private readonly Dictionary<int, string> serviceAmtEdits  = new();
-    private readonly Dictionary<int, string> serviceNoteEdits = new();
+    // Inline-edit state for an existing service charge. Set by double-clicking
+    // a row's amount or note label; cleared on commit / focus-out / row delete.
+    private int    editingServiceIdx   = -1;
+    private string editingServiceField = string.Empty; // "amt" or "note"
+    private string editingServiceBuf   = string.Empty;
 
     private readonly EdgeStatsCache _edgeCache = new();
 
@@ -171,9 +172,9 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.Text("Service Charges");
 
-        long serviceTotal           = 0;
-        long serviceToDealerTotal   = 0;
-        long serviceToVenueTotal    = 0;
+        long serviceTotal         = 0;
+        long serviceToDealerTotal = 0;
+        long serviceToVenueTotal  = 0;
         for (int i = 0; i < config.ServiceCharges.Count; i++)
         {
             var sc = config.ServiceCharges[i];
@@ -183,37 +184,14 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
             ImGui.PushID($"sc{i}");
 
-            // Editable amount
-            var amtVal = serviceAmtEdits.TryGetValue(i, out var ae) ? ae : sc.Amount.ToString();
-            ImGui.SetNextItemWidth(90);
-            var amtCommit = ImGui.InputText("##scamt", ref amtVal, 20, ImGuiInputTextFlags.EnterReturnsTrue);
-            serviceAmtEdits[i] = amtVal;
-            if (amtCommit || ImGui.IsItemDeactivatedAfterEdit())
-            {
-                if (long.TryParse(amtVal, out var newAmt) && newAmt != 0)
-                {
-                    sc.Amount = newAmt;
-                    config.Save();
-                }
-                serviceAmtEdits.Remove(i);
-            }
-
-            // Editable note
+            DrawServiceField(i, "amt",  sc.Amount.ToString("N0"), 90);
             ImGui.SameLine();
-            var noteVal = serviceNoteEdits.TryGetValue(i, out var ne) ? ne : sc.Note;
-            ImGui.SetNextItemWidth(220);
-            var noteCommit = ImGui.InputTextWithHint("##scnote", "description", ref noteVal, 80, ImGuiInputTextFlags.EnterReturnsTrue);
-            serviceNoteEdits[i] = noteVal;
-            if (noteCommit || ImGui.IsItemDeactivatedAfterEdit())
-            {
-                sc.Note = noteVal.Trim();
-                config.Save();
-                serviceNoteEdits.Remove(i);
-            }
+            var noteLabel = sc.Note.Length > 0 ? sc.Note : "(no description)";
+            DrawServiceField(i, "note", noteLabel, 220, noteIsPlaceholder: sc.Note.Length == 0);
 
             // Dealer/Venue routing toggle
             ImGui.SameLine();
-            if (ImGui.SmallButton(sc.GoesToVenue ? "Venue" : "Dealer"))
+            if (ImGui.SmallButton(sc.GoesToVenue ? "To Venue" : "To Dealer"))
             {
                 sc.GoesToVenue = !sc.GoesToVenue;
                 config.Save();
@@ -227,8 +205,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             {
                 config.ServiceCharges.RemoveAt(i);
                 config.Save();
-                serviceAmtEdits.Clear();
-                serviceNoteEdits.Clear();
+                CancelServiceEdit();
                 ImGui.PopID();
                 break;
             }
@@ -502,6 +479,73 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             color = GameColors.PushGrey;
         var text = value > 0 ? $"+{GameEngine.FormatGil(value)}" : GameEngine.FormatGil(value);
         ImGui.TextColored(color, text);
+    }
+
+    // Renders one editable field on a service-charge row. While not in edit
+    // mode it shows the label text; double-click swaps in an InputText that
+    // commits on Enter or focus-out.
+    private void DrawServiceField(int idx, string field, string label, float editWidth, bool noteIsPlaceholder = false)
+    {
+        var sc = config.ServiceCharges[idx];
+        var isEditing = editingServiceIdx == idx && editingServiceField == field;
+
+        if (isEditing)
+        {
+            ImGui.SetNextItemWidth(editWidth);
+            ImGui.SetKeyboardFocusHere();
+            var commit = field == "amt"
+                ? ImGui.InputText("##scedit", ref editingServiceBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue)
+                : ImGui.InputTextWithHint("##scedit", "description", ref editingServiceBuf, 80, ImGuiInputTextFlags.EnterReturnsTrue);
+            if (commit || ImGui.IsItemDeactivatedAfterEdit())
+            {
+                CommitServiceEdit(sc);
+            }
+            else if (ImGui.IsKeyPressed(ImGuiKey.Escape))
+            {
+                CancelServiceEdit();
+            }
+        }
+        else
+        {
+            ImGui.AlignTextToFramePadding();
+            if (noteIsPlaceholder) ImGui.TextDisabled(label);
+            else                   ImGui.TextUnformatted(label);
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Double-click to edit");
+                if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                {
+                    editingServiceIdx   = idx;
+                    editingServiceField = field;
+                    editingServiceBuf   = field == "amt" ? sc.Amount.ToString() : sc.Note;
+                }
+            }
+        }
+    }
+
+    private void CommitServiceEdit(ServiceCharge sc)
+    {
+        if (editingServiceField == "amt")
+        {
+            if (long.TryParse(editingServiceBuf, out var v) && v != 0)
+            {
+                sc.Amount = v;
+                config.Save();
+            }
+        }
+        else if (editingServiceField == "note")
+        {
+            sc.Note = editingServiceBuf.Trim();
+            config.Save();
+        }
+        CancelServiceEdit();
+    }
+
+    private void CancelServiceEdit()
+    {
+        editingServiceIdx   = -1;
+        editingServiceField = string.Empty;
+        editingServiceBuf   = string.Empty;
     }
 
     private long CalcBetsHeld()
