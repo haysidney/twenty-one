@@ -56,6 +56,7 @@ public partial class MainWindow : Window, IDisposable
     private int    bankManagePlayerIndex = -1;
     private string bankDepositBuf        = string.Empty;
     private string bankWithdrawBuf       = string.Empty;
+    private string bankCreditBuf         = string.Empty;
     // Discriminated prompt for trade-result modals. Only one may be active at a time.
     private abstract record PendingPrompt
     {
@@ -286,6 +287,14 @@ public partial class MainWindow : Window, IDisposable
         var (newBalance, entry) = BankLedger.Apply(stat.Bank, tx, DateTime.Now);
         stat.Bank = newBalance;
         stat.BankLog.Add(entry);
+        // Credit drains first: a BankCredit lifts the outstanding amount; every
+        // other tx (bet / withdrawal / loss / win) clamps it down to the new
+        // bank balance. Withdrawals against a fully-phantom bank therefore
+        // dissolve credit without recording a real gil outflow.
+        if (tx is BankCredit c)
+            stat.CreditOutstanding += c.Amount;
+        else
+            stat.CreditOutstanding = Math.Min(stat.CreditOutstanding, stat.Bank);
     }
 
     // Adjust a player's bet during the Deal phase, reconciling their bank in lockstep.

@@ -52,6 +52,11 @@ public class PlayerStat
     public int     Charlies    { get; set; } = 0;
     public long    TotalWon    { get; set; } = 0;
     public long    Bank        { get; set; } = 0;
+    // Phantom portion of Bank from VIP / free-play credit. Always clamped to
+    // [0, Bank]. Subtracted from banksHeld in the session-ledger reconciliation
+    // so issued credit doesn't masquerade as a real obligation. Increments on
+    // BankCredit; clamped down by every other bank txn (credit drains first).
+    public long    CreditOutstanding { get; set; } = 0;
     public bool    MaintainBet { get; set; } = false;
     // When true, trade-detected withdrawals up to the current balance are applied
     // silently (no prompt). Auto-clears when Bank reaches 0.

@@ -962,7 +962,11 @@ public partial class MainWindow
             ImGui.AlignTextToFramePadding();
             ImGui.Text($"{bmp.DisplayName}");
             ImGui.SameLine();
-            ImGui.TextDisabled($"Bank: {bmpBank:N0}");
+            var bmpCredit = bmpStat.CreditOutstanding;
+            var bmpReal   = bmpBank - bmpCredit;
+            ImGui.TextDisabled(bmpCredit > 0
+                ? $"Bank: {bmpBank:N0} ({bmpReal:N0} real, {bmpCredit:N0} credit)"
+                : $"Bank: {bmpBank:N0}");
             if (ImGui.IsItemClicked()) ImGui.SetClipboardText(bmpBank.ToString());
             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Click to copy");
             if (bmp.World.Length > 0)
@@ -1009,6 +1013,24 @@ public partial class MainWindow
                 bankWithdrawBuf = string.Empty;
             }
             if (!canWd2) ImGui.EndDisabled();
+
+            ImGui.Spacing();
+
+            // Issue Credit (phantom deposit; no real gil moves)
+            ImGui.AlignTextToFramePadding(); ImGui.Text("Credit"); ImGui.SameLine(80);
+            ImGui.SetNextItemWidth(140);
+            ImGui.InputText("##bankcredit", ref bankCreditBuf, 20);
+            ImGui.SameLine();
+            var canCredit = long.TryParse(bankCreditBuf, out var crAmt) && crAmt > 0;
+            if (!canCredit) ImGui.BeginDisabled();
+            if (ImGui.Button("Issue##bankcreditconfirm"))
+            {
+                ApplyBank(bmpStat, new BankCredit(crAmt));
+                bankCreditBuf = string.Empty;
+            }
+            if (!canCredit) ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip("Issue a VIP / free-play credit. Adds to bank without real gil moving.\nCredit drains first when the player bets, loses, or withdraws.");
 
             ImGui.Spacing();
 

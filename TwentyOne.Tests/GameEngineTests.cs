@@ -2966,6 +2966,25 @@ public class BankLedgerTests
         (bank, _) = Apply(bank, new BankBetAdjust(-700));   // bet down by 700
         Assert.Equal(1200, bank);
     }
+
+    // ── Credit (VIP / free play) ───────────────────────────────────────────────
+
+    [Fact]
+    public void Credit_IncreasesBalance_AndLabelsCorrectly()
+    {
+        var (bal, entry) = Apply(0, new BankCredit(500));
+        Assert.Equal(500, bal);
+        Assert.Equal(500, entry.Balance);
+        Assert.Equal(500, entry.Amount);
+        Assert.Equal(BankTransactionKind.Credit, entry.Kind);
+    }
+
+    [Fact]
+    public void Credit_StacksOntoExistingBalance()
+    {
+        var (bal, _) = Apply(1000, new BankCredit(500));
+        Assert.Equal(1500, bal);
+    }
 }
 
 public class AdjustBetTests

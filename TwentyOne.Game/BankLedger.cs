@@ -2,7 +2,7 @@ using System;
 
 namespace TwentyOne.Game;
 
-public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split, BetAdjust, Surrender }
+public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split, BetAdjust, Surrender, Credit }
 
 [Serializable]
 public class BankTransactionEntry
@@ -29,6 +29,10 @@ public record BankBetAdjust(long Delta)   : IBankTransaction;
 // returned to the bank (bet - ceil(bet/2)); the half-loss was already debited
 // by the original BankBet at deal start.
 public record BankSurrender(long Amount)  : IBankTransaction;
+// Phantom deposit (VIP / free play). Adds to bank without any real gil moving.
+// The caller is responsible for incrementing PlayerStat.CreditOutstanding so the
+// reconciliation formula can subtract the still-phantom portion from banksHeld.
+public record BankCredit(long Amount)     : IBankTransaction;
 
 public static class BankLedger
 {
@@ -49,6 +53,7 @@ public static class BankLedger
             BankSplit      s => (Math.Max(0, balance - s.Amount), BankTransactionKind.Split,      s.Amount),
             BankBetAdjust  a => (Math.Max(0, balance - a.Delta),  BankTransactionKind.BetAdjust,  a.Delta),
             BankSurrender  s => (balance + s.Amount,              BankTransactionKind.Surrender,  s.Amount),
+            BankCredit     c => (balance + c.Amount,              BankTransactionKind.Credit,     c.Amount),
             _                => throw new ArgumentOutOfRangeException(nameof(tx)),
         };
 

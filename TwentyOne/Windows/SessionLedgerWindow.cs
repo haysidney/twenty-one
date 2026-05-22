@@ -219,16 +219,22 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         ImGui.Separator();
 
         // Reconciliation
-        var difference   = config.GilEnd - config.GilStart;
-        var grandTotal   = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
-        var betsHeld     = CalcBetsHeld();
-        var banksHeld    = config.PlayerStatsStore.Values.Sum(s => s.Bank);
-        var adjustedDiff = difference - betsHeld - banksHeld - tipTotal - serviceTotal;
-        var reconciled   = adjustedDiff + grandTotal == 0;
+        var difference     = config.GilEnd - config.GilStart;
+        var grandTotal     = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
+        var betsHeld       = CalcBetsHeld();
+        var banksHeldGross = config.PlayerStatsStore.Values.Sum(s => s.Bank);
+        var creditOut      = config.PlayerStatsStore.Values.Sum(s => s.CreditOutstanding);
+        var banksHeld      = banksHeldGross - creditOut;
+        var adjustedDiff   = difference - betsHeld - banksHeld - tipTotal - serviceTotal;
+        var reconciled     = adjustedDiff + grandTotal == 0;
 
         ImGui.Text("House Difference:"); ImGui.SameLine(130); ColoredGilText(difference);
         ImGui.Text("Bets held:");        ImGui.SameLine(130); ImGui.Text($"{betsHeld:N0} gil");
-        ImGui.Text("Player banks:");     ImGui.SameLine(130); ImGui.Text($"{banksHeld:N0} gil");
+        ImGui.Text("Player banks:");     ImGui.SameLine(130);
+        if (creditOut > 0)
+            ImGui.Text($"{banksHeld:N0} gil ({banksHeldGross:N0} bank - {creditOut:N0} credit)");
+        else
+            ImGui.Text($"{banksHeld:N0} gil");
         ImGui.Text("Tips held:");        ImGui.SameLine(130); ImGui.Text($"{tipTotal:N0} gil");
         ImGui.Text("Service revenue:");  ImGui.SameLine(130); ImGui.Text($"{serviceTotal:N0} gil");
         ImGui.Text("Adjusted:");         ImGui.SameLine(130); ColoredGilText(adjustedDiff);

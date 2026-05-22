@@ -113,13 +113,14 @@ nix develop --command dotnet test TwentyOne.Tests/TwentyOne.Tests.csproj
 `BankLedger.Apply(long balance, BankTransaction) → (long NewBalance, BankTransactionEntry)`
 
 - Lives in `TwentyOne.Game/BankLedger.cs` - no Dalamud dependency, fully unit-testable.
-- `BankTransaction` is a discriminated union: `BankDeposit`, `BankWithdrawal`, `BankBet`, `BankWin`, `BankDoubleDown`, `BankSplit`, `BankBetAdjust`.
+- `BankTransaction` is a discriminated union: `BankDeposit`, `BankWithdrawal`, `BankBet`, `BankWin`, `BankDoubleDown`, `BankSplit`, `BankBetAdjust`, `BankSurrender`, `BankCredit`.
 - Never produces a negative balance - debits clamp to zero.
 - Returns both the new balance and a log entry (timestamp, kind, amount, post-transaction balance).
-- `MainWindow` calls `ApplyBank(stat, tx)` which calls `BankLedger.Apply`, writes result back to `stat.Bank`, appends entry to `stat.BankLog`. No raw bank arithmetic anywhere else.
+- `MainWindow` calls `ApplyBank(stat, tx)` which calls `BankLedger.Apply`, writes result back to `stat.Bank`, appends entry to `stat.BankLog`. No raw bank arithmetic anywhere else. `ApplyBank` also maintains `PlayerStat.CreditOutstanding`: a `BankCredit` lifts it, every other tx clamps it down to the new bank balance (credit drains first).
 - Bank mutations are intentionally outside `GameState` and the undo stack - they represent real-money ledger entries.
 - Double/split bank deduction happens at **Confirm** time (not at Dbl/Spl button click).
 - `BankBetAdjust` carries a **signed** `Delta`: positive deducts (bet went up), negative refunds (bet went down). The stored `BankTransactionEntry.Amount` keeps the sign so the audit log shows direction.
+- `BankCredit` is a phantom deposit (VIP / free play). It increases bank like a deposit but never represents real gil received, so the session-ledger reconciliation subtracts `sum(PlayerStat.CreditOutstanding)` from `banksHeld`. When a player bets, loses, or withdraws against a credit-funded bank, credit drains first; any remaining credit dissolves silently on withdrawal (no real gil out).
 
 ### GameEngine (pure functional core)
 
