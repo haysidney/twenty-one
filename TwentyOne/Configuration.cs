@@ -36,8 +36,10 @@ public class PlayerStatsSession
 [Serializable]
 public class ServiceCharge
 {
-    public long   Amount { get; set; } = 0;
-    public string Note   { get; set; } = string.Empty;
+    public long   Amount       { get; set; } = 0;
+    public string Note         { get; set; } = string.Empty;
+    // Per-charge routing in the dealer/venue split. Default = dealer.
+    public bool   GoesToVenue  { get; set; } = false;
 }
 
 [Serializable]
@@ -103,10 +105,9 @@ public class VenueSettings
     public List<long> Tips         { get; set; } = [];
 
     // Side revenue (VIP memberships, table service, etc.) recorded separately
-    // from Tips and gambling profit. ServiceGoesToVenue routes the total to the
-    // venue side of the payout split; default is dealer.
-    public List<ServiceCharge> ServiceCharges    { get; set; } = [];
-    public bool                ServiceGoesToVenue { get; set; } = false;
+    // from Tips and gambling profit. Each entry carries its own Dealer/Venue
+    // routing so a session can mix dealer-keep service with venue-routed sales.
+    public List<ServiceCharge> ServiceCharges { get; set; } = [];
 
     // ── Player stats ───────────────────────────────────────────────────────────
     // Key: "{FullName}@{World}" for FFXIV players, Nickname for manual players.
@@ -200,7 +201,6 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public int    DealerCutPct               { get => ActiveVenue.DealerCutPct;               set => ActiveVenue.DealerCutPct = value; }
     [JsonIgnore] public List<long> Tips                   { get => ActiveVenue.Tips;                       set => ActiveVenue.Tips = value; }
     [JsonIgnore] public List<ServiceCharge> ServiceCharges { get => ActiveVenue.ServiceCharges;            set => ActiveVenue.ServiceCharges = value; }
-    [JsonIgnore] public bool   ServiceGoesToVenue          { get => ActiveVenue.ServiceGoesToVenue;        set => ActiveVenue.ServiceGoesToVenue = value; }
     [JsonIgnore] public Dictionary<string, PlayerStat> PlayerStatsStore { get => ActiveVenue.PlayerStatsStore; set => ActiveVenue.PlayerStatsStore = value; }
     [JsonIgnore] public List<RoundHistoryEntry> RoundHistory { get => ActiveVenue.RoundHistory; set => ActiveVenue.RoundHistory = value; }
     [JsonIgnore] public List<PlayerStatsSession> StatsSessions { get => ActiveVenue.StatsSessions; set => ActiveVenue.StatsSessions = value; }

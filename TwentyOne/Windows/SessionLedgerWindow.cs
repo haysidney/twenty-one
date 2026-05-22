@@ -24,6 +24,10 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     private string tipBuf           = string.Empty;
     private string serviceAmountBuf = string.Empty;
     private string serviceNoteBuf   = string.Empty;
+    // In-flight buffers for editing existing service charges. Keyed by list
+    // index; cleared whenever a charge is removed (indexes shift after delete).
+    private readonly Dictionary<int, string> serviceAmtEdits  = new();
+    private readonly Dictionary<int, string> serviceNoteEdits = new();
 
     private readonly EdgeStatsCache _edgeCache = new();
 
@@ -166,46 +170,79 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
         ImGui.Separator();
         ImGui.Text("Service Charges");
-        ImGui.SameLine();
-        var goesToVenue = config.ServiceGoesToVenue;
-        if (ImGui.SmallButton(goesToVenue ? "to Venue" : "to Dealer"))
-        {
-            config.ServiceGoesToVenue = !goesToVenue;
-            config.Save();
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Click to toggle where service revenue is routed in the payout split.");
 
-        long serviceTotal = 0;
+        long serviceTotal           = 0;
+        long serviceToDealerTotal   = 0;
+        long serviceToVenueTotal    = 0;
         for (int i = 0; i < config.ServiceCharges.Count; i++)
         {
             var sc = config.ServiceCharges[i];
             serviceTotal += sc.Amount;
-            ImGui.Text($"  {sc.Amount:N0}");
-            ImGui.SameLine();
+            if (sc.GoesToVenue) serviceToVenueTotal  += sc.Amount;
+            else                serviceToDealerTotal += sc.Amount;
+
             ImGui.PushID($"sc{i}");
+
+            // Editable amount
+            var amtVal = serviceAmtEdits.TryGetValue(i, out var ae) ? ae : sc.Amount.ToString();
+            ImGui.SetNextItemWidth(90);
+            var amtCommit = ImGui.InputText("##scamt", ref amtVal, 20, ImGuiInputTextFlags.EnterReturnsTrue);
+            serviceAmtEdits[i] = amtVal;
+            if (amtCommit || ImGui.IsItemDeactivatedAfterEdit())
+            {
+                if (long.TryParse(amtVal, out var newAmt) && newAmt != 0)
+                {
+                    sc.Amount = newAmt;
+                    config.Save();
+                }
+                serviceAmtEdits.Remove(i);
+            }
+
+            // Editable note
+            ImGui.SameLine();
+            var noteVal = serviceNoteEdits.TryGetValue(i, out var ne) ? ne : sc.Note;
+            ImGui.SetNextItemWidth(220);
+            var noteCommit = ImGui.InputTextWithHint("##scnote", "description", ref noteVal, 80, ImGuiInputTextFlags.EnterReturnsTrue);
+            serviceNoteEdits[i] = noteVal;
+            if (noteCommit || ImGui.IsItemDeactivatedAfterEdit())
+            {
+                sc.Note = noteVal.Trim();
+                config.Save();
+                serviceNoteEdits.Remove(i);
+            }
+
+            // Dealer/Venue routing toggle
+            ImGui.SameLine();
+            if (ImGui.SmallButton(sc.GoesToVenue ? "Venue" : "Dealer"))
+            {
+                sc.GoesToVenue = !sc.GoesToVenue;
+                config.Save();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Click to toggle whether this charge is routed to the dealer or venue in the payout split.");
+
+            // Delete
+            ImGui.SameLine();
             if (ImGui.SmallButton("X"))
             {
                 config.ServiceCharges.RemoveAt(i);
                 config.Save();
+                serviceAmtEdits.Clear();
+                serviceNoteEdits.Clear();
                 ImGui.PopID();
                 break;
             }
+
             ImGui.PopID();
-            if (sc.Note.Length > 0)
-            {
-                ImGui.SameLine();
-                ImGui.TextDisabled(sc.Note);
-            }
         }
 
         ImGui.Text($"Service total: {serviceTotal:N0} gil");
 
-        ImGui.SetNextItemWidth(120);
-        var addService = ImGui.InputText("##serviceamt", ref serviceAmountBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue);
+        ImGui.SetNextItemWidth(90);
+        var addService = ImGui.InputTextWithHint("##serviceamt", "amount", ref serviceAmountBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
-        ImGui.SetNextItemWidth(200);
-        addService |= ImGui.InputText("##servicenote", ref serviceNoteBuf, 80, ImGuiInputTextFlags.EnterReturnsTrue);
+        ImGui.SetNextItemWidth(220);
+        addService |= ImGui.InputTextWithHint("##servicenote", "description", ref serviceNoteBuf, 80, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         addService |= ImGui.Button("Add Service");
         if (addService && long.TryParse(serviceAmountBuf, out var svcAmt) && svcAmt != 0)
@@ -258,8 +295,8 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         var profit      = difference - betsHeld - banksHeld - tipTotal - serviceTotal;
         var venueOwes   = profit > 0 ? (long)Math.Floor(profit * config.DealerCutPct / 100.0) : 0;
         var dealerKeeps = profit > 0 ? profit - venueOwes + tipTotal : tipTotal;
-        if (config.ServiceGoesToVenue) venueOwes   += serviceTotal;
-        else                            dealerKeeps += serviceTotal;
+        venueOwes   += serviceToVenueTotal;
+        dealerKeeps += serviceToDealerTotal;
         ImGui.Separator();
         CopyableGilRow("Profit", profit);
         ImGui.Separator();
