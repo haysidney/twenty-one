@@ -112,20 +112,51 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip("Hold Ctrl and click to overwrite starting gil with the current value."u8);
 
+        // Auto-update: track dealer's gil every frame when enabled.
+        if (config.AutoUpdateGilEnd)
+        {
+            var liveGil = (long)InventoryManager.Instance()->GetGil();
+            if (liveGil != config.GilEnd)
+            {
+                config.GilEnd = liveGil;
+                gilEndBuf = liveGil.ToString();
+            }
+        }
+
         ImGui.Text("Ending Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);
-        if (ImGui.InputTextWithHint("##gilend", "amount", ref gilEndBuf, 20) && long.TryParse(gilEndBuf, out var v2))
+        if (!config.AutoUpdateGilEnd)
         {
-            config.GilEnd = v2; config.Save();
+            if (ImGui.InputTextWithHint("##gilend", "amount", ref gilEndBuf, 20) && long.TryParse(gilEndBuf, out var v2))
+            {
+                config.GilEnd = v2; config.Save();
+            }
+        }
+        else
+        {
+            ImGui.BeginDisabled();
+            ImGui.InputTextWithHint("##gilend", "amount", ref gilEndBuf, 20);
+            ImGui.EndDisabled();
         }
         ImGui.SameLine();
-        if (ImGui.SmallButton("Current##end"))
+        if (config.AutoUpdateGilEnd) ImGui.BeginDisabled();
+        if (ImGui.SmallButton("Current##end") && !config.AutoUpdateGilEnd)
         {
             var gil = (long)InventoryManager.Instance()->GetGil();
             config.GilEnd = gil;
             gilEndBuf = gil.ToString();
             config.Save();
         }
+        if (config.AutoUpdateGilEnd) ImGui.EndDisabled();
+        ImGui.SameLine();
+        var autoUpdate = config.AutoUpdateGilEnd;
+        if (ImGui.Checkbox("Auto Update##gilend", ref autoUpdate))
+        {
+            config.AutoUpdateGilEnd = autoUpdate;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("When enabled, Ending Gil tracks your on-hand gil automatically. Disable to set it manually."u8);
 
         ImGui.AlignTextToFramePadding(); ImGui.Text("Venue Cut %"); ImGui.SameLine();
         ImGui.SetNextItemWidth(100);
