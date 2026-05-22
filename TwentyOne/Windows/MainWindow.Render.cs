@@ -1089,6 +1089,7 @@ public partial class MainWindow
             if (ImGui.Button("Clear All##bankClear"))
             {
                 bmpStat.Bank = 0;
+                bmpStat.CreditOutstanding = 0;
                 bmpStat.MaintainBet = false;
                 bmpStat.BankLog.Clear();
                 config.Save();
@@ -1119,7 +1120,7 @@ public partial class MainWindow
                 {
                     var entry    = log[li];
                     // BetAdjust stores a signed delta: negative means bet decreased → bank refunded.
-                    var isCredit = entry.Kind is BankTransactionKind.Deposit or BankTransactionKind.Win or BankTransactionKind.Surrender
+                    var isCredit = entry.Kind is BankTransactionKind.Deposit or BankTransactionKind.Win or BankTransactionKind.Surrender or BankTransactionKind.Credit
                                 || (entry.Kind == BankTransactionKind.BetAdjust && entry.Amount < 0);
                     ImGui.TableNextRow();
                     ImGui.TableSetColumnIndex(0); ImGui.TextUnformatted(entry.Timestamp.ToString("HH:mm"));
@@ -1133,6 +1134,7 @@ public partial class MainWindow
                         BankTransactionKind.Split      => "Split",
                         BankTransactionKind.BetAdjust  => "Bet Adj",
                         BankTransactionKind.Surrender  => "Surrender",
+                        BankTransactionKind.Credit     => "Credit",
                         _                              => "?"
                     });
                     ImGui.TableSetColumnIndex(2);
