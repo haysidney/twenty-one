@@ -29,9 +29,9 @@ public record BankBetAdjust(long Delta)   : IBankTransaction;
 // returned to the bank (bet - ceil(bet/2)); the half-loss was already debited
 // by the original BankBet at deal start.
 public record BankSurrender(long Amount)  : IBankTransaction;
-// Phantom deposit (VIP / free play). Adds to bank without any real gil moving.
-// The caller is responsible for incrementing PlayerStat.CreditOutstanding so the
-// reconciliation formula can subtract the still-phantom portion from banksHeld.
+// Venue-funded deposit (VIP / free play). Behaves like a regular deposit in the
+// bank ledger; tagged separately so the session ledger can total credits issued
+// and the bank log distinguishes them from player deposits.
 public record BankCredit(long Amount)     : IBankTransaction;
 
 public static class BankLedger

@@ -267,21 +267,27 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         var difference     = config.GilEnd - config.GilStart;
         var grandTotal     = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
         var betsHeld       = CalcBetsHeld();
-        var banksHeldGross = config.PlayerStatsStore.Values.Sum(s => s.Bank);
-        var creditOut      = config.PlayerStatsStore.Values.Sum(s => s.CreditOutstanding);
-        var banksHeld      = banksHeldGross - creditOut;
+        var banksHeld      = config.PlayerStatsStore.Values.Sum(s => s.Bank);
+        // Venue-funded credits sit in the dealer's pile (Vral pre-loaded them into
+        // Starting Gil), so they need to enter the balance the same way grandTotal
+        // does: as a phantom contribution that closes the books when credit-funded
+        // gil ends up in player banks, gets cashed out, or drains back to the house.
+        var creditIssued   = config.PlayerStatsStore.Values
+            .SelectMany(s => s.BankLog)
+            .Where(e => e.Kind == BankTransactionKind.Credit)
+            .Sum(e => e.Amount);
         var adjustedDiff   = difference - betsHeld - banksHeld - tipTotal - serviceTotal;
-        var reconciled     = adjustedDiff + grandTotal == 0;
+        var reconciled     = adjustedDiff + grandTotal + creditIssued == 0;
 
         ImGui.Text("House Difference:"); ImGui.SameLine(130); ColoredGilText(difference);
         ImGui.Text("Bets held:");        ImGui.SameLine(130); ImGui.Text($"{betsHeld:N0} gil");
-        ImGui.Text("Player banks:");     ImGui.SameLine(130);
-        if (creditOut > 0)
-            ImGui.Text($"{banksHeld:N0} gil ({banksHeldGross:N0} bank - {creditOut:N0} credit)");
-        else
-            ImGui.Text($"{banksHeld:N0} gil");
+        ImGui.Text("Player banks:");     ImGui.SameLine(130); ImGui.Text($"{banksHeld:N0} gil");
         ImGui.Text("Tips held:");        ImGui.SameLine(130); ImGui.Text($"{tipTotal:N0} gil");
         ImGui.Text("Service revenue:");  ImGui.SameLine(130); ImGui.Text($"{serviceTotal:N0} gil");
+        if (creditIssued > 0)
+        {
+            ImGui.Text("Credits issued:"); ImGui.SameLine(130); ImGui.Text($"{creditIssued:N0} gil");
+        }
         ImGui.Text("Adjusted:");         ImGui.SameLine(130); ColoredGilText(adjustedDiff);
         ImGui.SameLine(0, 20);
         ImGui.Text("Player Net:"); ImGui.SameLine();

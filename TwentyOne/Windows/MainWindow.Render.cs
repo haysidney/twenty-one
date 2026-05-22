@@ -962,11 +962,7 @@ public partial class MainWindow
             ImGui.AlignTextToFramePadding();
             ImGui.Text($"{bmp.DisplayName}");
             ImGui.SameLine();
-            var bmpCredit = bmpStat.CreditOutstanding;
-            var bmpReal   = bmpBank - bmpCredit;
-            ImGui.TextDisabled(bmpCredit > 0
-                ? $"Bank: {bmpBank:N0} ({bmpReal:N0} real, {bmpCredit:N0} credit)"
-                : $"Bank: {bmpBank:N0}");
+            ImGui.TextDisabled($"Bank: {bmpBank:N0}");
             if (ImGui.IsItemClicked()) ImGui.SetClipboardText(bmpBank.ToString());
             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Click to copy");
             if (bmp.World.Length > 0)
@@ -1089,7 +1085,6 @@ public partial class MainWindow
             if (ImGui.Button("Clear All##bankClear"))
             {
                 bmpStat.Bank = 0;
-                bmpStat.CreditOutstanding = 0;
                 bmpStat.MaintainBet = false;
                 bmpStat.BankLog.Clear();
                 config.Save();
