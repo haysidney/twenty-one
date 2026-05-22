@@ -92,13 +92,18 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             config.GilStart = v; config.Save();
         }
         ImGui.SameLine();
-        if (ImGui.SmallButton("Current##start"))
+        var ctrlForStart = ImGui.GetIO().KeyCtrl;
+        if (!ctrlForStart) ImGui.BeginDisabled();
+        if (ImGui.SmallButton("Current##start") && ctrlForStart)
         {
             var gil = (long)InventoryManager.Instance()->GetGil();
             config.GilStart = gil;
             gilStartBuf = gil.ToString();
             config.Save();
         }
+        if (!ctrlForStart) ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Hold Ctrl and click to overwrite starting gil with the current value."u8);
 
         ImGui.Text("Ending Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);
@@ -198,9 +203,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         CopyableGilRow("Dealer receives", dealerKeeps);
         CopyableGilRow("Venue receives", venueOwes);
 
-        ImGui.Spacing();
         ImGui.Separator();
-        ImGui.Spacing();
 
         // Edge stats: theoretical uses the currently configured rules ("what does
         // this session look like under my current rule set?"). Realized is purely
@@ -214,9 +217,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         EdgeStatsDisplay.Draw(liveStats, config.RoundHistory.Count,
             "Expected bank gain per gil wagered under your currently configured rules.\nRecomputed across this session's rounds with the current rule set applied.");
 
-        ImGui.Spacing();
         ImGui.Separator();
-        ImGui.Spacing();
 
         // Player stats controls
         if (ImGui.Button("History") && _historyWindow != null)

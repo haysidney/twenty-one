@@ -19,7 +19,6 @@ public static class EdgeStatsDisplay
 
     private static void DrawRow(string label, double? edge, string tooltip)
     {
-        ImGui.AlignTextToFramePadding();
         ImGui.TextUnformatted(label);
         ImGui.SameLine();
         if (!edge.HasValue)
