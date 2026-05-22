@@ -60,7 +60,7 @@ public class ConfigWindow : Window, IDisposable
         ImGui.SameLine();
         var dealerName = config.DealerName;
         ImGui.SetNextItemWidth(160);
-        if (ImGui.InputText("##dealerName", ref dealerName, 64))
+        if (ImGui.InputTextWithHint("##dealerName", "name", ref dealerName, 64))
         {
             config.DealerName = dealerName;
             config.Save();
@@ -271,7 +271,7 @@ public class ConfigWindow : Window, IDisposable
         {
             ImGui.SetNextItemWidth(-1);
             if (ImGui.IsWindowAppearing()) ImGui.SetKeyboardFocusHere();
-            var confirmed = ImGui.InputText("##venueRenameInput", ref _renameBuffer, 64, ImGuiInputTextFlags.EnterReturnsTrue);
+            var confirmed = ImGui.InputTextWithHint("##venueRenameInput", "new name", ref _renameBuffer, 64, ImGuiInputTextFlags.EnterReturnsTrue);
             if (confirmed || ImGui.Button("OK##venueRenameOK"))
             {
                 if (!string.IsNullOrWhiteSpace(_renameBuffer))
@@ -300,7 +300,7 @@ public class ConfigWindow : Window, IDisposable
         {
             ImGui.SetNextItemWidth(-1);
             if (ImGui.IsWindowAppearing()) ImGui.SetKeyboardFocusHere();
-            var confirmed = ImGui.InputText("##venueDuplicateInput", ref _renameBuffer, 64, ImGuiInputTextFlags.EnterReturnsTrue);
+            var confirmed = ImGui.InputTextWithHint("##venueDuplicateInput", "new name", ref _renameBuffer, 64, ImGuiInputTextFlags.EnterReturnsTrue);
             if (confirmed || ImGui.Button("OK##venueDuplicateOK"))
             {
                 if (!string.IsNullOrWhiteSpace(_renameBuffer))

@@ -94,7 +94,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         // Gil inputs
         ImGui.Text("Starting Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);
-        if (ImGui.InputText("##gilstart", ref gilStartBuf, 20) && long.TryParse(gilStartBuf, out var v))
+        if (ImGui.InputTextWithHint("##gilstart", "amount", ref gilStartBuf, 20) && long.TryParse(gilStartBuf, out var v))
         {
             config.GilStart = v; config.Save();
         }
@@ -114,7 +114,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
         ImGui.Text("Ending Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);
-        if (ImGui.InputText("##gilend", ref gilEndBuf, 20) && long.TryParse(gilEndBuf, out var v2))
+        if (ImGui.InputTextWithHint("##gilend", "amount", ref gilEndBuf, 20) && long.TryParse(gilEndBuf, out var v2))
         {
             config.GilEnd = v2; config.Save();
         }
@@ -159,7 +159,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         ImGui.Text($"Tips total: {tipTotal:N0} gil");
 
         ImGui.SetNextItemWidth(120);
-        var addTip = ImGui.InputText("##tipinput", ref tipBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue);
+        var addTip = ImGui.InputTextWithHint("##tipinput", "amount", ref tipBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         addTip |= ImGui.Button("Add Tip");
         if (addTip && long.TryParse(tipBuf, out var tip) && tip != 0)
@@ -494,7 +494,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             ImGui.SetNextItemWidth(editWidth);
             ImGui.SetKeyboardFocusHere();
             var commit = field == "amt"
-                ? ImGui.InputText("##scedit", ref editingServiceBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue)
+                ? ImGui.InputTextWithHint("##scedit", "amount", ref editingServiceBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue)
                 : ImGui.InputTextWithHint("##scedit", "description", ref editingServiceBuf, 80, ImGuiInputTextFlags.EnterReturnsTrue);
             if (commit || ImGui.IsItemDeactivatedAfterEdit())
             {

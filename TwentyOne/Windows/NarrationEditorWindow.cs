@@ -365,7 +365,7 @@ public class NarrationEditorWindow : Window
         {
             var line = lines[i];
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - btnW);
-            if (ImGui.InputText($"##{id}_{vi}_{i}", ref line, 512))
+            if (ImGui.InputTextWithHint($"##{id}_{vi}_{i}", "chat line text", ref line, 512))
             { lines[i] = line; MarkNarrationDirty(); }
 
             ImGui.SameLine();
@@ -418,7 +418,7 @@ public class NarrationEditorWindow : Window
 
         ImGui.TableSetColumnIndex(1);
         ImGui.SetNextItemWidth(-1);
-        ImGui.InputText($"##{id}", ref value, 512);
+        ImGui.InputTextWithHint($"##{id}", "text", ref value, 512);
 
         ImGui.TableSetColumnIndex(2);
         if (!ctrlHeld) ImGui.BeginDisabled();

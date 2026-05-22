@@ -175,7 +175,7 @@ public class DebugWindow : Window
         }
 
         ImGui.SetNextItemWidth(220);
-        ImGui.InputText("##rollInput", ref _rollInput, 512);
+        ImGui.InputTextWithHint("##rollInput", "e.g. 1, 10, 7, 6", ref _rollInput, 512);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Comma-separated card values (1–13). Enqueued in order."u8);
         ImGui.SameLine();

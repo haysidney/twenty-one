@@ -224,7 +224,7 @@ public partial class MainWindow
                 ImGui.SetNextItemWidth(cellRight - ImGui.GetCursorPosX() - tradeButtonW - confirmButtonW);
                 var betVal = betEdits.TryGetValue(pi, out var e) ? e : p.Bet;
                 if (p.SittingOut) ImGui.BeginDisabled();
-                if (ImGui.InputText($"##bet{pi}", ref betVal, 16, ImGuiInputTextFlags.EnterReturnsTrue))
+                if (ImGui.InputTextWithHint($"##bet{pi}", "amount", ref betVal, 16, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
                     betEdits.Remove(pi);
                     Apply(new SetPlayerBet(pi, betVal));
@@ -346,7 +346,7 @@ public partial class MainWindow
             shortfall = delta - stat.Bank;
 
         ImGui.SetNextItemWidth(cellRight - ImGui.GetCursorPosX() - reservedRight);
-        var submitted = ImGui.InputText($"##adjustbet{pi}", ref adjustBetBuf, 16,
+        var submitted = ImGui.InputTextWithHint($"##adjustbet{pi}", "new bet", ref adjustBetBuf, 16,
             ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll);
 
         var canCommit = parsedNew > 0 && shortfall == 0;
@@ -644,7 +644,7 @@ public partial class MainWindow
             {
                 var okW = ImGui.CalcTextSize("OK").X + ImGui.GetStyle().FramePadding.X * 2 + ImGui.GetStyle().ItemSpacing.X;
                 ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - okW);
-                var submitted = ImGui.InputText($"##rename{pi}", ref renamingBuffer, 64,
+                var submitted = ImGui.InputTextWithHint($"##rename{pi}", "nickname", ref renamingBuffer, 64,
                     ImGuiInputTextFlags.EnterReturnsTrue | ImGuiInputTextFlags.AutoSelectAll);
                 ImGui.SameLine();
                 var canConfirm = renamingBuffer.Length > 0 || p.World.Length > 0;
@@ -983,7 +983,7 @@ public partial class MainWindow
             // Deposit
             ImGui.AlignTextToFramePadding(); ImGui.Text("Deposit"); ImGui.SameLine(80);
             ImGui.SetNextItemWidth(140);
-            ImGui.InputText("##bankdep", ref bankDepositBuf, 20);
+            ImGui.InputTextWithHint("##bankdep", "amount", ref bankDepositBuf, 20);
             ImGui.SameLine();
             var canDep2 = long.TryParse(bankDepositBuf, out var depAmt2) && depAmt2 > 0;
             if (!canDep2) ImGui.BeginDisabled();
@@ -1001,7 +1001,7 @@ public partial class MainWindow
             // Withdraw
             ImGui.AlignTextToFramePadding(); ImGui.Text("Withdraw"); ImGui.SameLine(80);
             ImGui.SetNextItemWidth(140);
-            ImGui.InputText("##bankwd", ref bankWithdrawBuf, 20);
+            ImGui.InputTextWithHint("##bankwd", "amount", ref bankWithdrawBuf, 20);
             ImGui.SameLine();
             var canWd2 = long.TryParse(bankWithdrawBuf, out var wdAmt2) && wdAmt2 > 0 && wdAmt2 <= bmpBank;
             if (!canWd2) ImGui.BeginDisabled();
@@ -1019,7 +1019,7 @@ public partial class MainWindow
             // Issue Credit (phantom deposit; no real gil moves)
             ImGui.AlignTextToFramePadding(); ImGui.Text("Credit"); ImGui.SameLine(80);
             ImGui.SetNextItemWidth(140);
-            ImGui.InputText("##bankcredit", ref bankCreditBuf, 20);
+            ImGui.InputTextWithHint("##bankcredit", "amount", ref bankCreditBuf, 20);
             ImGui.SameLine();
             var canCredit = long.TryParse(bankCreditBuf, out var crAmt) && crAmt > 0;
             if (!canCredit) ImGui.BeginDisabled();
@@ -1777,7 +1777,7 @@ public partial class MainWindow
         if (Phase != GamePhase.Betting) return;
 
         ImGui.SetNextItemWidth(200);
-        var nameSubmitted = ImGui.InputText("##newName"u8, ref newPlayerName, 64,
+        var nameSubmitted = ImGui.InputTextWithHint("##newName", "player name", ref newPlayerName, 64,
             ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         var canAdd = newPlayerName.Length > 0;
