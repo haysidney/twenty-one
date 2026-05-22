@@ -408,11 +408,26 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         var gs = config.GameState;
         if (gs.Phase == GamePhase.Betting) return 0;
         long total = 0;
-        foreach (var player in gs.Players)
+        for (var pi = 0; pi < gs.Players.Length; pi++)
         {
+            var player = gs.Players[pi];
             if (player.SittingOut) continue;
-            foreach (var hand in player.Hands)
-                total += (long)GameEngine.GetEffectiveBet(player, hand);
+
+            if (gs.Phase == GamePhase.Payout)
+            {
+                // Banking players were auto-settled in UpdatePlayerStats: bet + winnings
+                // moved into the bank, so they're already counted in banksHeld. Counting
+                // their bets here would double-count. Non-banking players still have
+                // bet + winnings sitting with the dealer until trade-back.
+                if (player.TryGetBankingStat(config, out _)) continue;
+                for (var hi = 0; hi < player.Hands.Length; hi++)
+                    total += (long)GameEngine.PayoutTotalOwed(gs, pi, hi);
+            }
+            else
+            {
+                foreach (var hand in player.Hands)
+                    total += (long)GameEngine.GetEffectiveBet(player, hand);
+            }
         }
         return total;
     }
