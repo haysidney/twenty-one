@@ -19,9 +19,11 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     private readonly FileDialogManager _fileDialogManager = new();
     private HistoryWindow? _historyWindow;
 
-    private string gilStartBuf = string.Empty;
-    private string gilEndBuf   = string.Empty;
-    private string tipBuf      = string.Empty;
+    private string gilStartBuf      = string.Empty;
+    private string gilEndBuf        = string.Empty;
+    private string tipBuf           = string.Empty;
+    private string serviceAmountBuf = string.Empty;
+    private string serviceNoteBuf   = string.Empty;
 
     private readonly EdgeStatsCache _edgeCache = new();
 
@@ -163,19 +165,72 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         }
 
         ImGui.Separator();
+        ImGui.Text("Service Charges");
+        ImGui.SameLine();
+        var goesToVenue = config.ServiceGoesToVenue;
+        if (ImGui.SmallButton(goesToVenue ? "to Venue" : "to Dealer"))
+        {
+            config.ServiceGoesToVenue = !goesToVenue;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Click to toggle where service revenue is routed in the payout split.");
+
+        long serviceTotal = 0;
+        for (int i = 0; i < config.ServiceCharges.Count; i++)
+        {
+            var sc = config.ServiceCharges[i];
+            serviceTotal += sc.Amount;
+            ImGui.Text($"  {sc.Amount:N0}");
+            ImGui.SameLine();
+            ImGui.PushID($"sc{i}");
+            if (ImGui.SmallButton("X"))
+            {
+                config.ServiceCharges.RemoveAt(i);
+                config.Save();
+                ImGui.PopID();
+                break;
+            }
+            ImGui.PopID();
+            if (sc.Note.Length > 0)
+            {
+                ImGui.SameLine();
+                ImGui.TextDisabled(sc.Note);
+            }
+        }
+
+        ImGui.Text($"Service total: {serviceTotal:N0} gil");
+
+        ImGui.SetNextItemWidth(120);
+        var addService = ImGui.InputText("##serviceamt", ref serviceAmountBuf, 20, ImGuiInputTextFlags.EnterReturnsTrue);
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(200);
+        addService |= ImGui.InputText("##servicenote", ref serviceNoteBuf, 80, ImGuiInputTextFlags.EnterReturnsTrue);
+        ImGui.SameLine();
+        addService |= ImGui.Button("Add Service");
+        if (addService && long.TryParse(serviceAmountBuf, out var svcAmt) && svcAmt != 0)
+        {
+            config.ServiceCharges.Add(new ServiceCharge { Amount = svcAmt, Note = serviceNoteBuf.Trim() });
+            config.Save();
+            serviceAmountBuf = string.Empty;
+            serviceNoteBuf   = string.Empty;
+        }
+
+        ImGui.Separator();
 
         // Reconciliation
         var difference   = config.GilEnd - config.GilStart;
         var grandTotal   = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
         var betsHeld     = CalcBetsHeld();
         var banksHeld    = config.PlayerStatsStore.Values.Sum(s => s.Bank);
-        var adjustedDiff = difference - betsHeld - banksHeld - tipTotal;
+        var adjustedDiff = difference - betsHeld - banksHeld - tipTotal - serviceTotal;
         var reconciled   = adjustedDiff + grandTotal == 0;
 
         ImGui.Text("House Difference:"); ImGui.SameLine(130); ColoredGilText(difference);
         ImGui.Text("Bets held:");        ImGui.SameLine(130); ImGui.Text($"{betsHeld:N0} gil");
         ImGui.Text("Player banks:");     ImGui.SameLine(130); ImGui.Text($"{banksHeld:N0} gil");
         ImGui.Text("Tips held:");        ImGui.SameLine(130); ImGui.Text($"{tipTotal:N0} gil");
+        ImGui.Text("Service revenue:");  ImGui.SameLine(130); ImGui.Text($"{serviceTotal:N0} gil");
         ImGui.Text("Adjusted:");         ImGui.SameLine(130); ColoredGilText(adjustedDiff);
         ImGui.SameLine(0, 20);
         ImGui.Text("Player Net:"); ImGui.SameLine();
@@ -194,9 +249,11 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             ImGui.PopStyleColor();
         }
 
-        var profit      = difference - betsHeld - banksHeld - tipTotal;
+        var profit      = difference - betsHeld - banksHeld - tipTotal - serviceTotal;
         var venueOwes   = profit > 0 ? (long)Math.Floor(profit * config.DealerCutPct / 100.0) : 0;
         var dealerKeeps = profit > 0 ? profit - venueOwes + tipTotal : tipTotal;
+        if (config.ServiceGoesToVenue) venueOwes   += serviceTotal;
+        else                            dealerKeeps += serviceTotal;
         ImGui.Separator();
         CopyableGilRow("Profit", profit);
         ImGui.Separator();
@@ -370,6 +427,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
         venue.RoundHistory.Clear();
         venue.Tips.Clear();
+        venue.ServiceCharges.Clear();
         var currentGil = (long)InventoryManager.Instance()->GetGil();
         venue.GilStart = currentGil;
         venue.GilEnd   = currentGil;
