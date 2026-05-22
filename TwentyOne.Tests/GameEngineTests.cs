@@ -204,13 +204,33 @@ public class ApplyAddPlayerCardTests
     }
 
     [Fact]
-    public void AddPlayerCard_HitsTo21_AutoStands_NoAfterHitNarration()
+    public void AddPlayerCard_HitsTo21_AutoStands_NarratesHitThenStand()
     {
-        // 5 + 6 + 10 = 21: hand auto-stands, no "hit or stand?" prompt
+        // 5 + 6 + 10 = 21: hand auto-stands. PlayerHit fires, then PlayerStand
+        // mirrors the dealer-side hit+stand pattern (and rescues configs that
+        // intentionally empty PlayerHit by merging it into PlayerAfterHit).
         var (newState, effects) = GameEngine.Apply(ActivePlayerState(), new AddPlayerCard(0, 0, 10));
         Assert.Equal(HandState.Stand, newState.Players[0].Hands[0].State);
-        Assert.Single(effects); // PlayerHit only, no PlayerAfterHit
-        Assert.Contains("Lorah", ((SendChat)effects[0]).Text);
+        Assert.Equal(2, effects.Count);
+        Assert.Contains("hits", ((SendChat)effects[0]).Text);
+        Assert.Contains("stands", ((SendChat)effects[1]).Text);
+        Assert.Contains("21", ((SendChat)effects[1]).Text);
+    }
+
+    [Fact]
+    public void AddPlayerCard_HitsTo21_EmptyPlayerHitTemplate_StillNarratesStand()
+    {
+        // Repro for the venue-config case where PlayerHit was intentionally
+        // emptied (merged into PlayerAfterHit). Hitting to 21 used to be
+        // completely silent because PlayerAfterHit only fires while Playing.
+        var t = new NarrationTemplates { PlayerHit = [] };
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", 5, 6)
+            .Build();
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 10), templates: t);
+        Assert.Single(effects);
+        Assert.Contains("stands", ((SendChat)effects[0]).Text);
     }
 
     [Fact]

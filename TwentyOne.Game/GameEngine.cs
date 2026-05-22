@@ -690,6 +690,15 @@ public static class GameEngine
                     ("score",   score),
                     ("actions", ValidActionsString(newHand, cd2, cs2)));
             }
+            else if (newHand.State == HandState.Stand)
+            {
+                // Mirror the dealer-side pattern: hit narration is followed by an
+                // explicit stand line when the hand auto-stops (here, hitting to 21).
+                ctx.Narrate(t.PlayerStand,
+                    ("name",  displayName),
+                    ("cards", cards),
+                    ("score", HandValue(newHand.Cards).ToString()));
+            }
         }
     }
 
