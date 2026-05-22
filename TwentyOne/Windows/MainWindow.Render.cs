@@ -1776,18 +1776,18 @@ public partial class MainWindow
         ImGui.Spacing();
         if (Phase != GamePhase.Betting) return;
 
-        ImGui.SetNextItemWidth(200);
-        var nameSubmitted = ImGui.InputTextWithHint("##newName", "player name", ref newPlayerName, 64,
-            ImGuiInputTextFlags.EnterReturnsTrue);
-        ImGui.SameLine();
-        var canAdd = newPlayerName.Length > 0;
+        var target      = Plugin.TargetManager.Target as Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter;
+        var targetName  = target?.Name.TextValue ?? string.Empty;
+        var targetWorld = target?.HomeWorld.Value.Name.ToString() ?? string.Empty;
+        var alreadyIn   = target != null &&
+                          config.GameState.Players.Any(p => p.FullName == targetName && p.World == targetWorld);
+        var canAdd      = target != null && !alreadyIn;
+
         if (!canAdd) ImGui.BeginDisabled();
-        if (ImGui.Button("Add Player") || (nameSubmitted && canAdd))
-        {
-            Apply(new AddPlayer(Nickname: newPlayerName));
-            newPlayerName = string.Empty;
-        }
+        if (ImGui.Button("Add Selected Player"))
+            Apply(new AddPlayer(Nickname: string.Empty, FullName: targetName, World: targetWorld));
         if (!canAdd) ImGui.EndDisabled();
+
         ImGui.Spacing();
     }
 

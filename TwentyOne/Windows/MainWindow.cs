@@ -41,7 +41,6 @@ public partial class MainWindow : Window, IDisposable
     private bool sessionBannerDismissed;
 
     // Betting-phase UI state
-    private string newPlayerName  = string.Empty;
     private int    renamingIndex  = -1;
     private string renamingBuffer = string.Empty;
     private bool   isReorderMode  = false;
