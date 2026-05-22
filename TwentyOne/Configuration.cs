@@ -46,6 +46,9 @@ public class PlayerStat
     public long    TotalWon    { get; set; } = 0;
     public long    Bank        { get; set; } = 0;
     public bool    MaintainBet { get; set; } = false;
+    // When true, trade-detected withdrawals up to the current balance are applied
+    // silently (no prompt). Auto-clears when Bank reaches 0.
+    public bool    CashOut     { get; set; } = false;
     public List<BankTransactionEntry> BankLog { get; set; } = [];
 }
 

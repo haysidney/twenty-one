@@ -1043,6 +1043,22 @@ public partial class MainWindow
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Track this player's bank relative to their bet.\nSuppresses deposit/withdraw narration.");
 
+            ImGui.SameLine();
+
+            // Cash Out toggle: silently treats incoming trades as withdrawals.
+            // Capture the pre-click state so the push/pop pair stays balanced
+            // even when the button click flips the field this frame.
+            var cashOutOn = bmpStat.CashOut;
+            if (cashOutOn) ImGui.PushStyleColor(ImGuiCol.Button, GameColors.ActiveOrange);
+            if (ImGui.Button(cashOutOn ? "Cash Out: ON##cashOut" : "Cash Out##cashOut"))
+            {
+                bmpStat.CashOut = !cashOutOn;
+                config.Save();
+            }
+            if (cashOutOn) ImGui.PopStyleColor();
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Auto-treat incoming trades as withdrawals (no prompt) up to the bank balance.\nTurns off automatically when the bank reaches 0.");
+
             ImGui.Spacing();
 
             // Clear all

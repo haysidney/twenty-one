@@ -553,7 +553,8 @@ public partial class MainWindow : Window, IDisposable
                     pendingPrompt = new PendingPrompt.BankDeposit(pbd.Pi, pbd.Gil);
                 break;
             case TradeMonitor.Outcome.PromptBankWithdraw pbw:
-                if (!TryAutoMaintainBetWithdraw(pbw.Pi, pbw.Gil))
+                if (!TryAutoCashOutWithdraw(pbw.Pi, pbw.Gil)
+                    && !TryAutoMaintainBetWithdraw(pbw.Pi, pbw.Gil))
                     pendingPrompt = new PendingPrompt.BankWithdraw(pbw.Pi, pbw.Gil);
                 break;
             case TradeMonitor.Outcome.PromptBetOrBank pbob:
@@ -595,6 +596,20 @@ public partial class MainWindow : Window, IDisposable
         var bet = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
         if (bet <= 0 || gil != bet) return false;
         ApplyBank(stat, new BankDeposit(gil));
+        config.Save();
+        return true;
+    }
+
+    // Returns true and silently applies if Cash Out mode is on and the trade fits within bank.
+    // Auto-disables Cash Out when the resulting balance reaches 0.
+    private bool TryAutoCashOutWithdraw(int pi, long gil)
+    {
+        if (pi < 0 || pi >= State.Players.Length) return false;
+        var p = State.Players[pi];
+        if (!p.TryGetBankingStat(config, out var stat) || !stat.CashOut) return false;
+        if (gil <= 0 || gil > stat.Bank) return false;
+        ApplyBank(stat, new BankWithdrawal(gil));
+        if (stat.Bank == 0) stat.CashOut = false;
         config.Save();
         return true;
     }
