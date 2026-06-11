@@ -252,7 +252,7 @@ public partial class MainWindow : Window, IDisposable
             {
                 config.NarrationLog.Add(chat.Text);
                 if (config.ChatEnabled)
-                    chatQueue.EnqueueChat(chat.Text, config.ChatChannel, config.AllowCrossChannelCommands, SendChatMessage);
+                    chatQueue.EnqueueChat(chat.Text, config.ChatChannel, config.CrossChannelCommands, SendChatMessage);
             }
             else if (effect is AutoHit ah)
             {
@@ -375,7 +375,7 @@ public partial class MainWindow : Window, IDisposable
             if      (net > 0) stat.GamesWon++;
             else if (net < 0) stat.GamesLost++;
             else               stat.GamesPushed++;
-            stat.TotalWon += (long)net;
+            stat.TotalNet += (long)net;
             if (p.Hands.Any(h => h.State == HandState.Blackjack))
                 stat.Blackjacks++;
             for (var chi = 0; chi < p.Hands.Length; chi++)

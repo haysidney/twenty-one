@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using TwentyOne.Game;
 
 namespace TwentyOne;
 
@@ -53,7 +54,7 @@ internal sealed partial class ChatQueue
     /// resolve cross-channel overrides against <paramref name="configChannel"/>,
     /// and enqueue an entry that will hand the cleaned message to <paramref name="send"/>.
     /// </summary>
-    public void EnqueueChat(string text, string configChannel, bool allowCrossChannelCommands, Action<string> send)
+    public void EnqueueChat(string text, string configChannel, CrossChannelCommands crossChannel, Action<string> send)
     {
         var raw           = text;
         var minWaitAfter  = 0;
@@ -76,8 +77,13 @@ internal sealed partial class ChatQueue
         string msg;
         if (raw.StartsWith('/'))
         {
-            if (!allowCrossChannelCommands && IsCrossChannelCommand(raw, configChannel))
-                raw = "/echo " + raw.Split(' ', 2)[1];
+            if (crossChannel != CrossChannelCommands.Allow && IsCrossChannelCommand(raw, configChannel))
+            {
+                var body = raw.Split(' ', 2)[1];
+                raw = crossChannel == CrossChannelCommands.Redirect
+                    ? configChannel + " " + body
+                    : "/echo " + body;
+            }
             msg = raw;
         }
         else

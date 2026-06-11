@@ -160,10 +160,10 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
         ImGui.AlignTextToFramePadding(); ImGui.Text("Venue Cut %"); ImGui.SameLine();
         ImGui.SetNextItemWidth(100);
-        var cut = config.DealerCutPct;
-        if (ImGui.InputInt("##dealercut", ref cut))
+        var cut = config.VenueCutPct;
+        if (ImGui.InputInt("##venuecut", ref cut))
         {
-            config.DealerCutPct = Math.Clamp(cut, 0, 100);
+            config.VenueCutPct = Math.Clamp(cut, 0, 100);
             config.Save();
         }
 
@@ -265,7 +265,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
         // Reconciliation
         var difference     = config.GilEnd - config.GilStart;
-        var grandTotal     = config.PlayerStatsStore.Values.Sum(s => s.TotalWon);
+        var grandTotal     = config.PlayerStatsStore.Values.Sum(s => s.TotalNet);
         var betsHeld       = CalcBetsHeld();
         var banksHeld      = config.PlayerStatsStore.Values.Sum(s => s.Bank);
         // Venue-funded credits sit in the dealer's pile (Vral pre-loaded them into
@@ -307,7 +307,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         }
 
         var profit      = difference - betsHeld - banksHeld - tipTotal - serviceTotal;
-        var venueOwes   = profit > 0 ? (long)Math.Floor(profit * config.DealerCutPct / 100.0) : 0;
+        var venueOwes   = profit > 0 ? (long)Math.Floor(profit * config.VenueCutPct / 100.0) : 0;
         var dealerKeeps = profit > 0 ? profit - venueOwes + tipTotal : tipTotal;
         venueOwes   += serviceToVenueTotal;
         dealerKeeps += serviceToDealerTotal;
@@ -422,13 +422,13 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
                 ImGui.TableSetColumnIndex(8);
                 ImGui.AlignTextToFramePadding();
                 Vector4 netColor;
-                if (stat.TotalWon > 0)
+                if (stat.TotalNet > 0)
                     netColor = GameColors.ProfitGreen;
-                else if (stat.TotalWon < 0)
+                else if (stat.TotalNet < 0)
                     netColor = GameColors.BustRed;
                 else
                     netColor = GameColors.PushGrey;
-                var netStr = stat.TotalWon > 0 ? $"+{GameEngine.FormatGil(stat.TotalWon)}" : GameEngine.FormatGil(stat.TotalWon);
+                var netStr = stat.TotalNet > 0 ? $"+{GameEngine.FormatGil(stat.TotalNet)}" : GameEngine.FormatGil(stat.TotalNet);
                 ImGui.TextColored(netColor, netStr);
             }
 
@@ -451,7 +451,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
                 GamesLost   = kv.Value.GamesLost,
                 Blackjacks  = kv.Value.Blackjacks,
                 Charlies    = kv.Value.Charlies,
-                TotalWon    = kv.Value.TotalWon,
+                TotalNet    = kv.Value.TotalNet,
             });
 
         // Snapshot each player's bank transaction log so it survives the
@@ -630,7 +630,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             var winPct = stat.GamesPlayed > 0
                 ? $"{stat.GamesWon * 100.0 / stat.GamesPlayed:0.#}%"
                 : "-";
-            var totalStr = stat.TotalWon > 0 ? $"+{GameEngine.FormatGil(stat.TotalWon)}" : GameEngine.FormatGil(stat.TotalWon);
+            var totalStr = stat.TotalNet > 0 ? $"+{GameEngine.FormatGil(stat.TotalNet)}" : GameEngine.FormatGil(stat.TotalNet);
             sb.AppendLine($"{stat.DisplayName}\t{stat.GamesPlayed}\t{stat.GamesWon}\t{stat.GamesPushed}\t{stat.GamesLost}\t{stat.Blackjacks}\t{stat.Charlies}\t{winPct}\t{totalStr}");
         }
         return sb.ToString().TrimEnd();

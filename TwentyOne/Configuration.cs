@@ -52,7 +52,7 @@ public class PlayerStat
     public int     GamesLost   { get; set; } = 0;
     public int     Blackjacks  { get; set; } = 0;
     public int     Charlies    { get; set; } = 0;
-    public long    TotalWon    { get; set; } = 0;
+    public long    TotalNet    { get; set; } = 0;
     public long    Bank        { get; set; } = 0;
     public bool    MaintainBet { get; set; } = false;
     // When true, trade-detected withdrawals up to the current balance are applied
@@ -71,20 +71,20 @@ public class VenueSettings
     public bool NarrationUseChannelCommand { get; set; } = false;
 
     // ── Trade ──────────────────────────────────────────────────────────────────
-    public bool AutoTradeEnabled       { get; set; } = false;
-    public bool AutoBetFromTrades      { get; set; } = false;
-    public bool AutoDepositFromTrades  { get; set; } = false;
+    public bool AutoTradeEnabled       { get; set; } = true;
+    public bool AutoBetFromTrades      { get; set; } = true;
+    public bool AutoDepositFromTrades  { get; set; } = true;
 
     // ── Targeting ──────────────────────────────────────────────────────────────
-    public bool AutoTargetEnabled   { get; set; } = false;
-    public bool RemindTargetEnabled { get; set; } = false;
+    public bool AutoTargetEnabled   { get; set; } = true;
+    public bool RemindTargetEnabled { get; set; } = true;
 
     // ── Chat ───────────────────────────────────────────────────────────────────
-    public bool   ChatEnabled               { get; set; } = false;
+    public bool   ChatEnabled               { get; set; } = true;
     public string ChatChannel               { get; set; } = "/p";
-    public bool   AllowCrossChannelCommands { get; set; } = false;
+    public CrossChannelCommands CrossChannelCommands { get; set; } = CrossChannelCommands.Redirect;
     public int    PublicChatCooldownMs      { get; set; } = 2000;
-    public int    PrivateChatCooldownMs     { get; set; } = 1200;
+    public int    PrivateChatCooldownMs     { get; set; } = 800;
     public int    SlashCommandCooldownMs    { get; set; } = 1200;
 
     // ── Narration templates ────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ public class VenueSettings
     public long       GilStart          { get; set; } = 0;
     public long       GilEnd            { get; set; } = 0;
     public bool       AutoUpdateGilEnd  { get; set; } = false;
-    public int        DealerCutPct { get; set; } = 0;
+    public int        VenueCutPct { get; set; } = 70;
     public List<long> Tips         { get; set; } = [];
 
     // Side revenue (VIP memberships, table service, etc.) recorded separately
@@ -136,7 +136,7 @@ public class VenueSettings
     public bool                DoubleAfterSplit     { get; set; } = true;
     public bool                HitSplitAces         { get; set; } = false;
     public bool                ResplitAces          { get; set; } = false;
-    public ResplitCap          ResplitCap           { get; set; } = ResplitCap.Max4;
+    public ResplitCap          ResplitCap           { get; set; } = ResplitCap.Unlimited;
     public DoubleRestriction   DoubleRestriction    { get; set; } = DoubleRestriction.Any;
     public bool                AllowSurrender       { get; set; } = false;
 }
@@ -186,7 +186,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public bool   RemindTargetEnabled        { get => ActiveVenue.RemindTargetEnabled;         set => ActiveVenue.RemindTargetEnabled = value; }
     [JsonIgnore] public bool   ChatEnabled                { get => ActiveVenue.ChatEnabled;                 set => ActiveVenue.ChatEnabled = value; }
     [JsonIgnore] public string ChatChannel                { get => ActiveVenue.ChatChannel;                 set => ActiveVenue.ChatChannel = value; }
-    [JsonIgnore] public bool   AllowCrossChannelCommands  { get => ActiveVenue.AllowCrossChannelCommands;   set => ActiveVenue.AllowCrossChannelCommands = value; }
+    [JsonIgnore] public CrossChannelCommands CrossChannelCommands { get => ActiveVenue.CrossChannelCommands; set => ActiveVenue.CrossChannelCommands = value; }
     [JsonIgnore] public int    PublicChatCooldownMs       { get => ActiveVenue.PublicChatCooldownMs;        set => ActiveVenue.PublicChatCooldownMs = value; }
     [JsonIgnore] public int    PrivateChatCooldownMs      { get => ActiveVenue.PrivateChatCooldownMs;       set => ActiveVenue.PrivateChatCooldownMs = value; }
     [JsonIgnore] public int    SlashCommandCooldownMs     { get => ActiveVenue.SlashCommandCooldownMs;      set => ActiveVenue.SlashCommandCooldownMs = value; }
@@ -195,7 +195,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public long   GilStart                   { get => ActiveVenue.GilStart;                   set => ActiveVenue.GilStart = value; }
     [JsonIgnore] public long   GilEnd                     { get => ActiveVenue.GilEnd;                     set => ActiveVenue.GilEnd = value; }
     [JsonIgnore] public bool   AutoUpdateGilEnd           { get => ActiveVenue.AutoUpdateGilEnd;           set => ActiveVenue.AutoUpdateGilEnd = value; }
-    [JsonIgnore] public int    DealerCutPct               { get => ActiveVenue.DealerCutPct;               set => ActiveVenue.DealerCutPct = value; }
+    [JsonIgnore] public int    VenueCutPct                { get => ActiveVenue.VenueCutPct;                set => ActiveVenue.VenueCutPct = value; }
     [JsonIgnore] public List<long> Tips                   { get => ActiveVenue.Tips;                       set => ActiveVenue.Tips = value; }
     [JsonIgnore] public List<ServiceCharge> ServiceCharges { get => ActiveVenue.ServiceCharges;            set => ActiveVenue.ServiceCharges = value; }
     [JsonIgnore] public Dictionary<string, PlayerStat> PlayerStatsStore { get => ActiveVenue.PlayerStatsStore; set => ActiveVenue.PlayerStatsStore = value; }

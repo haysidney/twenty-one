@@ -47,6 +47,9 @@ public class ConfigWindow : Window, IDisposable
         "/l1", "/l2", "/l3", "/l4", "/l5", "/l6", "/l7", "/l8",
     ];
 
+    // Order must match CrossChannelCommands enum (Block, Redirect, Allow).
+    private static readonly string[] CrossChannelLabels = ["Block", "Redirect", "Allow"];
+
     public override void Draw()
     {
         DrawVenueSelector();
@@ -131,14 +134,23 @@ public class ConfigWindow : Window, IDisposable
                 config.Save();
             }
 
-            var allowCross = config.AllowCrossChannelCommands;
-            if (ImGui.Checkbox("Allow cross-channel commands in templates", ref allowCross))
+            ImGui.AlignTextToFramePadding();
+            ImGui.TextUnformatted("Cross-channel commands");
+            ImGui.SameLine();
+            var ccIdx = (int)config.CrossChannelCommands;
+            ImGui.SetNextItemWidth(120);
+            if (ImGui.Combo("##crosschannel", ref ccIdx, CrossChannelLabels, CrossChannelLabels.Length))
             {
-                config.AllowCrossChannelCommands = allowCross;
+                config.CrossChannelCommands = (CrossChannelCommands)ccIdx;
                 config.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("When disabled, narration commands that target a channel other than the one\nselected above are redirected to /echo so only you see them.");
+                ImGui.SetTooltip(
+                    "What to do when a narration line starts with a channel command (e.g. \"/y ...\")\n"
+                  + "that doesn't match the channel above.\n\n"
+                  + "Block    - rewrite to /echo so only you see it locally.\n"
+                  + "Redirect - strip the override and send in the configured channel.\n"
+                  + "Allow    - send as-is, broadcasting in the override channel.");
 
             var isPublic = currentChannel is "/say" or "/yell" or "/shout";
             if (isPublic)

@@ -324,13 +324,13 @@ public class HistoryWindow : Window
                 ImGui.TextUnformatted(winPct);
                 ImGui.TableSetColumnIndex(7);
                 ImGui.AlignTextToFramePadding();
-                DrawNetCell(stat.TotalWon);
+                DrawNetCell(stat.TotalNet);
             }
 
             ImGui.EndTable();
         }
 
-        var grandTotal = s.Stats.Values.Sum(v => v.TotalWon);
+        var grandTotal = s.Stats.Values.Sum(v => v.TotalNet);
         ImGui.Spacing();
         ImGui.TextUnformatted("Net (all players):");
         ImGui.SameLine();

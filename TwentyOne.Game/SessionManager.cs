@@ -15,7 +15,7 @@ public class PlayerStatData
     public int    GamesLost   { get; set; }
     public int    Blackjacks  { get; set; }
     public int    Charlies    { get; set; }
-    public long   TotalWon    { get; set; }
+    public long   TotalNet    { get; set; }
 }
 
 // Pure static session logic - no Dalamud dependency, fully unit-testable.
@@ -67,7 +67,7 @@ public static class SessionManager
             s.GamesLost   = 0;
             s.Blackjacks  = 0;
             s.Charlies    = 0;
-            s.TotalWon    = 0;
+            s.TotalNet    = 0;
         }
     }
 }

@@ -17,7 +17,7 @@ public class SessionTests
     {
         var stats = new List<PlayerStatData>
         {
-            new() { DisplayName = "Lorah", GamesPlayed = 5, GamesWon = 3, GamesPushed = 1, GamesLost = 1, Blackjacks = 2, TotalWon = 500 },
+            new() { DisplayName = "Lorah", GamesPlayed = 5, GamesWon = 3, GamesPushed = 1, GamesLost = 1, Blackjacks = 2, TotalNet = 500 },
         };
         SessionManager.ResetGameStats(stats);
         var s = stats[0];
@@ -26,7 +26,7 @@ public class SessionTests
         Assert.Equal(0, s.GamesPushed);
         Assert.Equal(0, s.GamesLost);
         Assert.Equal(0, s.Blackjacks);
-        Assert.Equal(0, s.TotalWon);
+        Assert.Equal(0, s.TotalNet);
         Assert.Equal("Lorah", s.DisplayName); // preserved
     }
 

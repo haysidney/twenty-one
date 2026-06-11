@@ -37,6 +37,13 @@ public enum FiveCardCharlieRule { Disabled, BeatsAll, LosesToDealerBJ }
 public enum ResplitCap { Max2, Max3, Max4, Unlimited }
 public enum DoubleRestriction { Any, Hard9To11, Hard10To11, HardOnly }
 
+// How narration lines that start with a channel command (e.g. "/y ...") behave
+// when that channel differs from the configured ChatChannel.
+//   Block    - rewrite to "/echo /y ..." so only the dealer sees it locally.
+//   Redirect - strip the override and send via the configured channel.
+//   Allow    - send as-is, broadcasting in the override channel.
+public enum CrossChannelCommands { Block, Redirect, Allow }
+
 [Serializable]
 public sealed record class Hand
 {
@@ -101,8 +108,8 @@ public sealed record class GameState
     // false (default), split-ace pairs cannot be resplit (standard rule).
     public bool ResplitAces { get; set; } = false;
     // Maximum number of hands a non-ace pair may be split into. Aces ignore this cap
-    // and are governed solely by ResplitAces. Default Max4 matches typical casinos.
-    public ResplitCap ResplitCap { get; set; } = ResplitCap.Max4;
+    // and are governed solely by ResplitAces.
+    public ResplitCap ResplitCap { get; set; } = ResplitCap.Unlimited;
     // Which 2-card totals may be doubled down. Any (default) allows every 2-card
     // hand; the other values restrict to common European/Reno style ranges. DAS
     // stacks independently - both must allow doubling on a post-split hand.
