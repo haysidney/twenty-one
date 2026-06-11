@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace TwentyOne.Game;
 
@@ -27,6 +29,8 @@ public class RoundHistoryEntry
     // "GoToPayout". Empty for entries logged before this field existed.
     // Announcements (narration-only actions) are not included.
     public List<string> Actions { get; set; } = [];
+
+    [JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; } = new();
 }
 
 public enum HandState { Playing, Stand, Bust, Blackjack, Charlie, Surrendered }

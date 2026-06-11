@@ -156,6 +156,32 @@ House rules live in two places by design: canonical on `VenueSettings` (edited v
 
 `VenueSettings.RoundHistory` holds `RoundHistoryEntry` snapshots (one per completed round). Each entry carries the full `GameState`, bank net, pre- and post-payout player balances, `StartedAt`/`FinishedAt` timestamps, and the engine-action sequence (`Actions`) produced by `ActionLog.Format` - e.g. `["StartDeal", "Deal:D:7", "Deal:0:0:10", ..., "Stand:0:0", "BeginDealerTurn", "Deal:D:6", "GoToPayout"]`. Announcements (narration-only actions) are not logged. Undo doesn't pop log entries: the list is a faithful record of every `Apply` call that happened during the round, including any that were later reverted.
 
+### Config schema migrations
+
+The persisted JSON shape is versioned via `Configuration.SchemaVersion` (separate from Dalamud's `IPluginConfiguration.Version`, which we don't touch). `ConfigMigrations.CurrentSchemaVersion` is the latest. On every plugin load, `Plugin.MigrateConfigFileIfNeeded()` parses the config file as a `JObject`, runs `ConfigMigrations.Migrate(root)`, and writes the migrated JSON back **before** Dalamud's strong-typed loader runs. If the on-disk version is below current, a sibling backup `TwentyOne.json.bak-schema-{oldVersion}-{timestamp}` is written first.
+
+`Plugin.StampPluginVersion()` runs after the typed config is loaded; it sets `Configuration.PluginVersion`, `Configuration.SchemaVersion`, and each venue's `LastModifiedPluginVersion` from the assembly version, then saves.
+
+**Forward-compat (unknown fields are preserved):** these types carry `[JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; }`:
+
+- `Configuration`, `VenueSettings`, `PlayerStat`, `PlayerStatsSession`, `ServiceCharge`
+- `NarrationTemplates`, `BankTransactionEntry`, `RoundHistoryEntry`
+
+Records (`GameState`, `Player`, `Hand`) are deliberately excluded: extension data would change synthesized record equality and break engine/undo logic that compares hands.
+
+**Bumping the schema:**
+
+1. Increment `ConfigMigrations.CurrentSchemaVersion`.
+2. Add an `if (version < N) { ...; version = N; }` block in `ConfigMigrations.Migrate`. Each block must end by writing its target version into the JObject so a crash mid-chain still results in an idempotent rerun.
+3. Snapshot a real `Save()` output from before the bump into `TwentyOne.Tests/Fixtures/config-v{N-1}.json` and add a `ConfigMigrationTests` case asserting the migrated shape.
+
+**Rules to remember:**
+
+- **Removals need a migration step too.** A removed property keeps round-tripping forever via `ExtraData` (which is exactly what makes downgrades safe). The migration must explicitly drop the key.
+- **Migrations operate on raw `JObject`, not the typed `Configuration`.** This lets a migration handle fields that no longer exist as CLR properties.
+- **Idempotency:** writing the new version into the JObject at the end of each step guarantees a re-run from any partial state still converges.
+- **`$type` markers** (from Newtonsoft's `TypeNameHandling`) are recognized by the serializer and consumed before extension-data capture - they should not appear in `ExtraData`. If you see one, suspect a serializer setting drift.
+
 ### Session persistence
 
 Archived sessions (`PlayerStatsSession`) are **not** stored in the main config JSON. Each session lives in its own file at `{ConfigDirectory}/sessions/{venueId}/{yyyy-MM-dd_HHmmss}-{shortGuid}.json`.

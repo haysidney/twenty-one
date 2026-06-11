@@ -1,0 +1,21 @@
+{
+  "Version": 0,
+  "Venues": [
+    {
+      "Name": "Eden",
+      "Id": "11111111-1111-1111-1111-111111111111",
+      "ChatEnabled": true,
+      "ChatChannel": "/p",
+      "VenueCutPct": 70,
+      "BjPayout": 1.5,
+      "CharliePayout": 2,
+      "FiveCardCharlie": 1,
+      "ResplitCap": 3,
+      "PlayerStatsStore": {
+        "Lorah": { "DisplayName": "Lorah", "GamesPlayed": 5, "GamesWon": 3, "TotalNet": 1000 }
+      }
+    }
+  ],
+  "ActiveVenueIndex": 0,
+  "VenueMemory": {}
+}

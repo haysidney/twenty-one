@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace TwentyOne.Game;
 
@@ -121,6 +123,8 @@ public class NarrationTemplates
     public List<List<string>> PayoutLose       { get; set; } = [["{name}: Lose (bet: {bet}) {amount}"]];
     public List<List<string>> PayoutPush       { get; set; } = [["{name}: Push (bet: {bet})"]];
     public List<List<string>> PayoutSurrender  { get; set; } = [["{name}: Surrendered (bet: {bet}) {amount}"]];
+
+    [JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; } = new();
 
     // Newtonsoft.Json reuses existing List instances and appends to them.
     // Clear all lists before deserialization so defaults don't accumulate on reload.

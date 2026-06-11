@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace TwentyOne.Game;
 
@@ -11,6 +14,8 @@ public class BankTransactionEntry
     public BankTransactionKind Kind      { get; set; }
     public long                Amount    { get; set; }
     public long                Balance   { get; set; }
+
+    [JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; } = new();
 }
 
 // Discriminated union - one type per bank event

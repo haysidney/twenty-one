@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Dalamud.Configuration;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using TwentyOne.Game;
 
 namespace TwentyOne;
@@ -31,6 +32,11 @@ public class PlayerStatsSession
     // Plugin version that wrote this session. Used to detect stored aggregates
     // computed by an older solver and trigger recomputation.
     public string                              PluginVersion { get; set; } = "";
+
+    // Forward-compat catch-all. Captures unknown JSON properties on load so a config
+    // written by a newer plugin survives a downgrade round-trip. Migrations should
+    // drain entries from here when promoting them into typed fields.
+    [JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; } = new();
 }
 
 [Serializable]
@@ -40,6 +46,8 @@ public class ServiceCharge
     public string Note         { get; set; } = string.Empty;
     // Per-charge routing in the dealer/venue split. Default = dealer.
     public bool   GoesToVenue  { get; set; } = false;
+
+    [JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; } = new();
 }
 
 [Serializable]
@@ -59,6 +67,8 @@ public class PlayerStat
     // silently (no prompt). Auto-clears when Bank reaches 0.
     public bool    CashOut     { get; set; } = false;
     public List<BankTransactionEntry> BankLog { get; set; } = [];
+
+    [JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; } = new();
 }
 
 [Serializable]
@@ -66,6 +76,11 @@ public class VenueSettings
 {
     public string Name { get; set; } = "Venue 1";
     public Guid   Id   { get; set; } = Guid.NewGuid();
+
+    // Assembly version of the plugin that last touched this venue's settings. Lets
+    // an exported / imported venue carry its origin for diagnostics. Plain string,
+    // not used for migration logic.
+    public string LastModifiedPluginVersion { get; set; } = string.Empty;
 
     // ── Narration ──────────────────────────────────────────────────────────────
     public bool NarrationUseChannelCommand { get; set; } = false;
@@ -139,12 +154,26 @@ public class VenueSettings
     public ResplitCap          ResplitCap           { get; set; } = ResplitCap.Unlimited;
     public DoubleRestriction   DoubleRestriction    { get; set; } = DoubleRestriction.Any;
     public bool                AllowSurrender       { get; set; } = false;
+
+    [JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; } = new();
 }
 
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
+    // Dalamud's IPluginConfiguration version. Reserved for Dalamud's own breaking-
+    // change signaling; do not bump for our schema changes - use SchemaVersion below.
     public int Version { get; set; } = 0;
+
+    // Our own schema version, bumped each time a ConfigMigrations step is added.
+    // Migration runs at startup before strong-typed deserialization, so this field
+    // is always equal to the latest constant by the time anything else reads it.
+    public int SchemaVersion { get; set; } = 0;
+
+    // Assembly version of the plugin that last wrote this config. Useful in bug
+    // reports and as a tripwire for diagnosing schema drift. Not used for migration
+    // decisions (SchemaVersion is the source of truth).
+    public string PluginVersion { get; set; } = string.Empty;
 
     // ── Game state ─────────────────────────────────────────────────────────────
     public GameState GameState { get; set; } = new();
@@ -164,6 +193,8 @@ public class Configuration : IPluginConfiguration
 
     // Global address → venue GUID map. Key: "{district}:{ward}:{plot}" (1-indexed).
     public Dictionary<string, string> VenueMemory { get; set; } = [];
+
+    [JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; } = new();
 
     // Ensures at least one venue exists (handles first-ever launch / old configs).
     public void EnsureVenues()

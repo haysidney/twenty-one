@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Command;
@@ -10,6 +12,8 @@ using Dalamud.Plugin;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using TwentyOne.Game;
 using TwentyOne.Windows;
 
@@ -80,8 +84,10 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin()
     {
+        MigrateConfigFileIfNeeded();
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.EnsureVenues();
+        StampPluginVersion();
 
         // Load each venue's archived sessions from disk. StatsSessions is
         // [JsonIgnore] on VenueSettings so the per-session JSON files under
@@ -123,6 +129,48 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
 
         Log.Information("Twenty One plugin loaded!");
+    }
+
+    /// <summary>
+    /// Reads the on-disk plugin config as a raw JObject, runs ConfigMigrations,
+    /// and writes the migrated JSON back before Dalamud's strong-typed loader
+    /// runs. On schema bumps, snapshots the pre-migration file as a sibling
+    /// backup so the user has a recovery path if a migration corrupts state.
+    /// No-op for fresh installs (no file on disk).
+    /// </summary>
+    private static void MigrateConfigFileIfNeeded()
+    {
+        var path = PluginInterface.ConfigFile.FullName;
+        if (!File.Exists(path)) return;
+
+        try
+        {
+            var json = File.ReadAllText(path);
+            var root = JObject.Parse(json);
+            var oldVersion = (int?)root["SchemaVersion"] ?? 0;
+            if (oldVersion >= ConfigMigrations.CurrentSchemaVersion) return;
+
+            var backup = path + $".bak-schema-{oldVersion}-{DateTime.Now:yyyyMMddHHmmss}";
+            File.Copy(path, backup, overwrite: false);
+
+            ConfigMigrations.Migrate(root);
+            File.WriteAllText(path, root.ToString(Formatting.Indented));
+            Log.Information($"Migrated config schema {oldVersion} -> {ConfigMigrations.CurrentSchemaVersion}. Backup: {Path.GetFileName(backup)}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Config migration failed; leaving file as-is.");
+        }
+    }
+
+    private void StampPluginVersion()
+    {
+        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? string.Empty;
+        Configuration.PluginVersion = version;
+        Configuration.SchemaVersion = ConfigMigrations.CurrentSchemaVersion;
+        foreach (var venue in Configuration.Venues)
+            venue.LastModifiedPluginVersion = version;
+        Configuration.Save();
     }
 
     private void OnMenuOpened(IMenuOpenedArgs args)
