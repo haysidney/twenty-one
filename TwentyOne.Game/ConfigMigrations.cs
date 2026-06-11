@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 
 namespace TwentyOne.Game;
@@ -20,7 +21,7 @@ namespace TwentyOne.Game;
 /// </summary>
 public static class ConfigMigrations
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     /// <summary>
     /// Runs all pending migrations on <paramref name="root"/> in-place and
@@ -35,11 +36,24 @@ public static class ConfigMigrations
 
         if (version < 1)
         {
-            // No-op stub: confirms the migration plumbing runs and a no-change
-            // bump round-trips cleanly. Replace this block when a real v0->v1
-            // change is needed; until then, keep the stub so the test exercises
-            // the version-bump path.
+            // No-op bump: the v0 baseline was the first config shape captured
+            // after the rename pass (DealerCutPct -> VenueCutPct, TotalWon ->
+            // TotalNet, AllowCrossChannelCommands -> CrossChannelCommands).
             version = 1;
+        }
+
+        if (version < 2)
+        {
+            // PlayerHit narration removed - PlayerAfterHit covers the same beat.
+            // Drop the now-unknown property from every venue's NarrationTemplates
+            // so it doesn't linger in ExtraData forever.
+            if (root["Venues"] is JArray venues)
+            {
+                foreach (var venue in venues.OfType<JObject>())
+                    if (venue["NarrationTemplates"] is JObject nt)
+                        nt.Remove("PlayerHit");
+            }
+            version = 2;
         }
 
         root["SchemaVersion"] = version;

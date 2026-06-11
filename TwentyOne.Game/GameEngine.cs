@@ -678,8 +678,6 @@ public static class GameEngine
                 ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
         else
         {
-            ctx.Narrate(t.PlayerHit,
-                ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
             if (newHand.State == HandState.Playing && pi == state.ActivePlayerIndex && hi == state.ActiveHandIndex)
             {
                 var cd2 = CanDouble(newHand, state.Players[pi].Bet, state.DoubleAfterSplit, state.DoubleRestriction);

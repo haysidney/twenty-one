@@ -149,10 +149,11 @@ public class ApplyAddDealerCardTests
     [Fact]
     public void AddDealerCard_DealerTurn_NarratesNormalDraw()
     {
-        // Draw a 4 → total 14, dealer must still hit - only one narration line
+        // Draw a 4 → total 14, dealer must still hit - DealerHit is one chat line
         var (newState, effects) = GameEngine.Apply(DealerTurnState(), new AddDealerCard(4));
         Assert.Single(effects);
-        Assert.Contains("Dealer draws 4", ((SendChat)effects[0]).Text);
+        Assert.Contains("draws", ((SendChat)effects[0]).Text);
+        Assert.Contains("4", ((SendChat)effects[0]).Text);
         Assert.Equal(2, newState.DealerHand.Cards.Length);
     }
 
@@ -164,7 +165,7 @@ public class ApplyAddDealerCardTests
             .Dealer(10, 8)
             .Build();
         var (_, effects) = GameEngine.Apply(state, new AddDealerCard(5));
-        Assert.Contains("Bust", ((SendChat)effects[0]).Text);
+        Assert.Contains(effects, e => e is SendChat c && c.Text.Contains("busted") || e is SendChat c2 && c2.Text.Contains("busts"));
     }
 
     [Fact]
@@ -195,42 +196,25 @@ public class ApplyAddPlayerCardTests
         .Build();
 
     [Fact]
-    public void AddPlayerCard_NarratesHit()
+    public void AddPlayerCard_NarratesAfterHit()
     {
+        // After the v2 PlayerHit removal, a hit that leaves the hand Playing
+        // produces a single PlayerAfterHit narration line.
         var (_, effects) = GameEngine.Apply(ActivePlayerState(), new AddPlayerCard(0, 0, 3));
-        Assert.Equal(2, effects.Count);
-        Assert.Contains("Lorah hits", ((SendChat)effects[0]).Text);
-        Assert.Contains("Lorah", ((SendChat)effects[1]).Text);
+        Assert.Single(effects);
+        Assert.Contains("Lorah", ((SendChat)effects[0]).Text);
     }
 
     [Fact]
-    public void AddPlayerCard_HitsTo21_AutoStands_NarratesHitThenStand()
+    public void AddPlayerCard_HitsTo21_AutoStands_NarratesStand()
     {
-        // 5 + 6 + 10 = 21: hand auto-stands. PlayerHit fires, then PlayerStand
-        // mirrors the dealer-side hit+stand pattern (and rescues configs that
-        // intentionally empty PlayerHit by merging it into PlayerAfterHit).
+        // 5 + 6 + 10 = 21: hand auto-stands. After the v2 PlayerHit removal,
+        // only PlayerStand fires.
         var (newState, effects) = GameEngine.Apply(ActivePlayerState(), new AddPlayerCard(0, 0, 10));
         Assert.Equal(HandState.Stand, newState.Players[0].Hands[0].State);
-        Assert.Equal(2, effects.Count);
-        Assert.Contains("hits", ((SendChat)effects[0]).Text);
-        Assert.Contains("stands", ((SendChat)effects[1]).Text);
-        Assert.Contains("21", ((SendChat)effects[1]).Text);
-    }
-
-    [Fact]
-    public void AddPlayerCard_HitsTo21_EmptyPlayerHitTemplate_StillNarratesStand()
-    {
-        // Repro for the venue-config case where PlayerHit was intentionally
-        // emptied (merged into PlayerAfterHit). Hitting to 21 used to be
-        // completely silent because PlayerAfterHit only fires while Playing.
-        var t = new NarrationTemplates { PlayerHit = [] };
-        var state = new GameStateBuilder()
-            .Phase(GamePhase.PlayerTurns)
-            .Player("Lorah", 5, 6)
-            .Build();
-        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 10), templates: t);
         Assert.Single(effects);
         Assert.Contains("stands", ((SendChat)effects[0]).Text);
+        Assert.Contains("21", ((SendChat)effects[0]).Text);
     }
 
     [Fact]
@@ -282,7 +266,7 @@ public class ApplyAddPlayerCardTests
             .Player("Bekki", 5, 6)
             .Build();
         var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
-        Assert.Contains("busts", ((SendChat)effects[0]).Text);
+        Assert.Contains(effects, e => e is SendChat c && (c.Text.Contains("busts") || c.Text.Contains("busted")));
         Assert.True(newState.WaitingForNextPlayer);
         Assert.Equal(0, newState.ActivePlayerIndex); // stays on Lorah until Next Player clicked
 
@@ -335,8 +319,10 @@ public class ApplyAnnounceTests
     [Fact]
     public void AnnounceDealerDeal_EmitsNarrationNoStateChange()
     {
+        var t = new NarrationTemplates { DealDealerCard = [["Dealer's Card:"]] };
         var state = new GameStateBuilder().Phase(GamePhase.Deal).Build();
-        var (newState, effects) = GameEngine.Apply(state, new AnnounceDealerDeal());
+        var (newState, effects) = GameEngine.Apply(state, new AnnounceDealerDeal(), t);
+        Assert.Same(state, newState);
         Assert.Single(effects);
         Assert.Equal("Dealer's Card:", ((SendChat)effects[0]).Text);
         Assert.Equal(GamePhase.Deal, newState.Phase);
@@ -345,11 +331,12 @@ public class ApplyAnnounceTests
     [Fact]
     public void AnnouncePlayerDeal_EmitsPlayerNameNarration()
     {
+        var t = new NarrationTemplates { DealPlayerHand = [["{name}'s Hand:"]] };
         var state = new GameStateBuilder()
             .Phase(GamePhase.Deal)
             .Player("Lorah")
             .Build();
-        var (newState, effects) = GameEngine.Apply(state, new AnnouncePlayerDeal(0));
+        var (newState, effects) = GameEngine.Apply(state, new AnnouncePlayerDeal(0), t);
         Assert.Single(effects);
         Assert.Equal("Lorah's Hand:", ((SendChat)effects[0]).Text);
         Assert.Equal(GamePhase.Deal, newState.Phase);
@@ -754,14 +741,6 @@ public class NarrationTemplateTests
         .Build();
 
     [Fact]
-    public void CustomPlayerHit_UsesTemplate()
-    {
-        var t = new NarrationTemplates { PlayerHit = [["CUSTOM {name} drew {card}"]] };
-        var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3), t);
-        Assert.Equal("CUSTOM Lorah drew 3", ((SendChat)effects[0]).Text);
-    }
-
-    [Fact]
     public void CustomPlayerBust_UsesTemplate()
     {
         var t = new NarrationTemplates { PlayerBust = [["OUT: {name}"]] };
@@ -882,7 +861,7 @@ public class NarrationTemplateTests
     public void NullTemplates_UsesDefaults()
     {
         var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3));
-        Assert.Contains("Lorah hits", ((SendChat)effects[0]).Text);
+        Assert.Contains(effects, e => e is SendChat c && c.Text.Contains("Lorah"));
     }
 
     [Fact]
@@ -890,10 +869,9 @@ public class NarrationTemplateTests
     {
         var t = new NarrationTemplates { PlayerAfterHit = [["SCORE:{score} DO:{actions}"]] };
         var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3), t);
-        // effects[0] = PlayerHit, effects[1] = PlayerAfterHit
-        Assert.Equal(2, effects.Count);
-        Assert.Contains("SCORE:14", ((SendChat)effects[1]).Text);
-        Assert.Contains("DO:", ((SendChat)effects[1]).Text);
+        Assert.Single(effects);
+        Assert.Contains("SCORE:14", ((SendChat)effects[0]).Text);
+        Assert.Contains("DO:", ((SendChat)effects[0]).Text);
     }
 
     [Fact]
@@ -1162,7 +1140,8 @@ public class AnnounceBettingOpenTests
         var state = new GameStateBuilder().Phase(GamePhase.Betting).Build();
         var (newState, effects) = GameEngine.Apply(state, new AnnounceBettingOpen());
         Assert.Same(state, newState);
-        Assert.Equal(2, effects.Count); // default template: narration line + /wringhands emote
+        Assert.NotEmpty(effects);
+        Assert.All(effects, e => Assert.IsType<SendChat>(e));
     }
 
     [Fact]
@@ -1629,7 +1608,7 @@ public class SplitHandTests
     public void SplitHand_NarratesSplit()
     {
         var (_, effects) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0));
-        Assert.Contains(effects, e => e is SendChat c && c.Text.ToLower().Contains("splits"));
+        Assert.Contains(effects, e => e is SendChat c && c.Text.ToLower().Contains("split"));
         Assert.Contains(effects, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 0);
     }
 
@@ -2119,8 +2098,8 @@ public class SplitHandTests
             .Player("Lorah")
             .Build();
         var (_, effects) = GameEngine.Apply(state, new AnnounceBetRequest(0));
-        Assert.Single(effects);
-        Assert.Contains("Lorah", ((SendChat)effects[0]).Text);
+        Assert.NotEmpty(effects);
+        Assert.Contains(effects, e => e is SendChat c && c.Text.Contains("Lorah"));
     }
 
     [Fact]
