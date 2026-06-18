@@ -21,7 +21,31 @@ namespace TwentyOne.Game;
 /// </summary>
 public static class ConfigMigrations
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
+
+    /// <summary>
+    /// Root-level keys that are now <c>[JsonIgnore]</c> proxies on
+    /// <c>Configuration</c> (they delegate to the active venue). Old configs
+    /// serialized them at the root; once the properties became JsonIgnore the keys
+    /// were orphaned into <c>Configuration.ExtraData</c> and round-tripped forever.
+    /// Worse, while they were still live serialized properties, Newtonsoft's
+    /// default ObjectCreationHandling.Auto re-appended each proxy collection to the
+    /// same underlying venue list on every load, doubling RoundHistory/Tips/etc.
+    /// The canonical copy lives in Venues[ActiveVenueIndex], so the root keys are
+    /// pure duplicates and safe to drop.
+    /// </summary>
+    private static readonly string[] OrphanedRootProxyKeys =
+    [
+        "ActiveVenue", "NarrationUseChannelCommand", "AutoTradeEnabled",
+        "AutoBetFromTrades", "AutoDepositFromTrades", "AutoTargetEnabled",
+        "RemindTargetEnabled", "ChatEnabled", "ChatChannel", "CrossChannelCommands",
+        "PublicChatCooldownMs", "PrivateChatCooldownMs", "SlashCommandCooldownMs",
+        "NarrationTemplates", "DealerName", "GilStart", "GilEnd", "AutoUpdateGilEnd",
+        "VenueCutPct", "Tips", "ServiceCharges", "PlayerStatsStore", "RoundHistory",
+        "StatsSessions", "BjPayout", "CharliePayout", "FiveCardCharlie",
+        "DealerStandsOnSoft17", "DoubleAfterSplit", "HitSplitAces", "ResplitAces",
+        "ResplitCap", "DoubleRestriction", "AllowSurrender",
+    ];
 
     /// <summary>
     /// Runs all pending migrations on <paramref name="root"/> in-place and
@@ -54,6 +78,23 @@ public static class ConfigMigrations
                         nt.Remove("PlayerHit");
             }
             version = 2;
+        }
+
+        if (version < 3)
+        {
+            // Drop orphaned [JsonIgnore]-proxy keys from the config root. They are
+            // stale duplicates of the active venue's data (a serializer footgun
+            // that, in older builds, ballooned the file via collection doubling).
+            foreach (var key in OrphanedRootProxyKeys)
+                root.Remove(key);
+
+            // StatsSessions moved to per-session files (SessionStore); the inline
+            // venue key is now [JsonIgnore] and lingers in each venue's ExtraData.
+            if (root["Venues"] is JArray sessVenues)
+                foreach (var venue in sessVenues.OfType<JObject>())
+                    venue.Remove("StatsSessions");
+
+            version = 3;
         }
 
         root["SchemaVersion"] = version;

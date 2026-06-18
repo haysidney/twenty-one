@@ -210,6 +210,11 @@ Archived sessions (`PlayerStatsSession`) are **not** stored in the main config J
   (memoization, split fixed-point) and a rule-by-rule cost table for adding
   new rule axes (S17, DAS toggle, HSA, RSA, peek, surrender, continuous
   payouts). Read before plumbing a new rule into `EdgeRules`.
+- `docs/troubleshooting/` - operational runbooks for plugin failures in the
+  field (symptom -> root cause -> recovery -> prevention). Start at
+  `docs/troubleshooting/README.md`. Notably
+  `docs/troubleshooting/config-file-bloat.md` covers the config-doubling bug
+  that ballooned `TwentyOne.json` to ~1 GB and the schema-v3 cleanup migration.
 
 ### EdgeSolver (house-edge calculator)
 

@@ -1,0 +1,39 @@
+{
+  "Version": 0,
+  "SchemaVersion": 2,
+  "PluginVersion": "1.0.0.0",
+  "GameState": { "Phase": 0 },
+  "UndoStack": [],
+  "RedoStack": [],
+  "NarrationLog": [],
+  "Venues": [
+    {
+      "Name": "Eden",
+      "Id": "11111111-1111-1111-1111-111111111111",
+      "ChatEnabled": true,
+      "ChatChannel": "/p",
+      "VenueCutPct": 70,
+      "RoundHistory": [ { "RoundNumber": 1 }, { "RoundNumber": 2 } ],
+      "Tips": [ 1000 ],
+      "StatsSessions": [ { "Id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" } ]
+    },
+    {
+      "Name": "Elysium",
+      "Id": "22222222-2222-2222-2222-222222222222",
+      "StatsSessions": [ { "Id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" } ]
+    }
+  ],
+  "ActiveVenueIndex": 0,
+  "VenueMemory": {},
+  "ActiveVenue": { "Name": "Eden", "RoundHistory": [ { "RoundNumber": 1 } ] },
+  "RoundHistory": [ { "RoundNumber": 1 }, { "RoundNumber": 1 } ],
+  "Tips": [ 1000, 1000 ],
+  "ServiceCharges": [],
+  "PlayerStatsStore": {},
+  "DealerName": "Dealer",
+  "ChatEnabled": true,
+  "BjPayout": 1.5,
+  "CharliePayout": 2,
+  "FiveCardCharlie": 1,
+  "DealerStandsOnSoft17": false
+}
