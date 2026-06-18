@@ -55,8 +55,7 @@ public sealed class ScenarioRunner
                     if (p.SittingOut) continue;
                     var betAmt = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
                     if (betAmt <= 0) continue;
-                    if (!p.TryGetBankingStat(cb.Config, out var betStat)) continue;
-                    cb.ApplyBank(betStat, new BankBet(betAmt));
+                    cb.ApplyBank(p.GetOrCreateStat(cb.Config), new BankBet(betAmt));
                 }
                 for (var i = 0; i < cb.State.Players.Length; i++)
                 {

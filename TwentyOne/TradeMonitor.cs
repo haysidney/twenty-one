@@ -17,10 +17,12 @@ internal sealed partial class TradeMonitor
     public abstract record Outcome
     {
         public sealed record None              : Outcome;
-        public sealed record PromptBet         (int Pi, long Gil) : Outcome;
         public sealed record PromptBankDeposit (int Pi, long Gil) : Outcome;
         public sealed record PromptBankWithdraw(int Pi, long Gil) : Outcome;
-        public sealed record PromptBetOrBank   (int Pi, long Gil) : Outcome;
+        // Bidirectional trade: both sides put gil in the window. Confirms the
+        // give as a withdrawal and the receive as a deposit so neither leg is
+        // silently absorbed.
+        public sealed record PromptTwoSided    (int Pi, long Gave, long Received) : Outcome;
         public sealed record Canceled          : Outcome;
     }
 
@@ -45,11 +47,9 @@ internal sealed partial class TradeMonitor
     /// "Trade complete." / "Trade canceled.", emits the corresponding
     /// <see cref="Outcome"/>. All other lines return <see cref="Outcome.None"/>.
     /// </summary>
-    public Outcome OnChat(string text, PlayerPayload? payload, GamePhase phase, GameState state, Configuration cfg)
+    public Outcome OnChat(string text, PlayerPayload? payload, GameState state, Configuration cfg)
     {
-        var isBetPhase    = cfg.AutoBetFromTrades && phase == GamePhase.Betting;
-        var isBankMonitor = cfg.AutoDepositFromTrades;
-        if (!isBetPhase && !isBankMonitor) return new Outcome.None();
+        if (!cfg.AutoDepositFromTrades) return new Outcome.None();
 
         var sentMatch = TradeSentRegex().Match(text);
         if (!sentMatch.Success) sentMatch = TradeWishesRegex().Match(text);
@@ -95,22 +95,17 @@ internal sealed partial class TradeMonitor
 
         if (pi < 0) return new Outcome.None();
 
-        if (snapGave > 0 && isBankMonitor)
+        // Bank-only routing (see TradeRouting): incoming gil always deposits,
+        // outgoing always withdraws, a bidirectional trade confirms both legs, and
+        // nothing is ever silently absorbed - the outgoing leg prompts even on an
+        // empty bank (formerly returned None here, a drift source).
+        return TradeRouting.Resolve(snapGave, snapTrade) switch
         {
-            var wdBank = state.Players[pi].BankBalance(cfg);
-            return wdBank > 0
-                ? new Outcome.PromptBankWithdraw(pi, snapGave)
-                : new Outcome.None();
-        }
-
-        if (snapTrade > 0)
-        {
-            if (isBetPhase && isBankMonitor) return new Outcome.PromptBetOrBank(pi, snapTrade);
-            if (isBetPhase)                  return new Outcome.PromptBet(pi, snapTrade);
-            if (isBankMonitor)               return new Outcome.PromptBankDeposit(pi, snapTrade);
-        }
-
-        return new Outcome.None();
+            TradeDirection.TwoSided => new Outcome.PromptTwoSided(pi, snapGave, snapTrade),
+            TradeDirection.Withdraw => new Outcome.PromptBankWithdraw(pi, snapGave),
+            TradeDirection.Deposit  => new Outcome.PromptBankDeposit(pi, snapTrade),
+            _                       => new Outcome.None(),
+        };
     }
 
     private void Reset()

@@ -18,24 +18,29 @@ internal static class PlayerStatExtensions
     public static string StatsKey(this Player p) =>
         p.FullName.Length > 0 ? $"{p.FullName}@{p.World}" : p.Nickname;
 
-    /// <summary>True if the player has any non-zero balance or any prior bank activity.</summary>
-    public static bool IsBanking(this PlayerStat stat) =>
-        stat.Bank > 0 || stat.BankLog.Count > 0;
-
     /// <summary>
     /// Look up the player's stats, if any. Mirrors <see cref="System.Collections.Generic.Dictionary{TKey, TValue}.TryGetValue"/>.
+    /// Bank-only mode: a stats row existing IS the banking record - there is no
+    /// separate "is this player banking?" predicate. Every tracked player banks.
     /// </summary>
     public static bool TryGetStat(this Player p, Configuration config,
         [MaybeNullWhen(false)] out PlayerStat stat) =>
         config.PlayerStatsStore.TryGetValue(p.StatsKey(), out stat);
 
-    /// <summary>True only if the player has stats AND those stats indicate banking activity.</summary>
-    public static bool TryGetBankingStat(this Player p, Configuration config,
-        [MaybeNullWhen(false)] out PlayerStat stat)
+    /// <summary>
+    /// Look up the player's stats, creating an empty banking row if none exists.
+    /// In bank-only mode every table player is a banking player, so this is the
+    /// canonical accessor for any path that funds or settles a bet.
+    /// </summary>
+    public static PlayerStat GetOrCreateStat(this Player p, Configuration config)
     {
-        if (!p.TryGetStat(config, out stat)) return false;
-        if (!stat.IsBanking()) { stat = null; return false; }
-        return true;
+        var key = p.StatsKey();
+        if (!config.PlayerStatsStore.TryGetValue(key, out var stat))
+        {
+            stat = new PlayerStat { DisplayName = p.DisplayName };
+            config.PlayerStatsStore[key] = stat;
+        }
+        return stat;
     }
 
     /// <summary>Current bank balance for the player, or zero if no stats record exists.</summary>

@@ -263,21 +263,19 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
         ImGui.Separator();
 
-        // Reconciliation
-        var difference     = config.GilEnd - config.GilStart;
-        var grandTotal     = config.PlayerStatsStore.Values.Sum(s => s.TotalNet);
-        var betsHeld       = CalcBetsHeld();
-        var banksHeld      = config.PlayerStatsStore.Values.Sum(s => s.Bank);
-        // Venue-funded credits sit in the dealer's pile (Vral pre-loaded them into
-        // Starting Gil), so they need to enter the balance the same way grandTotal
-        // does: as a phantom contribution that closes the books when credit-funded
-        // gil ends up in player banks, gets cashed out, or drains back to the house.
-        var creditIssued   = config.PlayerStatsStore.Values
-            .SelectMany(s => s.BankLog)
-            .Where(e => e.Kind == BankTransactionKind.Credit)
-            .Sum(e => e.Amount);
-        var adjustedDiff   = difference - betsHeld - banksHeld - tipTotal - serviceTotal;
-        var reconciled     = adjustedDiff + grandTotal + creditIssued == 0;
+        // Reconciliation - shared math (see Compute / Reconciliation). creditIssued:
+        // venue-funded credits sit in the dealer's pile (pre-loaded into Starting Gil),
+        // so they enter the balance like grandTotal does - a phantom contribution that
+        // closes the books when credit-funded gil ends up in player banks, gets cashed
+        // out, or drains back to the house.
+        var rec            = Compute(config);
+        var difference     = rec.Difference;
+        var grandTotal     = rec.GrandTotal;
+        var betsHeld       = rec.BetsHeld;
+        var banksHeld      = rec.BanksHeld;
+        var creditIssued   = rec.CreditIssued;
+        var adjustedDiff   = rec.AdjustedDiff;
+        var reconciled     = rec.Reconciled;
 
         ImGui.Text("House Difference:"); ImGui.SameLine(130); ColoredGilText(difference);
         ImGui.Text("Bets held:");        ImGui.SameLine(130); ImGui.Text($"{betsHeld:N0} gil");
@@ -585,7 +583,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         editingServiceBuf   = string.Empty;
     }
 
-    private long CalcBetsHeld()
+    private static long CalcBetsHeld(Configuration config)
     {
         var gs = config.GameState;
         if (gs.Phase == GamePhase.Betting) return 0;
@@ -599,9 +597,10 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             {
                 // Banking players were auto-settled in UpdatePlayerStats: bet + winnings
                 // moved into the bank, so they're already counted in banksHeld. Counting
-                // their bets here would double-count. Non-banking players still have
-                // bet + winnings sitting with the dealer until trade-back.
-                if (player.TryGetBankingStat(config, out _)) continue;
+                // their bets here would double-count. (Bank-only: every tracked player
+                // has a stats row, so this skips all of them; the fallback below only
+                // fires for an untracked player that somehow reached payout.)
+                if (player.TryGetStat(config, out _)) continue;
                 for (var hi = 0; hi < player.Hands.Length; hi++)
                     total += (long)GameEngine.PayoutTotalOwed(gs, pi, hi);
             }
@@ -613,6 +612,32 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         }
         return total;
     }
+
+    /// <summary>
+    /// Session-ledger reconciliation snapshot. Single source of truth for the
+    /// books-balance math, shared by this window's reconciliation block and the
+    /// main-window drift chip so the two can never diverge.
+    /// </summary>
+    public readonly record struct Reconciliation(
+        long Difference, long BetsHeld, long BanksHeld, long TipTotal,
+        long ServiceTotal, long CreditIssued, long GrandTotal)
+    {
+        public long AdjustedDiff => Difference - BetsHeld - BanksHeld - TipTotal - ServiceTotal;
+        public long Drift        => AdjustedDiff + GrandTotal + CreditIssued; // 0 == reconciled
+        public bool Reconciled   => Drift == 0;
+    }
+
+    public static Reconciliation Compute(Configuration config) => new(
+        Difference:   config.GilEnd - config.GilStart,
+        BetsHeld:     CalcBetsHeld(config),
+        BanksHeld:    config.PlayerStatsStore.Values.Sum(s => s.Bank),
+        TipTotal:     config.Tips.Sum(),
+        ServiceTotal: config.ServiceCharges.Sum(s => s.Amount),
+        CreditIssued: config.PlayerStatsStore.Values
+                          .SelectMany(s => s.BankLog)
+                          .Where(e => e.Kind == BankTransactionKind.Credit)
+                          .Sum(e => e.Amount),
+        GrandTotal:   config.PlayerStatsStore.Values.Sum(s => s.TotalNet));
 
     private static void CopyableGilRow(string label, long value)
     {

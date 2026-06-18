@@ -283,19 +283,60 @@ The two live views (Session Ledger, History > Rounds This Session) cache their `
 
 All cards from FFXIV chat rolls (`/random 13` or `/dice 13`). `OnChatMessage` parses roll result, sets `deferredRoll`; applied at top of next `Draw()` to avoid re-entrancy.
 
+### Bank-only mode (every tracked player banks)
+
+There is no non-banking player path. A player having a `PlayerStat` row **is** the
+banking record - the old `IsBanking()` predicate and `TryGetBankingStat` are gone.
+This removes the silent-absorb footgun where a trade equal to a bet amount could
+vanish from the ledger.
+
+- `PlayerStatExtensions`: `TryGetStat` (row lookup, no banking gate) and
+  `GetOrCreateStat` (the canonical accessor for any path that funds/settles a bet).
+- Incoming trade -> bank deposit; outgoing trade -> bank withdrawal (always, even
+  on an empty bank, so nothing is absorbed). Bets are typed by the dealer and
+  funded from the bank via `BankBet` at `StartDeal`; `Player.Bet` is just the
+  per-round wager amount. There is no "trade equals the bet" shortcut.
+- Start-Deal shortfall guard treats a missing/short bank as a shortfall that
+  blocks dealing (`x.p.BankBalance(config) < bet`).
+- The `AutoBetFromTrades` config was removed (dead under bank-only). Removal needs
+  no migration - the version-gated `ExtensionDataCleaner` drops the orphan key on
+  load. `AutoDepositFromTrades` alone gates trade detection.
+
+### TradeRouting (pure trade -> ledger decision)
+
+`TwentyOne.Game/TradeRouting.cs` - `Resolve(long gaveGil, long receivedGil) ->
+TradeDirection { None, Deposit, Withdraw, TwoSided }`. Pure and unit-tested
+(`TradeRoutingTests`). `TradeMonitor.OnChat` (plugin, not test-reachable because it
+needs Dalamud's `PlayerPayload`) delegates the decision here. A **bidirectional
+trade** (both sides put gil in the window) routes to `TwoSided` - this was the
+session-ledger drift bug: the old code returned a withdrawal-only outcome and
+silently dropped the incoming leg, so drift always equaled some player's bet.
+
 ### PendingPrompt (trade-result modals)
 
-A single `PendingPrompt? pendingPrompt` field replaces the three mutable nullable-tuple fields:
+A single `PendingPrompt? pendingPrompt` field models the active trade modal:
 ```csharp
 private abstract record PendingPrompt
 {
-    public sealed record Bet(int Pi, long Gil) : PendingPrompt;
     public sealed record BankDeposit(int Pi, long Gil) : PendingPrompt;
     public sealed record BankWithdraw(int Pi, long Gil) : PendingPrompt;
-    public sealed record BetOrBank(int Pi, long Gil) : PendingPrompt;
+    public sealed record TwoSided(int Pi, long Gave, long Received) : PendingPrompt;
 }
 ```
-Set by `OnChatMessage` switch over `TradeMonitor.Outcome`. Consumed by `DrawTradeBetPromptModal`, `DrawBetOrBankPromptModal`, `DrawBankTradePromptModal`. The type system prevents two prompts from being active simultaneously.
+Set by `OnChatMessage` switch over `TradeMonitor.Outcome`. Consumed by
+`DrawTwoSidedPromptModal` and `DrawBankTradePromptModal`. The type system prevents
+two prompts from being active simultaneously. `TwoSided` confirms both legs at once
+(withdraw the give, deposit the receive); its Cancel writes an `[Audit]` note to the
+narration log since a completed FFXIV trade cannot be reversed.
+
+### Drift chip (main-window top bar)
+
+`MainWindow.DrawDriftChip()` renders an always-visible books-balance signal:
+green `Books OK` when reconciled, red `Drift: +X` otherwise, clickable to open the
+Session Ledger, suppressed in history view. It and the Session Ledger share one
+source of truth: `SessionLedgerWindow.Compute(Configuration) -> Reconciliation`
+(a readonly record struct with `AdjustedDiff` / `Drift` / `Reconciled`), so the two
+displays can never diverge. Computed per-frame (cheap arithmetic, no solver).
 
 ### MainWindow.Render.cs cell helpers
 

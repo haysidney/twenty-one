@@ -100,12 +100,7 @@ public partial class MainWindow
 
     private void DrawBankCell(int loopIdx, int actualIdx, Player player, float bankCellRight, bool uiBusy)
     {
-        var bankKey = player.StatsKey();
-        if (!config.PlayerStatsStore.TryGetValue(bankKey, out var bankStat))
-        {
-            bankStat = new PlayerStat { DisplayName = player.DisplayName };
-            config.PlayerStatsStore[bankKey] = bankStat;
-        }
+        var bankStat = player.GetOrCreateStat(config);
         var bankVal         = bankStat.Bank;
         var effectiveBetStr = betEdits.TryGetValue(loopIdx, out var bEdit) ? bEdit : player.Bet;
         var parsedBet       = GameEngine.ParseBet(effectiveBetStr);
@@ -122,80 +117,73 @@ public partial class MainWindow
             }
 
         ImGui.AlignTextToFramePadding();
-        if (bankStat.IsBanking())
-        {
-            var bankLabel = GameEngine.FormatGil(bankVal);
-            if (shortfall > 0)
-                ImGui.TextColored(GameColors.WarningAmber, bankLabel);
-            else
-                ImGui.TextUnformatted(bankLabel);
-            if (ImGui.IsItemHovered())
-            {
-                var tip = new System.Text.StringBuilder();
-                if (shortfall > 0)
-                    tip.AppendLine($"Short by {GameEngine.FormatGil(shortfall)} - needs trade before deal");
-                if (Phase == GamePhase.Payout && bankCredit > 0)
-                {
-                    if (bankDelta != 0)
-                    {
-                        var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
-                        tip.AppendLine($"This round: {deltaStr}");
-                    }
-                    tip.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankCredit))}");
-                }
-                tip.Append("Click to copy");
-                ImGui.SetTooltip(tip.ToString());
-                if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                    ImGui.SetClipboardText(bankVal.ToString());
-            }
-
-            if (bankStat.MaintainBet && parsedBet > 0 && bankVal > parsedBet)
-            {
-                var owe     = bankVal - (long)Math.Floor(parsedBet);
-                var oweStr  = $"Owe {GameEngine.FormatGil(owe)}";
-                var fp2     = ImGui.GetStyle().FramePadding.X;
-                var sp2     = ImGui.GetStyle().ItemSpacing.X;
-                var manageW2 = ImGui.CalcTextSize("Manage").X + fp2 * 2;
-                var oweW    = ImGui.CalcTextSize(oweStr).X + sp2;
-                ImGui.SameLine();
-                if (ImGui.GetCursorPosX() < bankCellRight - manageW2 - sp2 - oweW)
-                    ImGui.SetCursorPosX(bankCellRight - manageW2 - sp2 - oweW);
-                ImGui.TextColored(GameColors.CreditGreen, oweStr);
-                if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip($"Bank is {GameEngine.FormatGil(owe)} over maintained bet - pay this out");
-            }
-
-            if (Phase == GamePhase.Betting && shortfall > 0)
-            {
-                var amber    = new Vector4(1f, 0.75f, 0.1f, 1f);
-                var fp       = ImGui.GetStyle().FramePadding.X;
-                var sp       = ImGui.GetStyle().ItemSpacing.X;
-                var manageW  = ImGui.CalcTextSize("Manage").X + fp * 2;
-                var shortW   = ImGui.CalcTextSize("Short").X  + fp * 2;
-                ImGui.SameLine();
-                if (ImGui.GetCursorPosX() < bankCellRight - manageW - sp - shortW)
-                    ImGui.SetCursorPosX(bankCellRight - manageW - sp - shortW);
-                var amberHov = new Vector4(1f, 0.88f, 0.3f, 1f);
-                ImGui.PushStyleColor(ImGuiCol.Button,        amber    with { W = 0.25f });
-                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, amberHov with { W = 0.4f  });
-                ImGui.PushStyleColor(ImGuiCol.Text,          amber);
-                if (ImGui.SmallButton($"Short##{actualIdx}short"))
-                {
-                    if (betEdits.TryGetValue(loopIdx, out var pendingBet) && pendingBet != player.Bet)
-                    {
-                        betEdits.Remove(loopIdx);
-                        Apply(new SetPlayerBet(actualIdx, pendingBet));
-                    }
-                    Apply(new AnnounceBankShortfall(actualIdx, (long)Math.Ceiling(shortfall)));
-                }
-                ImGui.PopStyleColor(3);
-                if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip($"Short by {GameEngine.FormatGil(shortfall)}\nClick to announce shortfall");
-            }
-        }
+        var bankLabel = GameEngine.FormatGil(bankVal);
+        if (shortfall > 0)
+            ImGui.TextColored(GameColors.WarningAmber, bankLabel);
         else
+            ImGui.TextUnformatted(bankLabel);
+        if (ImGui.IsItemHovered())
         {
-            ImGui.TextDisabled("-");
+            var tip = new System.Text.StringBuilder();
+            if (shortfall > 0)
+                tip.AppendLine($"Short by {GameEngine.FormatGil(shortfall)} - needs trade before deal");
+            if (Phase == GamePhase.Payout && bankCredit > 0)
+            {
+                if (bankDelta != 0)
+                {
+                    var deltaStr = bankDelta > 0 ? $"+{GameEngine.FormatGil(bankDelta)}" : GameEngine.FormatGil(bankDelta);
+                    tip.AppendLine($"This round: {deltaStr}");
+                }
+                tip.AppendLine($"After settlement: {GameEngine.FormatGil(Math.Max(0, bankVal + bankCredit))}");
+            }
+            tip.Append("Click to copy");
+            ImGui.SetTooltip(tip.ToString());
+            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                ImGui.SetClipboardText(bankVal.ToString());
+        }
+
+        if (bankStat.MaintainBet && parsedBet > 0 && bankVal > parsedBet)
+        {
+            var owe     = bankVal - (long)Math.Floor(parsedBet);
+            var oweStr  = $"Owe {GameEngine.FormatGil(owe)}";
+            var fp2     = ImGui.GetStyle().FramePadding.X;
+            var sp2     = ImGui.GetStyle().ItemSpacing.X;
+            var manageW2 = ImGui.CalcTextSize("Manage").X + fp2 * 2;
+            var oweW    = ImGui.CalcTextSize(oweStr).X + sp2;
+            ImGui.SameLine();
+            if (ImGui.GetCursorPosX() < bankCellRight - manageW2 - sp2 - oweW)
+                ImGui.SetCursorPosX(bankCellRight - manageW2 - sp2 - oweW);
+            ImGui.TextColored(GameColors.CreditGreen, oweStr);
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip($"Bank is {GameEngine.FormatGil(owe)} over maintained bet - pay this out");
+        }
+
+        if (Phase == GamePhase.Betting && shortfall > 0)
+        {
+            var amber    = new Vector4(1f, 0.75f, 0.1f, 1f);
+            var fp       = ImGui.GetStyle().FramePadding.X;
+            var sp       = ImGui.GetStyle().ItemSpacing.X;
+            var manageW  = ImGui.CalcTextSize("Manage").X + fp * 2;
+            var shortW   = ImGui.CalcTextSize("Short").X  + fp * 2;
+            ImGui.SameLine();
+            if (ImGui.GetCursorPosX() < bankCellRight - manageW - sp - shortW)
+                ImGui.SetCursorPosX(bankCellRight - manageW - sp - shortW);
+            var amberHov = new Vector4(1f, 0.88f, 0.3f, 1f);
+            ImGui.PushStyleColor(ImGuiCol.Button,        amber    with { W = 0.25f });
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, amberHov with { W = 0.4f  });
+            ImGui.PushStyleColor(ImGuiCol.Text,          amber);
+            if (ImGui.SmallButton($"Short##{actualIdx}short"))
+            {
+                if (betEdits.TryGetValue(loopIdx, out var pendingBet) && pendingBet != player.Bet)
+                {
+                    betEdits.Remove(loopIdx);
+                    Apply(new SetPlayerBet(actualIdx, pendingBet));
+                }
+                Apply(new AnnounceBankShortfall(actualIdx, (long)Math.Ceiling(shortfall)));
+            }
+            ImGui.PopStyleColor(3);
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip($"Short by {GameEngine.FormatGil(shortfall)}\nClick to announce shortfall");
         }
 
         DrawBankManageButton(actualIdx, bankCellRight, "bank", uiBusy);
@@ -342,7 +330,7 @@ public partial class MainWindow
         var oldAmt    = (long)Math.Ceiling(parsedOld);
         var delta     = newAmt - oldAmt;
         long shortfall = 0;
-        if (p.TryGetBankingStat(config, out var stat) && delta > 0 && stat.Bank < delta)
+        if (p.TryGetStat(config, out var stat) && delta > 0 && stat.Bank < delta)
             shortfall = delta - stat.Bank;
 
         ImGui.SetNextItemWidth(cellRight - ImGui.GetCursorPosX() - reservedRight);
@@ -1150,73 +1138,41 @@ public partial class MainWindow
         }
     }
 
-    private void DrawTradeBetPromptModal()
+    // Bidirectional trade: the dealer handed gil over (a withdrawal/cashout) and
+    // received gil back in the same window. Confirm both legs so neither is lost.
+    private void DrawTwoSidedPromptModal()
     {
-        if (pendingPrompt is PendingPrompt.Bet)
-            ImGui.OpenPopup("Set bet from trade?##tradeBet");
+        if (pendingPrompt is PendingPrompt.TwoSided)
+            ImGui.OpenPopup("Two-sided trade##twoSided");
         ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
-        var show = ImGui.BeginPopupModal("Set bet from trade?##tradeBet", ImGuiWindowFlags.AlwaysAutoResize);
+        var show = ImGui.BeginPopupModal("Two-sided trade##twoSided", ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.PopStyleColor();
         if (!show) return;
 
-        var b = (PendingPrompt.Bet)pendingPrompt!;
-        var bplayer = State.Players[b.Pi];
-        ImGui.Text($"Set {bplayer.DisplayName}'s bet to {b.Gil:N0} gil?");
+        var ts     = (PendingPrompt.TwoSided)pendingPrompt!;
+        var player = State.Players[ts.Pi];
+        var stat   = player.GetOrCreateStat(config);
+        ImGui.Text($"Two-sided trade with {player.DisplayName}:");
+        ImGui.BulletText($"You gave {ts.Gave:N0} gil  ->  withdraw from bank");
+        ImGui.BulletText($"You received {ts.Received:N0} gil  ->  deposit to bank");
         ImGui.Spacing();
-        if (ImGui.Button("Yes"))
+        if (ImGui.Button("Confirm both##twoSidedYes"))
         {
-            betEdits.Remove(b.Pi);
-            Apply(new SetPlayerBet(b.Pi, b.Gil.ToString()));
+            ApplyBank(stat, new BankWithdrawal(ts.Gave));
+            if (!stat.MaintainBet)
+                Apply(new AnnounceBankWithdraw(ts.Pi, ts.Gave, stat.Bank));
+            ApplyBank(stat, new BankDeposit(ts.Received));
+            if (!stat.MaintainBet)
+                Apply(new AnnounceBankDeposit(ts.Pi, ts.Received, stat.Bank));
             pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
         ImGui.SameLine();
-        if (ImGui.Button("No"))
+        if (ImGui.Button("Cancel##twoSidedNo"))
         {
-            pendingPrompt = null;
-            ImGui.CloseCurrentPopup();
-        }
-        ImGui.EndPopup();
-    }
-
-    private void DrawBetOrBankPromptModal()
-    {
-        if (pendingPrompt is PendingPrompt.BetOrBank)
-            ImGui.OpenPopup("Trade received##betOrBank");
-        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
-        var show = ImGui.BeginPopupModal("Trade received##betOrBank", ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.PopStyleColor();
-        if (!show) return;
-
-        var b = (PendingPrompt.BetOrBank)pendingPrompt!;
-        var bobPlayer = State.Players[b.Pi];
-        ImGui.Text($"Received {b.Gil:N0} gil from {bobPlayer.DisplayName}.");
-        ImGui.Spacing();
-        if (ImGui.Button("Set as bet##bobBet"))
-        {
-            betEdits.Remove(b.Pi);
-            Apply(new SetPlayerBet(b.Pi, b.Gil.ToString()));
-            pendingPrompt = null;
-            ImGui.CloseCurrentPopup();
-        }
-        ImGui.SameLine();
-        if (ImGui.Button("Bank deposit##bobBank"))
-        {
-            var bobKey = bobPlayer.StatsKey();
-            if (!config.PlayerStatsStore.TryGetValue(bobKey, out var bobStat))
-            {
-                bobStat = new PlayerStat { DisplayName = bobPlayer.DisplayName };
-                config.PlayerStatsStore[bobKey] = bobStat;
-            }
-            ApplyBank(bobStat, new BankDeposit(b.Gil));
-            if (!bobStat.MaintainBet)
-                Apply(new AnnounceBankDeposit(b.Pi, b.Gil, bobStat.Bank));
-            pendingPrompt = null;
-            ImGui.CloseCurrentPopup();
-        }
-        ImGui.SameLine();
-        if (ImGui.Button("Ignore##bobIgnore"))
-        {
+            config.NarrationLog.Add(
+                $"[Audit] Dismissed two-sided trade with {player.DisplayName}: " +
+                $"gave {ts.Gave:N0}, received {ts.Received:N0} (no ledger change)");
             pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
@@ -1336,6 +1292,8 @@ public partial class MainWindow
             debugWindow.Toggle();
 #endif
 
+        DrawDriftChip();
+
         var canUndo = config.UndoStack.Count > 0;
         var canRedo = config.RedoStack.Count > 0;
         var undoW   = ImGui.CalcTextSize("Undo").X + ImGui.GetStyle().FramePadding.X * 2;
@@ -1352,6 +1310,36 @@ public partial class MainWindow
         if (!canRedo) ImGui.EndDisabled();
     }
 
+    // Always-visible books-balance signal. Surfaces the same reconciliation the
+    // Session Ledger computes, so drift is noticed the moment it appears rather
+    // than only when the ledger window is open. Suppressed in history view (which
+    // swaps GameState and would skew the figure).
+    private void DrawDriftChip()
+    {
+        if (isHistoryView) return;
+        var rec = SessionLedgerWindow.Compute(config);
+        ImGui.SameLine();
+        if (rec.Reconciled)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ProfitGreen);
+            var clicked = ImGui.SmallButton("Books OK");
+            ImGui.PopStyleColor();
+            if (clicked) sessionLedgerWindow.Toggle();
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Session books reconcile.\nClick to open the Session Ledger.");
+        }
+        else
+        {
+            var sign = rec.Drift > 0 ? "+" : "";
+            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BustRed);
+            var clicked = ImGui.SmallButton($"Drift: {sign}{rec.Drift:N0}");
+            ImGui.PopStyleColor();
+            if (clicked) sessionLedgerWindow.Toggle();
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Books do not reconcile - a ledger entry is missing or off.\nClick to open the Session Ledger.");
+        }
+    }
+
     private void DrawBankTradePromptModal()
     {
         if (pendingPrompt is PendingPrompt.BankDeposit or PendingPrompt.BankWithdraw)
@@ -1365,12 +1353,7 @@ public partial class MainWindow
         var btpi   = isWd ? ((PendingPrompt.BankWithdraw)pendingPrompt!).Pi : ((PendingPrompt.BankDeposit)pendingPrompt!).Pi;
         var btamt  = isWd ? ((PendingPrompt.BankWithdraw)pendingPrompt!).Gil : ((PendingPrompt.BankDeposit)pendingPrompt!).Gil;
         var btplayer = State.Players[btpi];
-        var btKey    = btplayer.StatsKey();
-        if (!config.PlayerStatsStore.TryGetValue(btKey, out var btStat))
-        {
-            btStat = new PlayerStat { DisplayName = btplayer.DisplayName };
-            config.PlayerStatsStore[btKey] = btStat;
-        }
+        var btStat   = btplayer.GetOrCreateStat(config);
         var verb = isWd ? "Withdraw" : "Deposit";
         ImGui.Text($"{verb} {btamt:N0} gil {(isWd ? "from" : "to")} {btplayer.DisplayName}'s bank?");
         ImGui.Spacing();
@@ -1445,8 +1428,7 @@ public partial class MainWindow
         var uiBusy = chatQueue.Count > 0 || pendingHit != null || deferredRoll.HasValue;
 
         DrawBankManageWindow(uiBusy);
-        DrawTradeBetPromptModal();
-        DrawBetOrBankPromptModal();
+        DrawTwoSidedPromptModal();
         DrawBankTradePromptModal();
 
         DrawHistoryViewBanner();
@@ -1836,15 +1818,15 @@ public partial class MainWindow
                 ImGui.SameLine();
                 var effectiveBets = State.Players.Select((p, i) =>
                     betEdits.TryGetValue(i, out var e) ? e : p.Bet).ToList();
+                // Bank-only: every non-sitting player funds their bet from the bank,
+                // so a missing/empty bank that can't cover the bet is a shortfall
+                // that blocks dealing.
                 var shortfallPlayers = State.Players
                     .Select((p, i) => (p, i))
                     .Where(x => !x.p.SittingOut)
                     .Where(x => {
-                        var key = x.p.StatsKey();
-                        if (!config.PlayerStatsStore.TryGetValue(key, out var st)) return false;
-                        if (!st.IsBanking()) return false;
                         var eb = GameEngine.ParseBet(effectiveBets[x.i]);
-                        return eb > 0 && st.Bank < eb;
+                        return eb > 0 && x.p.BankBalance(config) < eb;
                     })
                     .Select(x => x.p.DisplayName)
                     .ToList();
@@ -1875,8 +1857,7 @@ public partial class MainWindow
                         if (p.SittingOut) continue;
                         var betAmt = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
                         if (betAmt <= 0) continue;
-                        if (!p.TryGetBankingStat(config, out var betStat)) continue;
-                        ApplyBank(betStat, new BankBet(betAmt));
+                        ApplyBank(p.GetOrCreateStat(config), new BankBet(betAmt));
                     }
                     for (var i = 0; i < State.Players.Length; i++)
                     {

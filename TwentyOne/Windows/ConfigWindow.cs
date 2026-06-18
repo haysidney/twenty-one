@@ -82,13 +82,6 @@ public class ConfigWindow : Window, IDisposable
             config.Save();
         }
 
-        var autoBet = config.AutoBetFromTrades;
-        if (ImGui.Checkbox("Auto-fill bet from trade (betting phase)", ref autoBet))
-        {
-            config.AutoBetFromTrades = autoBet;
-            config.Save();
-        }
-
         var autoDeposit = config.AutoDepositFromTrades;
         if (ImGui.Checkbox("Prompt to update bank when trade detected", ref autoDeposit))
         {

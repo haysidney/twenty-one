@@ -87,7 +87,6 @@ public class VenueSettings
 
     // ── Trade ──────────────────────────────────────────────────────────────────
     public bool AutoTradeEnabled       { get; set; } = true;
-    public bool AutoBetFromTrades      { get; set; } = true;
     public bool AutoDepositFromTrades  { get; set; } = true;
 
     // ── Targeting ──────────────────────────────────────────────────────────────
@@ -211,7 +210,6 @@ public class Configuration : IPluginConfiguration
     // ── Proxy properties (delegate to ActiveVenue, not serialized) ────────────
     [JsonIgnore] public bool   NarrationUseChannelCommand { get => ActiveVenue.NarrationUseChannelCommand; set => ActiveVenue.NarrationUseChannelCommand = value; }
     [JsonIgnore] public bool   AutoTradeEnabled           { get => ActiveVenue.AutoTradeEnabled;            set => ActiveVenue.AutoTradeEnabled = value; }
-    [JsonIgnore] public bool   AutoBetFromTrades          { get => ActiveVenue.AutoBetFromTrades;           set => ActiveVenue.AutoBetFromTrades = value; }
     [JsonIgnore] public bool   AutoDepositFromTrades      { get => ActiveVenue.AutoDepositFromTrades;       set => ActiveVenue.AutoDepositFromTrades = value; }
     [JsonIgnore] public bool   AutoTargetEnabled          { get => ActiveVenue.AutoTargetEnabled;           set => ActiveVenue.AutoTargetEnabled = value; }
     [JsonIgnore] public bool   RemindTargetEnabled        { get => ActiveVenue.RemindTargetEnabled;         set => ActiveVenue.RemindTargetEnabled = value; }

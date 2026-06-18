@@ -59,10 +59,9 @@ public partial class MainWindow : Window, IDisposable
     // Discriminated prompt for trade-result modals. Only one may be active at a time.
     private abstract record PendingPrompt
     {
-        public sealed record Bet(int Pi, long Gil) : PendingPrompt;
         public sealed record BankDeposit(int Pi, long Gil) : PendingPrompt;
         public sealed record BankWithdraw(int Pi, long Gil) : PendingPrompt;
-        public sealed record BetOrBank(int Pi, long Gil) : PendingPrompt;
+        public sealed record TwoSided(int Pi, long Gave, long Received) : PendingPrompt;
     }
     private PendingPrompt? pendingPrompt;
 
@@ -313,24 +312,17 @@ public partial class MainWindow : Window, IDisposable
             return (true, $"Bet unchanged ({newAmt:N0}).");
         }
 
-        if (player.TryGetBankingStat(config, out var stat))
+        var stat = player.GetOrCreateStat(config);
+        if (delta > 0 && stat.Bank < delta)
         {
-            if (delta > 0 && stat.Bank < delta)
-            {
-                var shortBy = delta - stat.Bank;
-                return (false, $"Bank short by {shortBy:N0} gil - trade more before increasing the bet.");
-            }
-            var beforeBank = stat.Bank;
-            ApplyBank(stat, new BankBetAdjust(delta));
-            config.NarrationLog.Add(
-                $"[Bank] {player.DisplayName}: bet adjusted {oldAmt:N0} → {newAmt:N0} " +
-                $"(bank {beforeBank:N0} → {stat.Bank:N0})");
+            var shortBy = delta - stat.Bank;
+            return (false, $"Bank short by {shortBy:N0} gil - trade more before increasing the bet.");
         }
-        else
-        {
-            config.NarrationLog.Add(
-                $"[Bet] {player.DisplayName}: bet adjusted {oldAmt:N0} → {newAmt:N0} (no bank)");
-        }
+        var beforeBank = stat.Bank;
+        ApplyBank(stat, new BankBetAdjust(delta));
+        config.NarrationLog.Add(
+            $"[Bank] {player.DisplayName}: bet adjusted {oldAmt:N0} → {newAmt:N0} " +
+            $"(bank {beforeBank:N0} → {stat.Bank:N0})");
 
         Apply(new AdjustBet(pi, newAmt.ToString()));
         return (true, $"Bet adjusted to {newAmt:N0}.");
@@ -543,10 +535,8 @@ public partial class MainWindow : Window, IDisposable
         // ── Trade detection (bet auto-fill + bank deposit/withdraw) ──────────
         var msgText = message.TextValue;
         var payload = message.Payloads.OfType<PlayerPayload>().FirstOrDefault();
-        switch (tradeMonitor.OnChat(msgText, payload, Phase, State, config))
+        switch (tradeMonitor.OnChat(msgText, payload, State, config))
         {
-            case TradeMonitor.Outcome.PromptBet pb:
-                pendingPrompt = new PendingPrompt.Bet(pb.Pi, pb.Gil); break;
             case TradeMonitor.Outcome.PromptBankDeposit pbd:
                 if (!TryAutoDoubleOrSplitDeposit(pbd.Pi, pbd.Gil)
                     && !TryAutoMaintainBetDeposit(pbd.Pi, pbd.Gil))
@@ -557,9 +547,8 @@ public partial class MainWindow : Window, IDisposable
                     && !TryAutoMaintainBetWithdraw(pbw.Pi, pbw.Gil))
                     pendingPrompt = new PendingPrompt.BankWithdraw(pbw.Pi, pbw.Gil);
                 break;
-            case TradeMonitor.Outcome.PromptBetOrBank pbob:
-                if (!TryAutoMaintainBetDeposit(pbob.Pi, pbob.Gil))
-                    pendingPrompt = new PendingPrompt.BetOrBank(pbob.Pi, pbob.Gil);
+            case TradeMonitor.Outcome.PromptTwoSided pts:
+                pendingPrompt = new PendingPrompt.TwoSided(pts.Pi, pts.Gave, pts.Received);
                 break;
         }
 
@@ -591,7 +580,7 @@ public partial class MainWindow : Window, IDisposable
     {
         if (pi < 0 || pi >= State.Players.Length) return false;
         var p = State.Players[pi];
-        if (!p.TryGetBankingStat(config, out var stat) || !stat.MaintainBet) return false;
+        if (!p.TryGetStat(config, out var stat) || !stat.MaintainBet) return false;
         if (stat.Bank != 0) return false;
         var bet = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
         if (bet <= 0 || gil != bet) return false;
@@ -606,7 +595,7 @@ public partial class MainWindow : Window, IDisposable
     {
         if (pi < 0 || pi >= State.Players.Length) return false;
         var p = State.Players[pi];
-        if (!p.TryGetBankingStat(config, out var stat) || !stat.CashOut) return false;
+        if (!p.TryGetStat(config, out var stat) || !stat.CashOut) return false;
         if (gil <= 0 || gil > stat.Bank) return false;
         ApplyBank(stat, new BankWithdrawal(gil));
         if (stat.Bank == 0) stat.CashOut = false;
@@ -619,7 +608,7 @@ public partial class MainWindow : Window, IDisposable
     {
         if (pi < 0 || pi >= State.Players.Length) return false;
         var p = State.Players[pi];
-        if (!p.TryGetBankingStat(config, out var stat) || !stat.MaintainBet) return false;
+        if (!p.TryGetStat(config, out var stat) || !stat.MaintainBet) return false;
         var bet = (long)Math.Floor(GameEngine.ParseBet(p.Bet));
         var owe = stat.Bank - bet;
         if (owe <= 0 || gil != owe) return false;
@@ -636,7 +625,7 @@ public partial class MainWindow : Window, IDisposable
         var pending = pendingDouble ?? pendingSplit;
         if (pending is null || pending.Value.PlayerIndex != pi) return false;
         var p = State.Players[pi];
-        if (!p.TryGetBankingStat(config, out var stat)) return false;
+        if (!p.TryGetStat(config, out var stat)) return false;
         var hand = p.Hands[pending.Value.HandIndex];
         var bet  = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
         if (bet <= 0) return false;
@@ -654,7 +643,7 @@ public partial class MainWindow : Window, IDisposable
         Apply(new AnnounceDoubleConfirm(pi, hi));
         Apply(new DoubleDown(pi, hi));
         var amt = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-        if (amt > 0 && p.TryGetBankingStat(config, out var stat))
+        if (amt > 0 && p.TryGetStat(config, out var stat))
         {
             var before = stat.Bank;
             ApplyBank(stat, new BankDoubleDown(amt));
@@ -670,7 +659,7 @@ public partial class MainWindow : Window, IDisposable
         var p    = State.Players[pi];
         var hand = p.Hands[hi];
         var amt  = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-        if (amt > 0 && p.TryGetBankingStat(config, out var stat))
+        if (amt > 0 && p.TryGetStat(config, out var stat))
         {
             var before = stat.Bank;
             ApplyBank(stat, new BankSplit(amt));
