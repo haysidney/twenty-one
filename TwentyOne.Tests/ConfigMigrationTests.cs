@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using TwentyOne.Game;
 using Xunit;
@@ -108,5 +110,34 @@ public class ConfigMigrationTests
         var afterFirst = root.DeepClone();
         ConfigMigrations.Migrate(root);
         Assert.True(JToken.DeepEquals(afterFirst, root));
+    }
+
+    [Fact]
+    public void DedupRoundHistory_CollapsesRepeatedBlocks_KeepingFirst()
+    {
+        // Two distinct rounds, list tripled by the doubling bug: [1,2,1,2,1,2].
+        var block = new[] { 1, 2 };
+        var rounds = Enumerable.Range(0, 3)
+            .SelectMany(_ => block)
+            .Select(n => new RoundHistoryEntry { RoundNumber = n })
+            .ToList();
+
+        var removed = ConfigMigrations.DedupRoundHistory(rounds);
+
+        Assert.Equal(4, removed);
+        Assert.Equal(new[] { 1, 2 }, rounds.Select(r => r.RoundNumber));
+    }
+
+    [Fact]
+    public void DedupRoundHistory_LeavesCleanHistoryUntouched()
+    {
+        var rounds = Enumerable.Range(1, 5)
+            .Select(n => new RoundHistoryEntry { RoundNumber = n })
+            .ToList();
+
+        var removed = ConfigMigrations.DedupRoundHistory(rounds);
+
+        Assert.Equal(0, removed);
+        Assert.Equal(new[] { 1, 2, 3, 4, 5 }, rounds.Select(r => r.RoundNumber));
     }
 }

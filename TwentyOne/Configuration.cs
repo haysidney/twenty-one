@@ -224,7 +224,13 @@ public class Configuration : IPluginConfiguration
         foreach (var key in ConfigMigrations.OrphanedRootProxyKeys)
             ExtraData.Remove(key);
         foreach (var v in Venues)
+        {
             v.ExtraData.Remove("StatsSessions");
+            // Collapse any duplicate RoundHistory entries left by the proxy-
+            // collection doubling. RoundNumbers are unique within a live venue, so
+            // repeats are pure corruption; keep the first of each.
+            ConfigMigrations.DedupRoundHistory(v.RoundHistory);
+        }
     }
 
     [JsonIgnore] public VenueSettings ActiveVenue => Venues[ActiveVenueIndex];
