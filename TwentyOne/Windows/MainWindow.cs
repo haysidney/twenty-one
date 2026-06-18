@@ -30,6 +30,7 @@ public partial class MainWindow : Window, IDisposable
     private GameState?       savedCurrentState;
     private List<GameState>? savedUndoStack;
     private List<GameState>? savedRedoStack;
+    private List<List<UndoBankOp>>? savedUndoBankOps;
     private bool             isHistoryView => savedCurrentState != null;
     private readonly IChatGui       chatGui;
     private readonly IObjectTable   objectTable;
@@ -159,20 +160,24 @@ public partial class MainWindow : Window, IDisposable
         savedCurrentState = config.GameState;
         savedUndoStack    = [..config.UndoStack];
         savedRedoStack    = [..config.RedoStack];
+        savedUndoBankOps  = [..config.UndoBankOps];
         config.GameState  = snapshot;
         config.UndoStack.Clear();
         config.RedoStack.Clear();
+        config.UndoBankOps.Clear();
     }
 
     public void ExitHistoryView()
     {
         if (savedCurrentState == null) return;
-        config.GameState  = savedCurrentState;
-        config.UndoStack  = savedUndoStack ?? [];
-        config.RedoStack  = savedRedoStack ?? [];
+        config.GameState   = savedCurrentState;
+        config.UndoStack   = savedUndoStack ?? [];
+        config.RedoStack   = savedRedoStack ?? [];
+        config.UndoBankOps = savedUndoBankOps ?? [];
         savedCurrentState = null;
         savedUndoStack    = null;
         savedRedoStack    = null;
+        savedUndoBankOps  = null;
     }
 
     // Called from Plugin.OnMenuOpened (runs on framework thread via context menu callback).
@@ -187,7 +192,7 @@ public partial class MainWindow : Window, IDisposable
     {
         if (action is NewRound)
         {
-            config.UndoStack.Clear();
+            ClearUndoState();
             autoDealQueue.Clear();
             pendingHit     = null;
             pendingDouble  = null;
@@ -205,7 +210,7 @@ public partial class MainWindow : Window, IDisposable
         {
             // Always push the WaitingForNextPlayer state so undo can return to it.
             if (config.GameState.WaitingForNextPlayer)
-                config.UndoStack.Add(config.GameState);
+                PushUndoSnapshot();
         }
         else if (action.PushesUndo
                  && !IsTransientSplitState(config.GameState)
@@ -213,7 +218,7 @@ public partial class MainWindow : Window, IDisposable
         {
             // GameEngine is pure - it never mutates state, so pushing the current
             // reference is safe; future Apply calls create entirely new objects.
-            config.UndoStack.Add(config.GameState);
+            PushUndoSnapshot();
         }
         config.RedoStack.Clear();
 
@@ -262,29 +267,140 @@ public partial class MainWindow : Window, IDisposable
         config.Save();
     }
 
+    // True while the undo-confirmation modal is open; carries the bank ops the
+    // pending undo will reverse so the modal can describe them.
+    private List<UndoBankOp>? pendingUndoConfirm;
+
     private void Undo()
     {
-        if (config.UndoStack.Count == 0) return;
+        if (config.UndoStack.Count == 0 || pendingUndoConfirm != null) return;
+        // A completed payout also moved gil into player banks and bumped round
+        // history / stat counters, which undo does not unwind. Don't half-revert it.
+        if (Phase == GamePhase.Payout) return;
+
+        var bucket = config.UndoBankOps.Count > 0 ? config.UndoBankOps[^1] : [];
+        if (bucket.Count > 0)
+        {
+            // Crossing a financial boundary - confirm and describe before reversing.
+            pendingUndoConfirm = bucket;
+            return;
+        }
+        PopUndo();
+        config.Save();
+    }
+
+    // Confirmed undo across a financial boundary: post compensating reversals,
+    // then pop. Redo across a reversal isn't supported, so the redo stack is cleared.
+    private void ConfirmUndoWithReversals()
+    {
+        if (pendingUndoConfirm == null) return;
+        foreach (var op in pendingUndoConfirm)
+        {
+            if (!config.PlayerStatsStore.TryGetValue(op.StatKey, out var stat)) continue;
+            ApplyBank(stat, new BankReversal(-op.BalanceEffect));
+            config.NarrationLog.Add(
+                $"[Audit] Undo reversed {op.Kind} for {op.DisplayName}: {-op.BalanceEffect:+#,0;-#,0} gil " +
+                $"(bank now {stat.Bank:N0})");
+        }
+        pendingUndoConfirm = null;
+        config.GameState = config.UndoStack[^1];
+        config.UndoStack.RemoveAt(config.UndoStack.Count - 1);
+        config.UndoBankOps.RemoveAt(config.UndoBankOps.Count - 1);
+        config.RedoStack.Clear();
+        config.Save();
+    }
+
+    // Refund every bank deduction made this round (all undo buckets). Used by Abort
+    // Round so a misdeal returns players' bets/doubles/splits instead of pocketing them.
+    private void RefundRoundBankOps()
+    {
+        for (var i = config.UndoBankOps.Count - 1; i >= 0; i--)
+            foreach (var op in config.UndoBankOps[i])
+            {
+                if (!config.PlayerStatsStore.TryGetValue(op.StatKey, out var stat)) continue;
+                ApplyBank(stat, new BankReversal(-op.BalanceEffect));
+                config.NarrationLog.Add(
+                    $"[Audit] Abort refunded {op.Kind} for {op.DisplayName}: {-op.BalanceEffect:+#,0;-#,0} gil " +
+                    $"(bank now {stat.Bank:N0})");
+            }
+    }
+
+    // Pop one non-financial undo entry onto the redo stack.
+    private void PopUndo()
+    {
         config.RedoStack.Add(config.GameState);
         config.GameState = config.UndoStack[^1];
         config.UndoStack.RemoveAt(config.UndoStack.Count - 1);
-        config.Save();
+        if (config.UndoBankOps.Count > 0)
+            config.UndoBankOps.RemoveAt(config.UndoBankOps.Count - 1);
     }
 
     private void Redo()
     {
         if (config.RedoStack.Count == 0) return;
         config.UndoStack.Add(config.GameState);
+        config.UndoBankOps.Add([]); // redo never carries bank ops (financial undo clears redo)
         config.GameState = config.RedoStack[^1];
         config.RedoStack.RemoveAt(config.RedoStack.Count - 1);
         config.Save();
     }
 
-    private static void ApplyBank(PlayerStat stat, IBankTransaction tx)
+    private static BankTransactionEntry ApplyBank(PlayerStat stat, IBankTransaction tx)
     {
         var (newBalance, entry) = BankLedger.Apply(stat.Bank, tx, DateTime.Now);
         stat.Bank = newBalance;
         stat.BankLog.Add(entry);
+        return entry;
+    }
+
+    // Like ApplyBank, but also records the deduction against the current undo
+    // transition (UndoBankOps[^1]) so Undo / Abort can post a compensating reversal.
+    // Use this for bank ops that are part of an undoable GameAction (StartDeal bets,
+    // Double/Split confirms). Plain ApplyBank is correct for trades / manage / payout
+    // settlement, which are not unwound by undo.
+    private void ApplyBankUndoable(Player p, IBankTransaction tx)
+    {
+        var stat   = p.GetOrCreateStat(config);
+        var before = stat.Bank;
+        var entry  = ApplyBank(stat, tx);
+        var effect = stat.Bank - before;
+        if (effect != 0 && config.UndoBankOps.Count > 0)
+            config.UndoBankOps[^1].Add(new UndoBankOp
+            {
+                StatKey       = p.StatsKey(),
+                DisplayName   = p.DisplayName,
+                Kind          = entry.Kind,
+                BalanceEffect = effect,
+            });
+    }
+
+    // ── Undo-stack lockstep helpers (UndoStack <-> UndoBankOps) ─────────────────
+
+    // Push the current GameState as an undoable snapshot plus an empty bank-op
+    // bucket. Every direct UndoStack mutation goes through these so the two lists
+    // can never desync.
+    private void PushUndoSnapshot()
+    {
+        config.UndoStack.Add(config.GameState);
+        config.UndoBankOps.Add([]);
+    }
+
+    private void ClearUndoState()
+    {
+        config.UndoStack.Clear();
+        config.RedoStack.Clear();
+        config.UndoBankOps.Clear();
+    }
+
+    // Drop any persisted desync (older config has UndoStack but no UndoBankOps).
+    // Called once at startup. Aligns lengths by padding/truncating with empty
+    // buckets - pre-upgrade entries simply carry no reversal data.
+    public void ReconcileUndoBankOps()
+    {
+        while (config.UndoBankOps.Count < config.UndoStack.Count) config.UndoBankOps.Add([]);
+        if (config.UndoBankOps.Count > config.UndoStack.Count)
+            config.UndoBankOps.RemoveRange(config.UndoStack.Count,
+                config.UndoBankOps.Count - config.UndoStack.Count);
     }
 
     // Adjust a player's bet during the Deal phase, reconciling their bank in lockstep.
@@ -641,12 +757,13 @@ public partial class MainWindow : Window, IDisposable
         var p    = State.Players[pi];
         var hand = p.Hands[hi];
         Apply(new AnnounceDoubleConfirm(pi, hi));
-        Apply(new DoubleDown(pi, hi));
+        Apply(new DoubleDown(pi, hi)); // pushes the undo snapshot + bucket first
         var amt = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-        if (amt > 0 && p.TryGetStat(config, out var stat))
+        if (amt > 0)
         {
+            var stat   = p.GetOrCreateStat(config);
             var before = stat.Bank;
-            ApplyBank(stat, new BankDoubleDown(amt));
+            ApplyBankUndoable(p, new BankDoubleDown(amt));
             config.NarrationLog.Add($"[Bank] {p.DisplayName}: doubled - {amt:N0} deducted (was {before:N0} → {stat.Bank:N0})");
             config.Save();
         }
@@ -659,14 +776,17 @@ public partial class MainWindow : Window, IDisposable
         var p    = State.Players[pi];
         var hand = p.Hands[hi];
         var amt  = (long)Math.Ceiling(GameEngine.GetEffectiveBet(p, hand));
-        if (amt > 0 && p.TryGetStat(config, out var stat))
+        // Apply the split first so its undo snapshot + bucket exist before the bank
+        // deduction is recorded against them (amt is captured from the pre-split hand).
+        Apply(new SplitHand(pi, hi));
+        if (amt > 0)
         {
+            var stat   = p.GetOrCreateStat(config);
             var before = stat.Bank;
-            ApplyBank(stat, new BankSplit(amt));
+            ApplyBankUndoable(p, new BankSplit(amt));
             config.NarrationLog.Add($"[Bank] {p.DisplayName}: split - {amt:N0} deducted (was {before:N0} → {stat.Bank:N0})");
             config.Save();
         }
-        Apply(new SplitHand(pi, hi));
         pendingSplit = null;
     }
 

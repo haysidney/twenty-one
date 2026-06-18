@@ -1294,7 +1294,10 @@ public partial class MainWindow
 
         DrawDriftChip();
 
-        var canUndo = config.UndoStack.Count > 0;
+        // Undo is blocked in Payout: settlement also moved gil into player banks and
+        // bumped round-history / stat counters, which undo can't cleanly unwind. Use New Round.
+        var undoBlockedByPayout = Phase == GamePhase.Payout;
+        var canUndo = config.UndoStack.Count > 0 && !undoBlockedByPayout;
         var canRedo = config.RedoStack.Count > 0;
         var undoW   = ImGui.CalcTextSize("Undo").X + ImGui.GetStyle().FramePadding.X * 2;
         var redoW   = ImGui.CalcTextSize("Redo").X + ImGui.GetStyle().FramePadding.X * 2;
@@ -1304,6 +1307,9 @@ public partial class MainWindow
         if (!canUndo) ImGui.BeginDisabled();
         if (ImGui.SmallButton("Undo")) Undo();
         if (!canUndo) ImGui.EndDisabled();
+        if (undoBlockedByPayout && config.UndoStack.Count > 0
+            && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Can't undo a completed payout - use New Round."u8);
         ImGui.SameLine();
         if (!canRedo) ImGui.BeginDisabled();
         if (ImGui.SmallButton("Redo")) Redo();
@@ -1338,6 +1344,49 @@ public partial class MainWindow
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Books do not reconcile - a ledger entry is missing or off.\nClick to open the Session Ledger.");
         }
+    }
+
+    private static string DescribeBankKind(BankTransactionKind k) => k switch
+    {
+        BankTransactionKind.Bet        => "bet",
+        BankTransactionKind.DoubleDown => "double down",
+        BankTransactionKind.Split      => "split",
+        _                              => k.ToString().ToLowerInvariant(),
+    };
+
+    // Confirmation before an undo crosses a financial boundary. Lists the bank
+    // reversals the undo will post so the dealer sees exactly what happens.
+    private void DrawUndoConfirmModal()
+    {
+        if (pendingUndoConfirm != null)
+            ImGui.OpenPopup("Undo financial action?##undoConfirm");
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
+        var show = ImGui.BeginPopupModal("Undo financial action?##undoConfirm", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.PopStyleColor();
+        if (!show) return;
+
+        ImGui.TextUnformatted("This undo will reverse these bank transactions:");
+        ImGui.Spacing();
+        if (pendingUndoConfirm != null)
+            foreach (var op in pendingUndoConfirm)
+            {
+                var refund = -op.BalanceEffect; // deductions had negative effect -> positive refund
+                var verb   = refund >= 0 ? "refund" : "reclaim";
+                ImGui.BulletText($"{op.DisplayName}: {verb} {Math.Abs(refund):N0} gil (reverse {DescribeBankKind(op.Kind)})");
+            }
+        ImGui.Spacing();
+        if (ImGui.Button("Undo and reverse##undoConfirmYes"))
+        {
+            ConfirmUndoWithReversals();
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel##undoConfirmNo"))
+        {
+            pendingUndoConfirm = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.EndPopup();
     }
 
     private void DrawBankTradePromptModal()
@@ -1430,6 +1479,7 @@ public partial class MainWindow
         DrawBankManageWindow(uiBusy);
         DrawTwoSidedPromptModal();
         DrawBankTradePromptModal();
+        DrawUndoConfirmModal();
 
         DrawHistoryViewBanner();
 #if DEBUG
@@ -1857,7 +1907,7 @@ public partial class MainWindow
                         if (p.SittingOut) continue;
                         var betAmt = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
                         if (betAmt <= 0) continue;
-                        ApplyBank(p.GetOrCreateStat(config), new BankBet(betAmt));
+                        ApplyBankUndoable(p, new BankBet(betAmt));
                     }
                     for (var i = 0; i < State.Players.Length; i++)
                     {
@@ -1978,6 +2028,7 @@ public partial class MainWindow
             if (!ctrlHeld) ImGui.BeginDisabled();
             if (ImGui.Button("Abort Round"))
             {
+                RefundRoundBankOps(); // return this round's bets/doubles/splits to player banks
                 config.NarrationLog.Add("Round aborted.");
                 chatQueue.Clear();
                 deferredRoll = null;

@@ -116,6 +116,7 @@ public sealed class Plugin : IDalamudPlugin
         RulesEditorWindow     = new RulesEditorWindow(Configuration);
         ConfigWindow          = new ConfigWindow(Configuration, SessionLedgerWindow, NarrationEditorWindow, RulesEditorWindow);
         MainWindow            = new MainWindow(Configuration, ConfigWindow, SessionLedgerWindow, ChatGui, ObjectTable, ClientState);
+        MainWindow.ReconcileUndoBankOps(); // align additive UndoBankOps with a possibly-older UndoStack
         HistoryWindow       = new HistoryWindow(Configuration, MainWindow);
         MainWindow.SetHistoryWindow(HistoryWindow);
         SessionLedgerWindow.SetHistoryWindow(HistoryWindow);

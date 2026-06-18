@@ -150,10 +150,33 @@ All state mutations go through `GameEngine.Apply` via a `GameAction` discriminat
 
 ### Undo
 
-- Before every `Apply` call, `MainWindow` pushes `config.GameState` onto `config.UndoStack`.
+- Before every `Apply` call, `MainWindow` pushes `config.GameState` onto `config.UndoStack` (via `PushUndoSnapshot`).
 - `NewRound` / Abort Round clears the stack instead of pushing.
 - Undo restores previous `GameState` and pops the stack. `NarrationLog` is **not** restored.
 - The undo stack is persisted in `Configuration`.
+
+#### Undo vs bank ops (compensating reversals)
+
+Bank deductions (`BankBet` at StartDeal, `BankDoubleDown`/`BankSplit` at confirm)
+live outside `GameState`, so a plain state-restore would leave balances diverged
+and re-dealing would double-charge. Fix:
+
+- `Configuration.UndoBankOps` (`List<List<UndoBankOp>>`) is **additive** and kept
+  lockstep with `UndoStack` (`UndoBankOps[i]` belongs to `UndoStack[i]`). All
+  stack mutation goes through `PushUndoSnapshot` / `ClearUndoState` / `PopUndo` so
+  the two never desync; `Plugin` calls `MainWindow.ReconcileUndoBankOps()` once at
+  startup to align an older config (no schema migration - additive field).
+- `ApplyBankUndoable(player, tx)` records the op's signed `BalanceEffect` onto the
+  current bucket. Used only by StartDeal / Confirm Double / Confirm Split. Plain
+  `ApplyBank` (trades, manage, **payout settlement**) is *not* tracked.
+- Undo across a non-empty bucket opens `DrawUndoConfirmModal` describing each
+  reversal; on confirm, `ConfirmUndoWithReversals` posts `BankReversal(-effect)`
+  per op (+ `[Audit]` narration), pops, and clears redo (no redo across a
+  reversal). `BankReversal(long Delta)` is the ledger primitive (signed; clamps >=0).
+- **Undo is blocked in `Payout`** - settlement also bumped round history / stat
+  counters that undo can't unwind. Use New Round.
+- **Abort Round** calls `RefundRoundBankOps` (reverse every bucket) so a misdeal
+  returns bets/doubles/splits instead of pocketing them.
 
 ### State persistence
 
@@ -378,6 +401,25 @@ Every narration string emitted via `SendChat` must have a corresponding property
 ## Commits
 
 Commit messages follow `type(scope): message` style. Every commit builds (Debug + Release) and passes tests.
+
+## Versioning
+
+- **Scheme:** `0.MINOR.PATCH` while pre-release. The csproj `<Version>` is the
+  4-part `0.MINOR.PATCH.0` (Dalamud needs a `System.Version`); the 4th component
+  is always `0` and ignored. No `-alpha`/`-beta` suffixes - the leading `0`
+  already signals "unstable."
+- **Pre-1.0 bumps:** `MINOR` = new feature or behavior change; `PATCH` = bug fix /
+  polish only. The first build handed to friends becomes `1.0.0`; standard SemVer
+  applies after that (`MAJOR` = breaking).
+- **Bump discipline:** bump `<Version>` in the same commit that earns it. The
+  version stamps into config (`PluginVersion`) so the loaded build is identifiable
+  in-game.
+- **Git tags:** annotated `vMAJOR.MINOR.PATCH`, one per build actually run live or
+  shared. No ad-hoc tag names. Stale pre-consolidation tags (`v0.1-alpha`,
+  `v0.2-beta`, `banking-beta`, `wip/bet-payout-tracking`) are kept until the
+  public `1.0.0` cutover, then pruned (leaving `vX.Y.Z` + `archive/*`).
+- **`Configuration.SchemaVersion` is independent** - an integer that bumps only on
+  persisted-JSON shape changes, unrelated to the plugin version.
 
 ## UI Rules
 

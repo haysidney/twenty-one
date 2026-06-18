@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 
 namespace TwentyOne.Game;
 
-public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split, BetAdjust, Surrender, Credit }
+public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split, BetAdjust, Surrender, Credit, Reversal }
 
 [Serializable]
 public class BankTransactionEntry
@@ -38,6 +38,11 @@ public record BankSurrender(long Amount)  : IBankTransaction;
 // bank ledger; tagged separately so the session ledger can total credits issued
 // and the bank log distinguishes them from player deposits.
 public record BankCredit(long Amount)     : IBankTransaction;
+// Compensating entry that reverses a previously-applied bank op when its action
+// is undone or the round is aborted. Signed Delta: positive credits the bank
+// (reversing a deduction like Bet/DoubleDown/Split), negative debits it. Kept as
+// a distinct kind so the audit log shows it as a reversal, not a fresh deposit.
+public record BankReversal(long Delta)    : IBankTransaction;
 
 public static class BankLedger
 {
@@ -59,6 +64,7 @@ public static class BankLedger
             BankBetAdjust  a => (Math.Max(0, balance - a.Delta),  BankTransactionKind.BetAdjust,  a.Delta),
             BankSurrender  s => (balance + s.Amount,              BankTransactionKind.Surrender,  s.Amount),
             BankCredit     c => (balance + c.Amount,              BankTransactionKind.Credit,     c.Amount),
+            BankReversal   r => (Math.Max(0, balance + r.Delta),  BankTransactionKind.Reversal,   r.Delta),
             _                => throw new ArgumentOutOfRangeException(nameof(tx)),
         };
 

@@ -2964,6 +2964,43 @@ public class BankLedgerTests
         var (bal, _) = Apply(1000, new BankCredit(500));
         Assert.Equal(1500, bal);
     }
+
+    // ── Reversal (undo / abort compensating entries) ───────────────────────────
+
+    [Fact]
+    public void Reversal_PositiveDelta_CreditsBank()
+    {
+        var (bal, entry) = Apply(600, new BankReversal(400));
+        Assert.Equal(1000, bal);
+        Assert.Equal(BankTransactionKind.Reversal, entry.Kind);
+        Assert.Equal(400, entry.Amount);
+    }
+
+    [Fact]
+    public void Reversal_NegativeDelta_DebitsBank()
+    {
+        var (bal, _) = Apply(1000, new BankReversal(-300));
+        Assert.Equal(700, bal);
+    }
+
+    [Fact]
+    public void Reversal_NeverGoesNegative()
+    {
+        var (bal, _) = Apply(200, new BankReversal(-500));
+        Assert.Equal(0, bal);
+    }
+
+    // The common undo case: reversing a bet with the inverse of its balance effect
+    // restores the exact pre-bet balance.
+    [Fact]
+    public void BetThenInverseReversal_RestoresBalance()
+    {
+        var (afterBet, _) = Apply(1000, new BankBet(400));
+        Assert.Equal(600, afterBet);
+        var effect = afterBet - 1000; // -400
+        var (restored, _) = Apply(afterBet, new BankReversal(-effect));
+        Assert.Equal(1000, restored);
+    }
 }
 
 public class AdjustBetTests
