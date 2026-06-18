@@ -16,32 +16,51 @@ completes, so the plugin never registers its windows.
 
 ## Root cause
 
-A Newtonsoft serialization footgun on `[JsonIgnore]` proxy properties.
+**A bundled second copy of `Newtonsoft.Json.dll`.** This is the classic Dalamud
+plugin gotcha, and it is the source of the whole mess - everything below is a
+downstream symptom.
 
-`Configuration` exposes many `[JsonIgnore]` proxy properties that delegate to
-the active venue (`RoundHistory`, `ActiveVenue`, `Tips`, `PlayerStatsStore`,
-`DealerName`, ...). `VenueSettings.StatsSessions` is also `[JsonIgnore]` (its
-canonical store is the per-session files under `{ConfigDir}/sessions/`).
+`TwentyOne.Game.csproj` referenced `Newtonsoft.Json` as an ordinary
+`PackageReference`, so the build copied `Newtonsoft.Json.dll` into the plugin
+output. Dalamud already provides Newtonsoft at runtime. With two copies loaded,
+the plugin's types are compiled against the *bundled* Newtonsoft, but Dalamud
+serializes the config with *its own* Newtonsoft - so the attribute **types do
+not match**. Dalamud's serializer looks for *its* `JsonIgnoreAttribute` /
+`JsonExtensionDataAttribute`; the plugin's are a different `System.Type`, so they
+are silently ignored. With the attributes invisible to the serializer:
 
-In an **older build** these properties were serialized at the config root.
-Two compounding problems resulted:
+1. **`[JsonIgnore]` is ignored -> the proxies serialize.** `Configuration`
+   exposes `[JsonIgnore]` proxy properties that delegate to the active venue
+   (`RoundHistory`, `ActiveVenue`, `Tips`, `DealerName`, ...). Ignored, they get
+   written as flat top-level keys = the "orphans".
+2. **`[JsonIgnore]` is ignored on read too -> doubling.** On load the flat-root
+   `RoundHistory` / `ActiveVenue` bind back through the proxy setters, and
+   `ObjectCreationHandling.Auto` *appends* to the same `Venues[Active].RoundHistory`
+   list. Active venue + root `RoundHistory` + root `ActiveVenue.RoundHistory` =
+   the list tripled every load. A handful of reloads turned 94 rounds into
+   2,538 (and a 1 GB file the first time around).
+3. **`[JsonExtensionData]` is ignored -> nothing captures.** The forward-compat
+   bags stayed empty (the diagnostic confirmed flat-root orphans with an empty
+   `ExtraData`), so any `ExtraData`-based cleanup was aimed at thin air.
 
-1. **Orphaned keys round-trip forever.** Once a property became `[JsonIgnore]`,
-   its old key on disk was unknown to the typed loader and got captured into
-   the type's `[JsonExtensionData] ExtraData`, then re-written on every save.
-   No migration dropped it (violating the documented "removals need a migration
-   step too" rule in CLAUDE.md).
-
-2. **Collection doubling on load.** Newtonsoft's default
-   `ObjectCreationHandling.Auto` reuses an existing collection instance and
-   *appends* to it. With the root `RoundHistory` proxy returning the same list
-   as `Venues[ActiveVenueIndex].RoundHistory`, each load appended the venue's
-   list to itself -> the list doubled every load/save cycle. ~8 cycles turned
-   62 real rounds into 15,066 (243x) and 8 archived sessions into 1,464 copies
-   (~145k full `GameState` round snapshots).
+The fix: don't bundle Newtonsoft. `TwentyOne.Game`'s reference now carries
+`<ExcludeAssets>runtime</ExcludeAssets>` (compile-only); the test project, which
+has no Dalamud to supply it, references Newtonsoft directly. With a single
+Newtonsoft at runtime the attributes match, `[JsonIgnore]` takes effect, the
+proxies stop serializing, and the load-time cleanup self-heals the lingering
+orphans.
 
 The real session data was never at risk - the canonical session store
 (`{ConfigDir}/TwentyOne/sessions/`) is separate and was healthy throughout.
+
+### Why this was so hard to pin down
+
+Unit tests and standalone repros always passed because a test project has only
+**one** Newtonsoft, so the attributes match there. The bug only manifests inside
+Dalamud's two-Newtonsoft runtime. If `[JsonIgnore]` "works in tests but not in
+game", suspect a duplicated framework assembly before anything else. A load-time
+diagnostic that dumps the raw-vs-typed config shape to a file (we used a throwaway
+`WriteLoadDiagnostic`) is the fastest way to see the truth from outside the game.
 
 ## Diagnosis
 
@@ -95,21 +114,38 @@ Tell-tale signs:
 
 ## Prevention
 
-One rule, applied on every load (`Plugin` ctor): **if the on-disk
-`SchemaVersion <= CurrentSchemaVersion`, clear all `[JsonExtensionData]`
-dictionaries** (every captured key is then provably an orphan). Only a config
-from a *newer* schema version keeps its `ExtraData`, so downgrade safety is
-preserved while orphans can never accumulate. `ExtensionDataCleaner.ClearAll`
-does the clearing by reflecting over the config graph; it is safe by
-construction (those dictionaries only ever hold unknown keys, never real typed
-data) and wrapped in try/catch so it can never block plugin load.
+**Primary: never bundle an assembly Dalamud already provides.** Newtonsoft.Json
+(and ImGui, etc.) come from Dalamud at runtime. Any non-Dalamud project in the
+solution that needs them for compilation must reference them compile-only:
 
-This single rule replaced an earlier pile of special-case machinery (per-key
-drop lists in the migration, a `DropOrphanedExtraData` method, a RoundHistory
-de-duplicator). It also subsumes the old "removals need a migration step" rule:
-a removed field's key is just dropped on the next load.
+```xml
+<PackageReference Include="Newtonsoft.Json" Version="13.0.3">
+  <ExcludeAssets>runtime</ExcludeAssets>
+</PackageReference>
+```
 
-### Two gotchas worth remembering
+Sanity check after building: `ls TwentyOne/bin/Debug/Newtonsoft.Json.dll` must
+be **absent**. If it is present, the attribute-identity bug is back.
+
+**Secondary (defense in depth):** two cheap cleanups run on every load and keep
+a stray regression from snowballing:
+
+- `ExtensionDataCleaner.ClearAll` clears all `[JsonExtensionData]` dictionaries
+  when the on-disk `SchemaVersion <= CurrentSchemaVersion` (every captured key is
+  then provably an orphan; a *newer*-version config keeps its `ExtraData` for
+  downgrade safety). Safe by construction - those dicts only hold unknown keys -
+  and wrapped in try/catch.
+- `ConfigMigrations.DedupRoundHistory` collapses duplicate `RoundNumber`s per
+  venue (a live venue's rounds are unique, so repeats are corruption).
+
+These are belt-and-suspenders, not the fix. With a single Newtonsoft at runtime
+`[JsonIgnore]` works and the orphans/doubling never arise in the first place.
+
+### Three gotchas worth remembering
+
+- **"Works in tests, not in game" == suspect a duplicated framework assembly.**
+  Attributes/reflection behave differently when two copies of a library are
+  loaded. Standalone repros can't reproduce it.
 
 - The schema migration is gated on `SchemaVersion < CurrentSchemaVersion`, so it
   runs **once** at a version transition. Never rely on it to remove something that

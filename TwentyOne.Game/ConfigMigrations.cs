@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 
@@ -69,5 +70,19 @@ public static class ConfigMigrations
 
         root["SchemaVersion"] = version;
         return root;
+    }
+
+    /// <summary>
+    /// Removes RoundHistory entries that share a RoundNumber, keeping the first
+    /// occurrence and preserving order. A live venue's RoundHistory is numbered
+    /// 1..N with no repeats, so a duplicate RoundNumber is unambiguous corruption.
+    /// Mutates the list in place; returns the number removed. Applied to every
+    /// venue on load as a hard bound on the (still-being-diagnosed) doubling.
+    /// </summary>
+    public static int DedupRoundHistory(List<RoundHistoryEntry> rounds)
+    {
+        if (rounds.Count < 2) return 0;
+        var seen = new HashSet<int>();
+        return rounds.RemoveAll(r => !seen.Add(r.RoundNumber));
     }
 }

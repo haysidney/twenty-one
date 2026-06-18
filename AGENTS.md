@@ -100,6 +100,18 @@ nix develop --command dotnet build TwentyOne/TwentyOne.csproj -c Release
 nix develop --command dotnet test TwentyOne.Tests/TwentyOne.Tests.csproj
 ```
 
+**Never bundle an assembly Dalamud provides (Newtonsoft.Json, ImGui, etc.).** The
+plugin loads them from Dalamud at runtime. A non-Dalamud project that needs one
+for compilation (e.g. `TwentyOne.Game` uses Newtonsoft for `JObject`) must mark
+the reference compile-only with `<ExcludeAssets>runtime</ExcludeAssets>`; the
+test project references it normally (no Dalamud there). If a second copy ships in
+`bin/Debug`, the plugin's `[JsonIgnore]`/`[JsonExtensionData]` attribute types
+won't match the ones Dalamud's serializer checks for, so they're silently ignored
+- proxies serialize, nothing captures into `ExtraData`, and the config bloats.
+This is the bug behind `docs/troubleshooting/config-file-bloat.md`. Sanity check:
+`bin/Debug/Newtonsoft.Json.dll` must NOT exist. Symptom signature: serialization
+attributes "work in tests but not in-game".
+
 ## Architecture
 
 ### Project layout
