@@ -95,35 +95,28 @@ Tell-tale signs:
 
 ## Prevention
 
-Two layers, because the schema migration alone proved insufficient:
+One rule, applied on every load (`Plugin` ctor): **if the on-disk
+`SchemaVersion <= CurrentSchemaVersion`, clear all `[JsonExtensionData]`
+dictionaries** (every captured key is then provably an orphan). Only a config
+from a *newer* schema version keeps its `ExtraData`, so downgrade safety is
+preserved while orphans can never accumulate. `ExtensionDataCleaner.ClearAll`
+does the clearing by reflecting over the config graph; it is safe by
+construction (those dictionaries only ever hold unknown keys, never real typed
+data) and wrapped in try/catch so it can never block plugin load.
 
-- Schema **v3 migration** (`ConfigMigrations.cs`) drops the orphaned root proxy
-  keys and per-venue `StatsSessions` from the raw JObject before the typed load.
-- **Runtime self-heal** (`Configuration.DropOrphanedExtraData`, called from the
-  plugin ctor on every load) drains the same keys from the `[JsonExtensionData]`
-  `ExtraData` dictionaries *after* deserialization, so the first `Save()` never
-  re-emits them.
-- Current code marks the proxies `[JsonIgnore]`, so the doubling loop cannot
-  recur; the two cleanups only remove orphans left by older builds.
+This single rule replaced an earlier pile of special-case machinery (per-key
+drop lists in the migration, a `DropOrphanedExtraData` method, a RoundHistory
+de-duplicator). It also subsumes the old "removals need a migration step" rule:
+a removed field's key is just dropped on the next load.
 
-### Why the one-shot migration was not enough
+### Two gotchas worth remembering
 
-The migration is gated on `SchemaVersion < CurrentSchemaVersion`, so it runs
-**exactly once** at the version transition. If that run does not persist a clean
-file (observed in the field: the 2->3 transition left flat-root orphans on disk),
-the keys are captured into `Configuration.ExtraData` on the next load and
-`[JsonExtensionData]` re-emits them flat forever - and the migration never fires
-again because the version is already current. Note that `[JsonExtensionData]`
-writes its entries as **flat siblings** of the object's real properties, so a
-config can show an *empty* `"ExtraData": {}` object while still carrying the
-orphan keys at the root; do not trust an empty ExtraData object as proof of a
-clean file. The runtime self-heal closes this gap: it is idempotent and
-version-independent, so it corrects any config that still carries the orphans.
-
-### Rules to avoid reintroducing this
-
-- When a property becomes `[JsonIgnore]` or is removed, **add a migration step
-  that drops its old JSON key** (CLAUDE.md "Removals need a migration step too").
-- Be wary of a `[JsonIgnore]` proxy that returns a *mutable collection* shared
-  with another serialized property. If it ever loses `[JsonIgnore]`,
-  `ObjectCreationHandling.Auto` will double that collection on every load.
+- The schema migration is gated on `SchemaVersion < CurrentSchemaVersion`, so it
+  runs **once** at a version transition. Never rely on it to remove something that
+  must *stay* gone - if it fails to persist, it never fires again. Cleanup that
+  must happen every load belongs in the load-time `ExtensionDataCleaner` path, not
+  a migration step.
+- `[JsonExtensionData]` writes its entries as **flat siblings** of the object's
+  real properties, so a config can show an *empty* `"ExtraData": {}` object while
+  still carrying orphan keys at the root. Do not trust an empty ExtraData object
+  as proof of a clean file; inspect the actual top-level keys.

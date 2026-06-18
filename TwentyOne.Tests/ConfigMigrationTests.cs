@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using Newtonsoft.Json.Linq;
 using TwentyOne.Game;
 using Xunit;
@@ -76,68 +74,17 @@ public class ConfigMigrationTests
     }
 
     [Fact]
-    public void Migrate_v2_DropsOrphanedRootProxyKeys_AndVenueStatsSessions()
+    public void Migrate_v2_FixtureBumpsToCurrentAndIsIdempotent()
     {
-        var root = LoadFixture("config-v2.json");
-        // Sanity: fixture starts with the orphaned root dupes and inline sessions.
-        Assert.NotNull(root["ActiveVenue"]);
-        Assert.NotNull(root["RoundHistory"]);
-        Assert.NotNull(root["Venues"]![0]!["StatsSessions"]);
-
-        ConfigMigrations.Migrate(root);
-
-        Assert.Equal(3, (int)root["SchemaVersion"]!);
-        // Every orphaned root proxy key is gone.
-        foreach (var key in new[] { "ActiveVenue", "RoundHistory", "Tips",
-            "PlayerStatsStore", "ServiceCharges", "DealerName", "ChatEnabled",
-            "BjPayout", "CharliePayout", "FiveCardCharlie", "DealerStandsOnSoft17" })
-            Assert.Null(root[key]);
-        // StatsSessions dropped from every venue.
-        Assert.Null(root["Venues"]![0]!["StatsSessions"]);
-        Assert.Null(root["Venues"]![1]!["StatsSessions"]);
-        // Canonical venue data is preserved (only root-level dupes were removed).
-        Assert.Equal("Eden", (string?)root["Venues"]![0]!["Name"]);
-        Assert.True((bool)root["Venues"]![0]!["ChatEnabled"]!);
-        Assert.Equal(2, ((JArray)root["Venues"]![0]!["RoundHistory"]!).Count);
-        Assert.Single((JArray)root["Venues"]![0]!["Tips"]!);
-    }
-
-    [Fact]
-    public void Migrate_v2_FixtureIsIdempotent()
-    {
+        // config-v2.json carries the legacy orphan keys; the migration no longer
+        // surgically removes them (ExtensionDataCleaner drops them on load), so the
+        // only job here is the version bump - and it must be idempotent.
         var root = LoadFixture("config-v2.json");
         ConfigMigrations.Migrate(root);
+        Assert.Equal(ConfigMigrations.CurrentSchemaVersion, (int)root["SchemaVersion"]!);
+
         var afterFirst = root.DeepClone();
         ConfigMigrations.Migrate(root);
         Assert.True(JToken.DeepEquals(afterFirst, root));
-    }
-
-    [Fact]
-    public void DedupRoundHistory_CollapsesRepeatedBlocks_KeepingFirst()
-    {
-        // Two distinct rounds, list tripled by the doubling bug: [1,2,1,2,1,2].
-        var block = new[] { 1, 2 };
-        var rounds = Enumerable.Range(0, 3)
-            .SelectMany(_ => block)
-            .Select(n => new RoundHistoryEntry { RoundNumber = n })
-            .ToList();
-
-        var removed = ConfigMigrations.DedupRoundHistory(rounds);
-
-        Assert.Equal(4, removed);
-        Assert.Equal(new[] { 1, 2 }, rounds.Select(r => r.RoundNumber));
-    }
-
-    [Fact]
-    public void DedupRoundHistory_LeavesCleanHistoryUntouched()
-    {
-        var rounds = Enumerable.Range(1, 5)
-            .Select(n => new RoundHistoryEntry { RoundNumber = n })
-            .ToList();
-
-        var removed = ConfigMigrations.DedupRoundHistory(rounds);
-
-        Assert.Equal(0, removed);
-        Assert.Equal(new[] { 1, 2, 3, 4, 5 }, rounds.Select(r => r.RoundNumber));
     }
 }

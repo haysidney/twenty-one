@@ -87,11 +87,17 @@ public sealed class Plugin : IDalamudPlugin
         MigrateConfigFileIfNeeded();
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.EnsureVenues();
-        // Drop orphaned proxy/session keys captured into ExtraData on load, so the
-        // first Save() below never re-emits them. Belt-and-suspenders to the schema
-        // migration, which is one-shot and cannot self-correct a config already at
-        // the current SchemaVersion. See Configuration.DropOrphanedExtraData.
-        Configuration.DropOrphanedExtraData();
+        // Forward-compat is only meaningful for a config from a *future* schema
+        // version; at or below current, every [JsonExtensionData] entry is an
+        // orphaned/legacy key, so clear them all before the first Save() re-emits
+        // them. This is what prevents orphan accumulation (the ~1 GB bloat) and
+        // also auto-drops any removed field. SchemaVersion still holds the on-disk
+        // value here (StampPluginVersion overwrites it just below).
+        if (Configuration.SchemaVersion <= ConfigMigrations.CurrentSchemaVersion)
+        {
+            try { ExtensionDataCleaner.ClearAll(Configuration); }
+            catch (Exception ex) { Log.Error(ex, "ExtensionData cleanup failed; continuing."); }
+        }
         StampPluginVersion();
 
         // Load each venue's archived sessions from disk. StatsSessions is

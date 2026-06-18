@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 
@@ -17,36 +16,15 @@ namespace TwentyOne.Game;
 ///   3. Snapshot the previous Save() output into Fixtures/config-v{N-1}.json
 ///      and add a test in ConfigMigrationTests asserting the migrated shape.
 ///
-/// Removals require a migration step too: a removed property keeps round-
-/// tripping via JsonExtensionData until the migration explicitly drops it.
+/// Field removals do NOT need a migration step: <see cref="ExtensionDataCleaner"/>
+/// drops every captured unknown key on load for any config at or below the
+/// current version, so a removed property's key is cleaned automatically. A
+/// migration step is only needed to <em>transform</em> surviving data (rename a
+/// key while keeping its value, restructure an object, backfill a default).
 /// </summary>
 public static class ConfigMigrations
 {
     public const int CurrentSchemaVersion = 3;
-
-    /// <summary>
-    /// Root-level keys that are now <c>[JsonIgnore]</c> proxies on
-    /// <c>Configuration</c> (they delegate to the active venue). Old configs
-    /// serialized them at the root; once the properties became JsonIgnore the keys
-    /// were orphaned into <c>Configuration.ExtraData</c> and round-tripped forever.
-    /// Worse, while they were still live serialized properties, Newtonsoft's
-    /// default ObjectCreationHandling.Auto re-appended each proxy collection to the
-    /// same underlying venue list on every load, doubling RoundHistory/Tips/etc.
-    /// The canonical copy lives in Venues[ActiveVenueIndex], so the root keys are
-    /// pure duplicates and safe to drop.
-    /// </summary>
-    public static readonly string[] OrphanedRootProxyKeys =
-    [
-        "ActiveVenue", "NarrationUseChannelCommand", "AutoTradeEnabled",
-        "AutoBetFromTrades", "AutoDepositFromTrades", "AutoTargetEnabled",
-        "RemindTargetEnabled", "ChatEnabled", "ChatChannel", "CrossChannelCommands",
-        "PublicChatCooldownMs", "PrivateChatCooldownMs", "SlashCommandCooldownMs",
-        "NarrationTemplates", "DealerName", "GilStart", "GilEnd", "AutoUpdateGilEnd",
-        "VenueCutPct", "Tips", "ServiceCharges", "PlayerStatsStore", "RoundHistory",
-        "StatsSessions", "BjPayout", "CharliePayout", "FiveCardCharlie",
-        "DealerStandsOnSoft17", "DoubleAfterSplit", "HitSplitAces", "ResplitAces",
-        "ResplitCap", "DoubleRestriction", "AllowSurrender",
-    ];
 
     /// <summary>
     /// Runs all pending migrations on <paramref name="root"/> in-place and
@@ -70,8 +48,8 @@ public static class ConfigMigrations
         if (version < 2)
         {
             // PlayerHit narration removed - PlayerAfterHit covers the same beat.
-            // Drop the now-unknown property from every venue's NarrationTemplates
-            // so it doesn't linger in ExtraData forever.
+            // (Kept for the historical chain; ExtensionDataCleaner would now drop
+            // the key on load anyway.)
             if (root["Venues"] is JArray venues)
             {
                 foreach (var venue in venues.OfType<JObject>())
@@ -83,39 +61,13 @@ public static class ConfigMigrations
 
         if (version < 3)
         {
-            // Drop orphaned [JsonIgnore]-proxy keys from the config root. They are
-            // stale duplicates of the active venue's data (a serializer footgun
-            // that, in older builds, ballooned the file via collection doubling).
-            foreach (var key in OrphanedRootProxyKeys)
-                root.Remove(key);
-
-            // StatsSessions moved to per-session files (SessionStore); the inline
-            // venue key is now [JsonIgnore] and lingers in each venue's ExtraData.
-            if (root["Venues"] is JArray sessVenues)
-                foreach (var venue in sessVenues.OfType<JObject>())
-                    venue.Remove("StatsSessions");
-
+            // No-op bump. v3 introduced load-time ExtensionData cleanup (see
+            // ExtensionDataCleaner), which removes the orphaned proxy/session keys
+            // that previously had to be dropped here - no JObject surgery needed.
             version = 3;
         }
 
         root["SchemaVersion"] = version;
         return root;
-    }
-
-    /// <summary>
-    /// Removes RoundHistory entries that share a RoundNumber, keeping the first
-    /// occurrence and preserving order. A live venue's RoundHistory is numbered
-    /// 1..N with no gaps or repeats (RoundNumber = RoundHistory.Count + 1 at
-    /// payout, cleared on NewSession), so a repeated RoundNumber can only be
-    /// corruption - e.g. the now-fixed proxy-collection doubling that re-appended
-    /// the whole list. Mutates the list in place; returns the number removed.
-    /// </summary>
-    public static int DedupRoundHistory(List<RoundHistoryEntry> rounds)
-    {
-        if (rounds.Count < 2) return 0;
-        var seen = new HashSet<int>();
-        // RemoveAll visits elements in order; Add returns false on a RoundNumber
-        // already seen, so the first occurrence is kept and later repeats dropped.
-        return rounds.RemoveAll(r => !seen.Add(r.RoundNumber));
     }
 }

@@ -206,33 +206,6 @@ public class Configuration : IPluginConfiguration
             if (v.Id == Guid.Empty) v.Id = Guid.NewGuid();
     }
 
-    /// <summary>
-    /// Self-healing cleanup run on every load (not just the one-shot schema
-    /// migration). Old configs serialized the [JsonIgnore] proxy properties at the
-    /// config root and StatsSessions inline on each venue; on load those unknown
-    /// keys are captured into the [JsonExtensionData] ExtraData dictionaries and,
-    /// without this, [JsonExtensionData] re-emits them flat on the next Save -
-    /// reintroducing the duplicate venue snapshots that ballooned the file to 1 GB.
-    /// The schema migration alone is insufficient: once SchemaVersion reaches
-    /// current it never runs again, so any config that still carries the orphans
-    /// (e.g. a migration that failed to persist) would round-trip them forever.
-    /// Canonical data lives in Venues[ActiveVenueIndex] / per-session files, so the
-    /// captured copies are pure duplicates and safe to drop. Idempotent.
-    /// </summary>
-    public void DropOrphanedExtraData()
-    {
-        foreach (var key in ConfigMigrations.OrphanedRootProxyKeys)
-            ExtraData.Remove(key);
-        foreach (var v in Venues)
-        {
-            v.ExtraData.Remove("StatsSessions");
-            // Collapse any duplicate RoundHistory entries left by the proxy-
-            // collection doubling. RoundNumbers are unique within a live venue, so
-            // repeats are pure corruption; keep the first of each.
-            ConfigMigrations.DedupRoundHistory(v.RoundHistory);
-        }
-    }
-
     [JsonIgnore] public VenueSettings ActiveVenue => Venues[ActiveVenueIndex];
 
     // ── Proxy properties (delegate to ActiveVenue, not serialized) ────────────
