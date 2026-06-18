@@ -409,12 +409,13 @@ public static class GameEngine
     private sealed record NarrationContext(
         NarrationTemplates Templates,
         string             DealerName,
-        List<ISideEffect>   Effects)
+        List<ISideEffect>   Effects,
+        Func<int, int>     PickVariant)
     {
         public void Narrate(List<List<string>> variants, params (string Key, string Value)[] vars)
         {
             if (variants.Count == 0) return;
-            var lines = variants[Random.Shared.Next(variants.Count)];
+            var lines = variants[PickVariant(variants.Count)];
             foreach (var line in lines)
             {
                 var resolved = vars.Length > 0 ? NarrationTemplates.Fmt(line, vars) : line;
@@ -521,12 +522,18 @@ public static class GameEngine
         [typeof(ReorderPlayers)]       = (s, a, _) => HandleReorderPlayers(s, (ReorderPlayers)a),
     };
 
+    /// <param name="pickVariant">
+    /// Selects which narration variant to use given the variant count. Defaults to
+    /// <see cref="Random.Shared"/> for in-game variety; tests pass a deterministic
+    /// selector (e.g. always 0) so narration-content assertions never flake.
+    /// </param>
     public static (GameState State, IReadOnlyList<ISideEffect> Effects) Apply(
-        GameState state, GameAction action, NarrationTemplates? templates = null, string dealerName = "Dealer")
+        GameState state, GameAction action, NarrationTemplates? templates = null, string dealerName = "Dealer",
+        Func<int, int>? pickVariant = null)
     {
         var t       = templates ?? new NarrationTemplates();
         var effects = new List<ISideEffect>();
-        var ctx = new NarrationContext(t, dealerName, effects);
+        var ctx = new NarrationContext(t, dealerName, effects, pickVariant ?? Random.Shared.Next);
 
         var newState = ActionHandlers.TryGetValue(action.GetType(), out var handler)
             ? handler(state, action, ctx)

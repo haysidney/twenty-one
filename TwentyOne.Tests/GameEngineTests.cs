@@ -164,7 +164,7 @@ public class ApplyAddDealerCardTests
             .Phase(GamePhase.DealerTurn)
             .Dealer(10, 8)
             .Build();
-        var (_, effects) = GameEngine.Apply(state, new AddDealerCard(5));
+        var (_, effects) = GameEngine.Apply(state, new AddDealerCard(5), pickVariant: TestNarration.First);
         Assert.Contains(effects, e => e is SendChat c && c.Text.Contains("busted") || e is SendChat c2 && c2.Text.Contains("busts"));
     }
 
@@ -265,7 +265,7 @@ public class ApplyAddPlayerCardTests
             .Player("Lorah", 10, 8)
             .Player("Bekki", 5, 6)
             .Build();
-        var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7));
+        var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 7), pickVariant: TestNarration.First);
         Assert.Contains(effects, e => e is SendChat c && (c.Text.Contains("busts") || c.Text.Contains("busted")));
         Assert.True(newState.WaitingForNextPlayer);
         Assert.Equal(0, newState.ActivePlayerIndex); // stays on Lorah until Next Player clicked
@@ -860,7 +860,7 @@ public class NarrationTemplateTests
     [Fact]
     public void NullTemplates_UsesDefaults()
     {
-        var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3));
+        var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3), pickVariant: TestNarration.First);
         Assert.Contains(effects, e => e is SendChat c && c.Text.Contains("Lorah"));
     }
 
@@ -1607,7 +1607,7 @@ public class SplitHandTests
     [Fact]
     public void SplitHand_NarratesSplit()
     {
-        var (_, effects) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0));
+        var (_, effects) = GameEngine.Apply(ActiveState(8, 8), new SplitHand(0, 0), pickVariant: TestNarration.First);
         Assert.Contains(effects, e => e is SendChat c && c.Text.ToLower().Contains("split"));
         Assert.Contains(effects, e => e is AutoHit ah && ah.PlayerIndex == 0 && ah.HandIndex == 0);
     }
@@ -2097,7 +2097,7 @@ public class SplitHandTests
             .Phase(GamePhase.Betting)
             .Player("Lorah")
             .Build();
-        var (_, effects) = GameEngine.Apply(state, new AnnounceBetRequest(0));
+        var (_, effects) = GameEngine.Apply(state, new AnnounceBetRequest(0), pickVariant: TestNarration.First);
         Assert.NotEmpty(effects);
         Assert.Contains(effects, e => e is SendChat c && c.Text.Contains("Lorah"));
     }
@@ -2618,7 +2618,7 @@ public class FiveCardCharlieTests
             .Dealer(7)
             .Player("Lorah", "100", 2, 3, 4, 5)
             .Build();
-        var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 6));
+        var (newState, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 6), pickVariant: TestNarration.First);
         Assert.Equal(HandState.Charlie, newState.Players[0].Hands[0].State);
         Assert.Contains(effects.OfType<SendChat>(), e => e.Text.Contains("Five Card Charlie"));
     }

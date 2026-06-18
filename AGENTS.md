@@ -325,12 +325,14 @@ Use only these player names in test cases: Lorah, Bekki, Nolla. If more than 3 n
 
 ## Narration Templates
 
-`NarrationTemplates` properties are `List<List<string>>` - the outer list is random variants (one picked per use via `Random.Shared`), the inner list is the sequence of chat lines sent for that variant. Defaults always have exactly one variant. The three `DealSummary*` properties remain plain `string` (they are concatenated components, not narrated independently).
+`NarrationTemplates` properties are `List<List<string>>` - the outer list is random variants (one picked per use via the variant selector, `Random.Shared` in game), the inner list is the sequence of chat lines sent for that variant. Some defaults ship multiple variants (e.g. `PlayerBust`). The three `DealSummary*` properties remain plain `string` (they are concatenated components, not narrated independently).
+
+**Tests must never assert on randomly-selected narration.** `GameEngine.Apply` takes an optional `pickVariant` selector (defaults to `Random.Shared.Next`); any test that asserts on `SendChat` text must pass `pickVariant: TestNarration.First` (always variant 0) so the assertion is deterministic. Asserting content without it is the classic flaky test - a multi-variant default will fail whenever a variant that lacks the asserted phrase is picked.
 
 Every narration string emitted via `SendChat` must have a corresponding property in `NarrationTemplates` and a row in `NarrationEditorWindow`. When adding a new `Narrate(...)` call in `GameEngine`, always:
-1. Add a `List<List<string>>` property to `NarrationTemplates` with a sensible single-variant default.
+1. Add a `List<List<string>>` property to `NarrationTemplates` with a sensible default.
 2. Add an `NtListRow(...)` entry in the appropriate `NarrationEditorWindow` section (or a new section if needed).
-3. Add a test in `NarrationTemplateTests` verifying the new template variable(s) are substituted (initialise the property as `[["template string"]]`).
+3. Add a test in `NarrationTemplateTests` verifying the new template variable(s) are substituted (initialise the property as `[["template string"]]`, or pass `pickVariant: TestNarration.First` when using multi-variant defaults).
 
 ## Branch
 
