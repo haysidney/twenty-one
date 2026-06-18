@@ -95,10 +95,30 @@ Tell-tale signs:
 
 ## Prevention
 
+Two layers, because the schema migration alone proved insufficient:
+
 - Schema **v3 migration** (`ConfigMigrations.cs`) drops the orphaned root proxy
-  keys and per-venue `StatsSessions` from any config it migrates.
-- Current code already marks the proxies `[JsonIgnore]`, so the doubling loop
-  cannot recur - the migration only cleans up orphans left by older builds.
+  keys and per-venue `StatsSessions` from the raw JObject before the typed load.
+- **Runtime self-heal** (`Configuration.DropOrphanedExtraData`, called from the
+  plugin ctor on every load) drains the same keys from the `[JsonExtensionData]`
+  `ExtraData` dictionaries *after* deserialization, so the first `Save()` never
+  re-emits them.
+- Current code marks the proxies `[JsonIgnore]`, so the doubling loop cannot
+  recur; the two cleanups only remove orphans left by older builds.
+
+### Why the one-shot migration was not enough
+
+The migration is gated on `SchemaVersion < CurrentSchemaVersion`, so it runs
+**exactly once** at the version transition. If that run does not persist a clean
+file (observed in the field: the 2->3 transition left flat-root orphans on disk),
+the keys are captured into `Configuration.ExtraData` on the next load and
+`[JsonExtensionData]` re-emits them flat forever - and the migration never fires
+again because the version is already current. Note that `[JsonExtensionData]`
+writes its entries as **flat siblings** of the object's real properties, so a
+config can show an *empty* `"ExtraData": {}` object while still carrying the
+orphan keys at the root; do not trust an empty ExtraData object as proof of a
+clean file. The runtime self-heal closes this gap: it is idempotent and
+version-independent, so it corrects any config that still carries the orphans.
 
 ### Rules to avoid reintroducing this
 

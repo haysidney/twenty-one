@@ -177,7 +177,8 @@ Records (`GameState`, `Player`, `Hand`) are deliberately excluded: extension dat
 
 **Rules to remember:**
 
-- **Removals need a migration step too.** A removed property keeps round-tripping forever via `ExtraData` (which is exactly what makes downgrades safe). The migration must explicitly drop the key.
+- **Removals need a migration step too.** A removed property keeps round-tripping forever via `ExtraData` (which is exactly what makes downgrades safe). The migration must explicitly drop the key. **A one-shot migration is not enough for keys that must never persist** (e.g. orphaned `[JsonIgnore]`-proxy keys): the migration runs only at the version transition, so if it ever fails to persist a clean file the key is captured into `ExtraData` and re-emitted forever while the migration never fires again. For these, also drain them from the loaded `ExtraData` on every load - see `Configuration.DropOrphanedExtraData` (called from the plugin ctor) and `docs/troubleshooting/config-file-bloat.md`.
+- **`[JsonExtensionData]` emits captured keys as flat siblings**, not nested under an `"ExtraData"` object. A config can therefore show an empty `"ExtraData": {}` while still carrying orphan keys at the parent's root - do not trust an empty ExtraData object as proof of a clean file.
 - **Migrations operate on raw `JObject`, not the typed `Configuration`.** This lets a migration handle fields that no longer exist as CLR properties.
 - **Idempotency:** writing the new version into the JObject at the end of each step guarantees a re-run from any partial state still converges.
 - **`$type` markers** (from Newtonsoft's `TypeNameHandling`) are recognized by the serializer and consumed before extension-data capture - they should not appear in `ExtraData`. If you see one, suspect a serializer setting drift.

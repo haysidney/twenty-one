@@ -34,7 +34,7 @@ public static class ConfigMigrations
     /// The canonical copy lives in Venues[ActiveVenueIndex], so the root keys are
     /// pure duplicates and safe to drop.
     /// </summary>
-    private static readonly string[] OrphanedRootProxyKeys =
+    public static readonly string[] OrphanedRootProxyKeys =
     [
         "ActiveVenue", "NarrationUseChannelCommand", "AutoTradeEnabled",
         "AutoBetFromTrades", "AutoDepositFromTrades", "AutoTargetEnabled",

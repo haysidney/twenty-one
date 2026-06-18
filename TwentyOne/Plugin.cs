@@ -87,6 +87,11 @@ public sealed class Plugin : IDalamudPlugin
         MigrateConfigFileIfNeeded();
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.EnsureVenues();
+        // Drop orphaned proxy/session keys captured into ExtraData on load, so the
+        // first Save() below never re-emits them. Belt-and-suspenders to the schema
+        // migration, which is one-shot and cannot self-correct a config already at
+        // the current SchemaVersion. See Configuration.DropOrphanedExtraData.
+        Configuration.DropOrphanedExtraData();
         StampPluginVersion();
 
         // Load each venue's archived sessions from disk. StatsSessions is
