@@ -100,6 +100,18 @@ nix develop --command dotnet build TwentyOne/TwentyOne.csproj -c Release
 nix develop --command dotnet test TwentyOne.Tests/TwentyOne.Tests.csproj
 ```
 
+**Never bundle an assembly Dalamud provides (Newtonsoft.Json, ImGui, etc.).** The
+plugin loads them from Dalamud at runtime. A non-Dalamud project that needs one
+for compilation (e.g. `TwentyOne.Game` uses Newtonsoft for `JObject`) must mark
+the reference compile-only with `<ExcludeAssets>runtime</ExcludeAssets>`; the
+test project references it normally (no Dalamud there). If a second copy ships in
+`bin/Debug`, the plugin's `[JsonIgnore]`/`[JsonExtensionData]` attribute types
+won't match the ones Dalamud's serializer checks for, so they're silently ignored
+- proxies serialize, nothing captures into `ExtraData`, and the config bloats.
+This is the bug behind `docs/troubleshooting/config-file-bloat.md`. Sanity check:
+`bin/Debug/Newtonsoft.Json.dll` must NOT exist. Symptom signature: serialization
+attributes "work in tests but not in-game".
+
 ## Architecture
 
 ### Project layout
@@ -169,6 +181,12 @@ The persisted JSON shape is versioned via `Configuration.SchemaVersion` (separat
 
 Records (`GameState`, `Player`, `Hand`) are deliberately excluded: extension data would change synthesized record equality and break engine/undo logic that compares hands.
 
+**The version-gated cleanup (this is the load-time rule that keeps `ExtraData` honest):** `[JsonExtensionData]` cannot distinguish a genuine *future* field from an *orphan* (a field that was renamed, removed, or became `[JsonIgnore]`). Left alone it re-emits orphans forever, which is what once ballooned a config to ~1 GB. So on load `Plugin` applies one rule:
+
+> If the on-disk `SchemaVersion <= CurrentSchemaVersion`, every captured key is provably an orphan -> clear **all** `ExtraData`. If it is greater (a config from a newer plugin), keep `ExtraData` so the unknown fields survive the downgrade round-trip.
+
+`ExtensionDataCleaner.ClearAll` (in `TwentyOne.Game`) does the clearing: it reflects over the config graph and empties every `[JsonExtensionData]` dictionary. It is **safe by construction** - those dictionaries only ever hold unknown keys, never real typed data, so it cannot lose config data. It descends only into `TwentyOne.*` types plus collections, skips `[JsonIgnore]` proxies, and is cycle-safe. The `Plugin` call site reads `Configuration.SchemaVersion` *before* `StampPluginVersion` overwrites it, and is wrapped in try/catch so a cleanup bug can never block plugin load.
+
 **Bumping the schema:**
 
 1. Increment `ConfigMigrations.CurrentSchemaVersion`.
@@ -177,7 +195,8 @@ Records (`GameState`, `Player`, `Hand`) are deliberately excluded: extension dat
 
 **Rules to remember:**
 
-- **Removals need a migration step too.** A removed property keeps round-tripping forever via `ExtraData` (which is exactly what makes downgrades safe). The migration must explicitly drop the key.
+- **Removals do NOT need a migration step.** The version-gated cleanup above drops any orphaned key on load, so a removed/renamed/now-`[JsonIgnore]` field cleans itself. A migration step is only for *transforming* surviving data (rename a key while keeping its value, restructure an object, backfill a default) - not for deletion.
+- **`[JsonExtensionData]` emits captured keys as flat siblings**, not nested under an `"ExtraData"` object. A config can therefore show an empty `"ExtraData": {}` while still carrying orphan keys at the parent's root - do not trust an empty ExtraData object as proof of a clean file. (This is why the cleanup empties the typed `ExtraData` dictionaries after load rather than diffing the raw JSON.)
 - **Migrations operate on raw `JObject`, not the typed `Configuration`.** This lets a migration handle fields that no longer exist as CLR properties.
 - **Idempotency:** writing the new version into the JObject at the end of each step guarantees a re-run from any partial state still converges.
 - **`$type` markers** (from Newtonsoft's `TypeNameHandling`) are recognized by the serializer and consumed before extension-data capture - they should not appear in `ExtraData`. If you see one, suspect a serializer setting drift.
@@ -210,6 +229,11 @@ Archived sessions (`PlayerStatsSession`) are **not** stored in the main config J
   (memoization, split fixed-point) and a rule-by-rule cost table for adding
   new rule axes (S17, DAS toggle, HSA, RSA, peek, surrender, continuous
   payouts). Read before plumbing a new rule into `EdgeRules`.
+- `docs/troubleshooting/` - operational runbooks for plugin failures in the
+  field (symptom -> root cause -> recovery -> prevention). Start at
+  `docs/troubleshooting/README.md`. Notably
+  `docs/troubleshooting/config-file-bloat.md` covers the config-doubling bug
+  that ballooned `TwentyOne.json` to ~1 GB and the schema-v3 cleanup migration.
 
 ### EdgeSolver (house-edge calculator)
 

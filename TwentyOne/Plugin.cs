@@ -87,6 +87,22 @@ public sealed class Plugin : IDalamudPlugin
         MigrateConfigFileIfNeeded();
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.EnsureVenues();
+
+        // Defense-in-depth (cheap, runs every load): a live venue's RoundHistory
+        // has unique RoundNumbers, so collapsing repeats can only remove
+        // corruption, never real rounds. Bounds any future regression that might
+        // re-duplicate the list.
+        foreach (var venue in Configuration.Venues)
+            ConfigMigrations.DedupRoundHistory(venue.RoundHistory);
+
+        // Clear orphaned [JsonExtensionData] keys unless the config is from a
+        // future schema version. SchemaVersion still holds the on-disk value here
+        // (StampPluginVersion overwrites it below).
+        if (Configuration.SchemaVersion <= ConfigMigrations.CurrentSchemaVersion)
+        {
+            try { ExtensionDataCleaner.ClearAll(Configuration); }
+            catch (Exception ex) { Log.Error(ex, "ExtensionData cleanup failed; continuing."); }
+        }
         StampPluginVersion();
 
         // Load each venue's archived sessions from disk. StatsSessions is
