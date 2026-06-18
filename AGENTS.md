@@ -334,9 +334,9 @@ Every narration string emitted via `SendChat` must have a corresponding property
 2. Add an `NtListRow(...)` entry in the appropriate `NarrationEditorWindow` section (or a new section if needed).
 3. Add a test in `NarrationTemplateTests` verifying the new template variable(s) are substituted (initialise the property as `[["template string"]]`, or pass `pickVariant: TestNarration.First` when using multi-variant defaults).
 
-## Branch
+## Commits
 
-Active refactoring work is on the `refactor` branch (off `experimental`). Commit messages follow `type(scope): message` style. Every commit builds (Debug + Release) and passes tests.
+Commit messages follow `type(scope): message` style. Every commit builds (Debug + Release) and passes tests.
 
 ## UI Rules
 
