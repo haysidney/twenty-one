@@ -25,7 +25,7 @@ namespace TwentyOne.Game;
 /// </summary>
 public static class ConfigMigrations
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     /// <summary>
     /// Runs all pending migrations on <paramref name="root"/> in-place and
@@ -66,6 +66,18 @@ public static class ConfigMigrations
             // ExtensionDataCleaner), which removes the orphaned proxy/session keys
             // that previously had to be dropped here - no JObject surgery needed.
             version = 3;
+        }
+
+        if (version < 4)
+        {
+            // UndoStack/RedoStack changed element shape from a bare GameState to an
+            // UndoEntry wrapper (state plus bank ops). The two shapes are
+            // incompatible, and undo state is ephemeral (cleared every NewRound), so
+            // just empty the stacks rather than wrapping each existing element.
+            // Losing in-flight undo across this one upgrade is harmless.
+            root["UndoStack"] = new JArray();
+            root["RedoStack"] = new JArray();
+            version = 4;
         }
 
         root["SchemaVersion"] = version;

@@ -161,14 +161,16 @@ Bank deductions (`BankBet` at StartDeal, `BankDoubleDown`/`BankSplit` at confirm
 live outside `GameState`, so a plain state-restore would leave balances diverged
 and re-dealing would double-charge. Fix:
 
-- `Configuration.UndoBankOps` (`List<List<UndoBankOp>>`) is **additive** and kept
-  lockstep with `UndoStack` (`UndoBankOps[i]` belongs to `UndoStack[i]`). All
-  stack mutation goes through `PushUndoSnapshot` / `ClearUndoState` / `PopUndo` so
-  the two never desync; `Plugin` calls `MainWindow.ReconcileUndoBankOps()` once at
-  startup to align an older config (no schema migration - additive field).
+- `UndoStack` / `RedoStack` are `List<UndoEntry>` where `UndoEntry { GameState
+  State; List<UndoBankOp> BankOps }`. Bundling the snapshot with its bank ops means
+  they can't desync - clearing/popping the stack carries the ops with it (so the
+  external `UndoStack.Clear()` sites in DebugWindow / SessionLedgerWindow are
+  automatically correct). Pushing goes through `PushUndoSnapshot`; clearing through
+  `ClearUndoState`. This changed the persisted stack shape, so it has a schema-v4
+  migration that empties the stacks (undo state is ephemeral - see ConfigMigrations).
 - `ApplyBankUndoable(player, tx)` records the op's signed `BalanceEffect` onto the
-  current bucket. Used only by StartDeal / Confirm Double / Confirm Split. Plain
-  `ApplyBank` (trades, manage, **payout settlement**) is *not* tracked.
+  current entry's `BankOps`. Used only by StartDeal / Confirm Double / Confirm
+  Split. Plain `ApplyBank` (trades, manage, **payout settlement**) is *not* tracked.
 - Undo across a non-empty bucket opens `DrawUndoConfirmModal` describing each
   reversal; on confirm, `ConfirmUndoWithReversals` posts `BankReversal(-effect)`
   per op (+ `[Audit]` narration), pops, and clears redo (no redo across a

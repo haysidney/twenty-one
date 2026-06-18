@@ -178,16 +178,11 @@ public class Configuration : IPluginConfiguration
     public GameState GameState { get; set; } = new();
 
     // Snapshots pushed before each Apply; cleared on NewRound. Persisted so undo
-    // survives plugin restarts within the same round.
-    public List<GameState> UndoStack { get; set; } = [];
-    public List<GameState> RedoStack { get; set; } = [];
-
-    // Bank deductions applied during each undoable transition, lockstep with
-    // UndoStack (UndoBankOps[i] belongs to UndoStack[i]). Additive field - no
-    // schema migration needed; an older config loads it empty and Plugin reconciles
-    // the length on startup. Lets Undo / Abort post compensating BankReversal
-    // entries so balances never diverge from the round state being unwound.
-    public List<List<UndoBankOp>> UndoBankOps { get; set; } = [];
+    // survives plugin restarts within the same round. Each entry bundles the
+    // GameState with the bank deductions made during that transition so Undo /
+    // Abort can post compensating BankReversal entries (state + ops can't desync).
+    public List<UndoEntry> UndoStack { get; set; } = [];
+    public List<UndoEntry> RedoStack { get; set; } = [];
 
     // ── Narration log ─────────────────────────────────────────────────────────
     // Kept separate from GameState so it is never rolled back by undo.

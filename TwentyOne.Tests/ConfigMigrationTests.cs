@@ -91,6 +91,25 @@ public class ConfigMigrationTests
     }
 
     [Fact]
+    public void Migrate_v3_ClearsUndoStacks()
+    {
+        // UndoStack/RedoStack changed element shape (GameState -> UndoEntry); the v4
+        // step empties them since the old shape can't deserialize into the new type.
+        var root = new JObject
+        {
+            ["SchemaVersion"] = 3,
+            ["UndoStack"]     = new JArray(new JObject { ["Phase"] = "Deal" }),
+            ["RedoStack"]     = new JArray(new JObject { ["Phase"] = "Betting" }),
+        };
+
+        ConfigMigrations.Migrate(root);
+
+        Assert.Equal(ConfigMigrations.CurrentSchemaVersion, (int)root["SchemaVersion"]!);
+        Assert.Empty((JArray)root["UndoStack"]!);
+        Assert.Empty((JArray)root["RedoStack"]!);
+    }
+
+    [Fact]
     public void DedupRoundHistory_CollapsesRepeatedBlocks_KeepingFirst()
     {
         // Two distinct rounds, list tripled by the doubling bug: [1,2,1,2,1,2].
