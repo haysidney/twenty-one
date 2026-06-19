@@ -1590,7 +1590,7 @@ public partial class MainWindow
                     foreach (var (idx, val) in betEdits.ToList())
                     {
                         betEdits.Remove(idx);
-                        if (val != State.Players[idx].Bet)
+                        if (idx < State.Players.Length && val != State.Players[idx].Bet)
                             Apply(new SetPlayerBet(idx, val));
                     }
                     isReorderMode  = true;
@@ -1898,7 +1898,7 @@ public partial class MainWindow
                     foreach (var (idx, val) in betEdits.ToList())
                     {
                         betEdits.Remove(idx);
-                        if (val != State.Players[idx].Bet)
+                        if (idx < State.Players.Length && val != State.Players[idx].Bet)
                             Apply(new SetPlayerBet(idx, val));
                     }
                     Apply(new StartDeal());
