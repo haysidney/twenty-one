@@ -1158,6 +1158,7 @@ public partial class MainWindow
         ImGui.Spacing();
         if (ImGui.Button("Confirm both##twoSidedYes"))
         {
+            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), "TwoSided", player.DisplayName, ts.Received - ts.Gave, "Confirm");
             ApplyBank(stat, new BankWithdrawal(ts.Gave));
             if (!stat.MaintainBet)
                 Apply(new AnnounceBankWithdraw(ts.Pi, ts.Gave, stat.Bank));
@@ -1170,6 +1171,7 @@ public partial class MainWindow
         ImGui.SameLine();
         if (ImGui.Button("Cancel##twoSidedNo"))
         {
+            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), "TwoSided", player.DisplayName, ts.Received - ts.Gave, "Cancel");
             config.NarrationLog.Add(
                 $"[Audit] Dismissed two-sided trade with {player.DisplayName}: " +
                 $"gave {ts.Gave:N0}, received {ts.Received:N0} (no ledger change)");
@@ -1408,6 +1410,7 @@ public partial class MainWindow
         ImGui.Spacing();
         if (ImGui.Button("Yes##bankTradeYes"))
         {
+            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), verb, btplayer.DisplayName, btamt, "Confirm");
             ApplyBank(btStat, isWd ? new BankWithdrawal(btamt) : new BankDeposit(btamt));
             if (!btStat.MaintainBet)
                 Apply(isWd
@@ -1419,6 +1422,7 @@ public partial class MainWindow
         ImGui.SameLine();
         if (ImGui.Button("No##bankTradeNo"))
         {
+            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), verb, btplayer.DisplayName, btamt, "Cancel");
             pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }

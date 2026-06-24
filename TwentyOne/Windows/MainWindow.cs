@@ -336,11 +336,16 @@ public partial class MainWindow : Window, IDisposable
         config.Save();
     }
 
-    private static BankTransactionEntry ApplyBank(PlayerStat stat, IBankTransaction tx)
+    private BankTransactionEntry ApplyBank(PlayerStat stat, IBankTransaction tx)
     {
+        var before = stat.Bank;
         var (newBalance, entry) = BankLedger.Apply(stat.Bank, tx, DateTime.Now);
         stat.Bank = newBalance;
         stat.BankLog.Add(entry);
+        // Forensic audit: every bank mutation funnels through here. dealerGil is
+        // the polled wallet figure (config.GilEnd) for offline drift correlation.
+        AuditLog.Bank(config.ActiveVenue.Id.ToString(), stat.DisplayName,
+            entry.Kind.ToString(), entry.Amount, before, newBalance, config.GilEnd);
         return entry;
     }
 
@@ -629,16 +634,19 @@ public partial class MainWindow : Window, IDisposable
         switch (tradeMonitor.OnChat(msgText, payload, State, config))
         {
             case TradeMonitor.Outcome.PromptBankDeposit pbd:
+                AuditTrade(pbd.Pi, 0, pbd.Gil, "Deposit");
                 if (!TryAutoDoubleOrSplitDeposit(pbd.Pi, pbd.Gil)
                     && !TryAutoMaintainBetDeposit(pbd.Pi, pbd.Gil))
                     pendingPrompt = new PendingPrompt.BankDeposit(pbd.Pi, pbd.Gil);
                 break;
             case TradeMonitor.Outcome.PromptBankWithdraw pbw:
+                AuditTrade(pbw.Pi, pbw.Gil, 0, "Withdraw");
                 if (!TryAutoCashOutWithdraw(pbw.Pi, pbw.Gil)
                     && !TryAutoMaintainBetWithdraw(pbw.Pi, pbw.Gil))
                     pendingPrompt = new PendingPrompt.BankWithdraw(pbw.Pi, pbw.Gil);
                 break;
             case TradeMonitor.Outcome.PromptTwoSided pts:
+                AuditTrade(pts.Pi, pts.Gave, pts.Received, "TwoSided");
                 pendingPrompt = new PendingPrompt.TwoSided(pts.Pi, pts.Gave, pts.Received);
                 break;
         }
@@ -664,6 +672,14 @@ public partial class MainWindow : Window, IDisposable
         pendingHit   = null;
         LogRoll(isDealer, pi2, roll);
         deferredRoll = (isDealer, pi2, hi, roll);
+    }
+
+    // Forensic audit for a completed trade. partner resolved from the player
+    // index; dealerGil is the polled wallet figure for offline correlation.
+    private void AuditTrade(int pi, long gave, long received, string outcome)
+    {
+        var partner = pi >= 0 && pi < State.Players.Length ? State.Players[pi].DisplayName : "?";
+        AuditLog.Trade(config.ActiveVenue.Id.ToString(), partner, gave, received, outcome, config.GilEnd);
     }
 
     // Returns true and silently applies if the trade is the exact maintain-bet deposit amount.

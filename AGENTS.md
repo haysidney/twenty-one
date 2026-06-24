@@ -363,6 +363,48 @@ source of truth: `SessionLedgerWindow.Compute(Configuration) -> Reconciliation`
 (a readonly record struct with `AdjustedDiff` / `Drift` / `Reconciled`), so the two
 displays can never diverge. Computed per-frame (cheap arithmetic, no solver).
 
+The chip's input `config.GilEnd` is kept live by the framework-tick gil poll
+(below) - not by the Session Ledger window. Previously the only poll lived in
+`SessionLedgerWindow.Draw`, so the chip reconciled against a frozen `GilEnd`
+whenever that window was closed.
+
+### Gil poll (framework tick)
+
+`Plugin.OnFrameworkUpdate` polls the dealer's on-hand gil into `config.GilEnd`
+every frame when `AutoUpdateGilEnd` is on, independent of which windows are
+open (subscribed via `Framework.Update`, unsubscribed in `Dispose`). This is
+the single live wallet-tracking site; `SessionLedgerWindow` only mirrors
+`config.GilEnd` into its display buffer. First poll after enabling adopts the
+live value as a baseline (no delta logged against a stale `GilEnd`); each
+subsequent real change writes an `AuditLog.Wallet` checkpoint.
+
+### Audit log (disk-only forensic trail)
+
+`TwentyOne.Game/AuditLog.cs` - append-only JSONL log of every gil-affecting
+event, written to `{ConfigDirectory}/audit/{venueId}-{yyyy-MM-dd}.jsonl`. One
+JSON object per line, never edited. **No UI by design** - it exists so that
+when the dealer notices ledger drift, the file is read offline to localize
+when/why it entered (the original +250K silent-drift bug had no trail). Ships
+in Release (the drift only happens live); capture is cheap.
+
+- Four event kinds: `bank` (every `MainWindow.ApplyBank` - the single choke
+  point, so all `BankLedger` tx types are covered), `trade` (each completed
+  trade, logged in `OnChatMessage` via `AuditTrade` with gave/received +
+  outcome), `prompt` (trade-modal Confirm/Cancel resolutions), `wallet`
+  (unexplained on-hand-gil delta from the framework-tick poll - the
+  silent-drift catcher). `dealerGil` on bank/trade events is the polled
+  `config.GilEnd` for offline correlation.
+- The plugin extracts the primitives and passes them in, so `AuditLog` has no
+  Dalamud dependency and is unit-tested (`AuditLogTests`). It uses Newtonsoft
+  (compile-only in `TwentyOne.Game`, provided by Dalamud at runtime).
+- `AuditLog.Root` is the enable gate: the plugin sets it to the audit dir at
+  startup; null/empty no-ops every write. Writes are best-effort (swallow all
+  exceptions) so a logging failure never disrupts a trade, bank op, or load.
+- No `VenueSettings`/`Configuration` field, **no schema migration** - the log
+  lives entirely on disk, outside the config graph, so it cannot reintroduce
+  the config-bloat risk class. Classification of explained vs unexplained
+  deltas is done offline when reading the file, not live in the plugin.
+
 ### MainWindow.Render.cs cell helpers
 
 The player table in `Draw()` uses extracted per-cell methods for navigability:

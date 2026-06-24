@@ -73,7 +73,8 @@ public sealed class Plugin : IDalamudPlugin
     // auto-update is on, regardless of which windows are open. This keeps the
     // reconciliation (and the main-window drift chip) live even with the
     // Session Ledger closed - the chip used to go stale because the only poll
-    // lived in SessionLedgerWindow.Draw.
+    // lived in SessionLedgerWindow.Draw. Each real change also writes a
+    // forensic 'wallet' checkpoint for the audit log.
     private bool gilPollInitialized;
 
     private unsafe void OnFrameworkUpdate(IFramework framework)
@@ -99,6 +100,7 @@ public sealed class Plugin : IDalamudPlugin
         var prev = Configuration.GilEnd;
         if (liveGil == prev) return;
         Configuration.GilEnd = liveGil;
+        AuditLog.Wallet(Configuration.ActiveVenue.Id.ToString(), liveGil, liveGil - prev);
     }
 
     public Configuration Configuration { get; init; }
@@ -142,6 +144,8 @@ public sealed class Plugin : IDalamudPlugin
         // {ConfigDirectory}/sessions/ are the canonical store.
         foreach (var venue in Configuration.Venues)
             venue.StatsSessions = SessionStore.LoadAll(venue.Id);
+
+        AuditLog.Root = Path.Combine(PluginInterface.ConfigDirectory.FullName, "audit");
 
         SessionLedgerWindow   = new SessionLedgerWindow(Configuration);
         NarrationEditorWindow = new NarrationEditorWindow(Configuration);
