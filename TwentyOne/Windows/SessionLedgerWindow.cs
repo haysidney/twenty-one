@@ -112,16 +112,11 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip("Hold Ctrl and click to overwrite starting gil with the current value."u8);
 
-        // Auto-update: track dealer's gil every frame when enabled.
+        // Ending gil is polled into config.GilEnd by Plugin's framework tick
+        // (so it stays live even when this window is closed). Mirror it into the
+        // display buffer here.
         if (config.AutoUpdateGilEnd)
-        {
-            var liveGil = (long)InventoryManager.Instance()->GetGil();
-            if (liveGil != config.GilEnd)
-            {
-                config.GilEnd = liveGil;
-                gilEndBuf = liveGil.ToString();
-            }
-        }
+            gilEndBuf = config.GilEnd.ToString();
 
         ImGui.Text("Ending Gil"); ImGui.SameLine(110);
         ImGui.SetNextItemWidth(160);

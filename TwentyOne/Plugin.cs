@@ -69,6 +69,38 @@ public sealed class Plugin : IDalamudPlugin
             LastOutdoorHousingTerritoryId = territory;
     }
 
+    // Polls the dealer's on-hand gil into config.GilEnd every frame when
+    // auto-update is on, regardless of which windows are open. This keeps the
+    // reconciliation (and the main-window drift chip) live even with the
+    // Session Ledger closed - the chip used to go stale because the only poll
+    // lived in SessionLedgerWindow.Draw.
+    private bool gilPollInitialized;
+
+    private unsafe void OnFrameworkUpdate(IFramework framework)
+    {
+        if (!Configuration.AutoUpdateGilEnd)
+        {
+            gilPollInitialized = false; // re-baseline next time it's enabled
+            return;
+        }
+        var mgr = InventoryManager.Instance();
+        if (mgr == null) return;
+        var liveGil = (long)mgr->GetGil();
+
+        // First poll after enabling: adopt the live value as the baseline
+        // without logging a (meaningless) delta against a stale GilEnd.
+        if (!gilPollInitialized)
+        {
+            Configuration.GilEnd = liveGil;
+            gilPollInitialized = true;
+            return;
+        }
+
+        var prev = Configuration.GilEnd;
+        if (liveGil == prev) return;
+        Configuration.GilEnd = liveGil;
+    }
+
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("TwentyOne");
@@ -125,6 +157,7 @@ public sealed class Plugin : IDalamudPlugin
 #endif
         ClientState.TerritoryChanged += OnTerritoryChanged;
         ContextMenu.OnMenuOpened += OnMenuOpened;
+        Framework.Update += OnFrameworkUpdate;
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(SessionLedgerWindow);
         WindowSystem.AddWindow(HistoryWindow);
@@ -270,6 +303,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
         ClientState.TerritoryChanged -= OnTerritoryChanged;
         ContextMenu.OnMenuOpened -= OnMenuOpened;
+        Framework.Update -= OnFrameworkUpdate;
 
         WindowSystem.RemoveAllWindows();
         ConfigWindow.Dispose();
