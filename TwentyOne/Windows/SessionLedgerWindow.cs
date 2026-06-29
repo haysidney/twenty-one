@@ -20,7 +20,6 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     private HistoryWindow? _historyWindow;
 
     private string gilStartBuf      = string.Empty;
-    private string gilEndBuf        = string.Empty;
     private string tipBuf           = string.Empty;
     private string serviceAmountBuf = string.Empty;
     private string serviceNoteBuf   = string.Empty;
@@ -50,7 +49,6 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     public void SyncBuffers()
     {
         gilStartBuf = config.GilStart.ToString();
-        gilEndBuf   = config.GilEnd.ToString();
     }
 
     public void Dispose()
@@ -112,46 +110,16 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip("Hold Ctrl and click to overwrite starting gil with the current value."u8);
 
-        // Ending gil is polled into config.GilEnd by Plugin's framework tick
-        // (so it stays live even when this window is closed). Mirror it into the
-        // display buffer here.
-        if (config.AutoUpdateGilEnd)
-            gilEndBuf = config.GilEnd.ToString();
-
+        // Ending gil always tracks the live on-hand wallet (polled into
+        // config.GilEnd by Plugin's framework tick, even when this window is
+        // closed). Read-only display - no manual entry.
         ImGui.Text("Ending Gil"); ImGui.SameLine(110);
-        ImGui.SetNextItemWidth(160);
-        if (!config.AutoUpdateGilEnd)
-        {
-            if (ImGui.InputTextWithHint("##gilend", "amount", ref gilEndBuf, 20) && long.TryParse(gilEndBuf, out var v2))
-            {
-                config.GilEnd = v2; config.Save();
-            }
-        }
-        else
-        {
-            ImGui.BeginDisabled();
-            ImGui.InputTextWithHint("##gilend", "amount", ref gilEndBuf, 20);
-            ImGui.EndDisabled();
-        }
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text($"{config.GilEnd:N0}");
         ImGui.SameLine();
-        if (config.AutoUpdateGilEnd) ImGui.BeginDisabled();
-        if (ImGui.SmallButton("Current##end") && !config.AutoUpdateGilEnd)
-        {
-            var gil = (long)InventoryManager.Instance()->GetGil();
-            config.GilEnd = gil;
-            gilEndBuf = gil.ToString();
-            config.Save();
-        }
-        if (config.AutoUpdateGilEnd) ImGui.EndDisabled();
-        ImGui.SameLine();
-        var autoUpdate = config.AutoUpdateGilEnd;
-        if (ImGui.Checkbox("Auto Update##gilend", ref autoUpdate))
-        {
-            config.AutoUpdateGilEnd = autoUpdate;
-            config.Save();
-        }
+        ImGui.TextDisabled("(live)");
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("When enabled, Ending Gil tracks your on-hand gil automatically. Disable to set it manually."u8);
+            ImGui.SetTooltip("Tracks your on-hand gil automatically."u8);
 
         ImGui.AlignTextToFramePadding(); ImGui.Text("Venue Cut %"); ImGui.SameLine();
         ImGui.SetNextItemWidth(100);

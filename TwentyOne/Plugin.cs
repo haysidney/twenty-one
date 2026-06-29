@@ -69,12 +69,12 @@ public sealed class Plugin : IDalamudPlugin
             LastOutdoorHousingTerritoryId = territory;
     }
 
-    // Polls the dealer's on-hand gil into config.GilEnd every frame when
-    // auto-update is on, regardless of which windows are open. This keeps the
-    // reconciliation (and the main-window drift chip) live even with the
-    // Session Ledger closed - the chip used to go stale because the only poll
-    // lived in SessionLedgerWindow.Draw. Each real change also writes a
-    // forensic 'wallet' checkpoint for the audit log.
+    // Polls the dealer's on-hand gil into config.GilEnd every frame (when logged
+    // in), regardless of which windows are open. This keeps the reconciliation
+    // (and the main-window drift chip) live even with the Session Ledger closed.
+    // Each real change also writes a forensic 'wallet' checkpoint for the audit
+    // log and feeds the reconciler. There is no on/off toggle - the wallet is
+    // always tracked.
     private bool gilPollInitialized;
     // Continuous on-hand-gil reconciliation: trades feed RecordExpected (in
     // MainWindow), the poll below feeds Observe, and an unmatched delta is
@@ -83,11 +83,6 @@ public sealed class Plugin : IDalamudPlugin
 
     private unsafe void OnFrameworkUpdate(IFramework framework)
     {
-        if (!Configuration.AutoUpdateGilEnd)
-        {
-            gilPollInitialized = false; // re-baseline next time it's enabled
-            return;
-        }
         // While not logged in the wallet reads 0 (or a stale value); polling it
         // produced the spurious 32M log-out/log-in deltas in the audit log. Skip
         // and re-baseline on next login so no bogus delta is observed.

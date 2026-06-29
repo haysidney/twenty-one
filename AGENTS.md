@@ -402,7 +402,7 @@ should pair with a recorded trade.
     `Tag` is the credited player's stats-key so the modal can name / reverse it.
 - The shared instance lives on `Plugin` (`Reconciler`), passed to `MainWindow`.
   `Plugin.OnFrameworkUpdate` feeds `Observe`/`Tick` and calls
-  `MainWindow.RaiseUnexplained` per finding; `MainWindow.OnChatMessage` feeds
+  `MainWindow.RaiseFinding` per finding; `MainWindow.OnChatMessage` feeds
   `RecordExpected`. This is the runtime catcher for the dropped-chat-line trade
   miss that caused the 2026-06-26 +1M silent drift (diagnosed offline from the
   audit log: one `wallet` delta with no `trade` line).
@@ -424,19 +424,22 @@ whenever that window was closed.
 ### Gil poll (framework tick)
 
 `Plugin.OnFrameworkUpdate` polls the dealer's on-hand gil into `config.GilEnd`
-every frame when `AutoUpdateGilEnd` is on, independent of which windows are
-open (subscribed via `Framework.Update`, unsubscribed in `Dispose`). This is
-the single live wallet-tracking site; `SessionLedgerWindow` only mirrors
-`config.GilEnd` into its display buffer. First poll after enabling adopts the
-live value as a baseline (no delta logged against a stale `GilEnd`); each
-subsequent real change writes an `AuditLog.Wallet` checkpoint.
+every frame (when logged in), independent of which windows are open (subscribed
+via `Framework.Update`, unsubscribed in `Dispose`). The wallet is **always
+tracked** - there is no on/off toggle (the old `AutoUpdateGilEnd` venue setting
+was removed; it is an orphan key cleaned on load, no migration). This is the
+single live wallet-tracking site; `SessionLedgerWindow` shows `config.GilEnd`
+read-only ("Ending Gil (live)"). First poll after (re)login adopts the live value
+as a baseline (no delta against a stale `GilEnd`); each subsequent real change
+writes an `AuditLog.Wallet` checkpoint.
 
 - **Login gate:** the poll is skipped (and re-baselined) when
   `!ClientState.IsLoggedIn` - the wallet reads 0 while not logged in, which
   previously logged spurious ~32M log-out/log-in `wallet` deltas.
 - **Reconciler feed:** each real change calls `Reconciler.Observe(delta)`, and
-  every frame calls `Reconciler.Tick`, raising `MainWindow.RaiseUnexplained` for
-  any unmatched delta (see GilReconciler above).
+  every frame calls `Reconciler.Tick`, raising `MainWindow.RaiseFinding` for
+  any unmatched delta (see GilReconciler above). Because the poll is always on,
+  the reconciler always has its observation feed.
 
 ### Audit log (disk-only forensic trail)
 

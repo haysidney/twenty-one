@@ -110,7 +110,6 @@ public class VenueSettings
     // ── Gil tracker ────────────────────────────────────────────────────────────
     public long       GilStart          { get; set; } = 0;
     public long       GilEnd            { get; set; } = 0;
-    public bool       AutoUpdateGilEnd  { get; set; } = false;
     public int        VenueCutPct { get; set; } = 70;
     public List<long> Tips         { get; set; } = [];
 
@@ -225,7 +224,6 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public string DealerName                 { get => ActiveVenue.DealerName;                 set => ActiveVenue.DealerName = value; }
     [JsonIgnore] public long   GilStart                   { get => ActiveVenue.GilStart;                   set => ActiveVenue.GilStart = value; }
     [JsonIgnore] public long   GilEnd                     { get => ActiveVenue.GilEnd;                     set => ActiveVenue.GilEnd = value; }
-    [JsonIgnore] public bool   AutoUpdateGilEnd           { get => ActiveVenue.AutoUpdateGilEnd;           set => ActiveVenue.AutoUpdateGilEnd = value; }
     [JsonIgnore] public int    VenueCutPct                { get => ActiveVenue.VenueCutPct;                set => ActiveVenue.VenueCutPct = value; }
     [JsonIgnore] public List<long> Tips                   { get => ActiveVenue.Tips;                       set => ActiveVenue.Tips = value; }
     [JsonIgnore] public List<ServiceCharge> ServiceCharges { get => ActiveVenue.ServiceCharges;            set => ActiveVenue.ServiceCharges = value; }
