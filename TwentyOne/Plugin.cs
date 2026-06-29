@@ -76,12 +76,24 @@ public sealed class Plugin : IDalamudPlugin
     // lived in SessionLedgerWindow.Draw. Each real change also writes a
     // forensic 'wallet' checkpoint for the audit log.
     private bool gilPollInitialized;
+    // Continuous on-hand-gil reconciliation: trades feed RecordExpected (in
+    // MainWindow), the poll below feeds Observe, and an unmatched delta is
+    // surfaced to MainWindow as an "unexplained gil" prompt. Shared instance.
+    internal readonly GilReconciler Reconciler = new();
 
     private unsafe void OnFrameworkUpdate(IFramework framework)
     {
         if (!Configuration.AutoUpdateGilEnd)
         {
             gilPollInitialized = false; // re-baseline next time it's enabled
+            return;
+        }
+        // While not logged in the wallet reads 0 (or a stale value); polling it
+        // produced the spurious 32M log-out/log-in deltas in the audit log. Skip
+        // and re-baseline on next login so no bogus delta is observed.
+        if (!ClientState.IsLoggedIn)
+        {
+            gilPollInitialized = false;
             return;
         }
         var mgr = InventoryManager.Instance();
@@ -98,9 +110,17 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         var prev = Configuration.GilEnd;
-        if (liveGil == prev) return;
-        Configuration.GilEnd = liveGil;
-        AuditLog.Wallet(Configuration.ActiveVenue.Id.ToString(), liveGil, liveGil - prev);
+        if (liveGil != prev)
+        {
+            Configuration.GilEnd = liveGil;
+            AuditLog.Wallet(Configuration.ActiveVenue.Id.ToString(), liveGil, liveGil - prev);
+            Reconciler.Observe(liveGil - prev, DateTime.Now);
+        }
+
+        // Tick every frame (even when gil is unchanged) so pending observations
+        // age out into findings.
+        foreach (var finding in Reconciler.Tick(DateTime.Now))
+            MainWindow.RaiseFinding(finding);
     }
 
     public Configuration Configuration { get; init; }
@@ -151,7 +171,7 @@ public sealed class Plugin : IDalamudPlugin
         NarrationEditorWindow = new NarrationEditorWindow(Configuration);
         RulesEditorWindow     = new RulesEditorWindow(Configuration);
         ConfigWindow          = new ConfigWindow(Configuration, SessionLedgerWindow, NarrationEditorWindow, RulesEditorWindow);
-        MainWindow            = new MainWindow(Configuration, ConfigWindow, SessionLedgerWindow, ChatGui, ObjectTable, ClientState);
+        MainWindow            = new MainWindow(Configuration, ConfigWindow, SessionLedgerWindow, ChatGui, ObjectTable, ClientState, Reconciler);
         HistoryWindow       = new HistoryWindow(Configuration, MainWindow);
         MainWindow.SetHistoryWindow(HistoryWindow);
         SessionLedgerWindow.SetHistoryWindow(HistoryWindow);

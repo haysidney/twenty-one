@@ -337,22 +337,75 @@ trade** (both sides put gil in the window) routes to `TwoSided` - this was the
 session-ledger drift bug: the old code returned a withdrawal-only outcome and
 silently dropped the incoming leg, so drift always equaled some player's bet.
 
-### PendingPrompt (trade-result modals)
+### Trade auto-commit (no confirm prompt)
 
-A single `PendingPrompt? pendingPrompt` field models the active trade modal:
+Detected trades **auto-commit** to the player's bank - there is no per-trade
+confirm modal. `OnChatMessage`'s switch over `TradeMonitor.Outcome` calls the
+relevant `CommitTrade*` helper: `CommitTradeDeposit` (incoming -> `BankDeposit`),
+`CommitTradeWithdraw` (outgoing -> `BankWithdrawal`), `CommitTwoSided` (both legs).
+The special auto-helpers (`TryAutoDoubleOrSplitDeposit`, `TryAutoMaintainBet*`,
+`TryAutoCashOutWithdraw`) still get first refusal; the commit is the fall-through.
+
+Removing the prompt killed the prompt-overwrite money-loss bug (a second trade
+clobbering an unconfirmed first prompt) by construction. It is **safe only
+because of the `GilReconciler` backstop** (below): a *mis-detected* trade (wrong
+/ no partner match -> `OnChat` returns `None`) records nothing and would silently
+vanish under auto-commit, but the wallet poll observes the on-hand change with no
+recorded trade and surfaces it as an unexplained-gil prompt. The two features are
+a pair.
+
+### PendingPrompt (unexplained-gil modal)
+
+After auto-commit, the only modal left is the reconciler's unexplained-gil prompt:
 ```csharp
 private abstract record PendingPrompt
 {
-    public sealed record BankDeposit(int Pi, long Gil) : PendingPrompt;
-    public sealed record BankWithdraw(int Pi, long Gil) : PendingPrompt;
-    public sealed record TwoSided(int Pi, long Gave, long Received) : PendingPrompt;
+    public sealed record Unexplained(long Delta) : PendingPrompt;            // gil moved, no trade
+    public sealed record PhantomCredit(long Delta, string StatsKey) : PendingPrompt; // trade, no gil
 }
 ```
-Set by `OnChatMessage` switch over `TradeMonitor.Outcome`. Consumed by
-`DrawTwoSidedPromptModal` and `DrawBankTradePromptModal`. The type system prevents
-two prompts from being active simultaneously. `TwoSided` confirms both legs at once
-(withdraw the give, deposit the receive); its Cancel writes an `[Audit]` note to the
-narration log since a completed FFXIV trade cannot be reversed.
+`GilReconciler.Finding`s from the framework-tick reconciler are queued
+(`findingQueue`) and surfaced one at a time by `DrawFindingModals`, which pops the
+next finding into the matching prompt:
+
+- **Unexplained** (`DrawUnexplainedPromptModal`): dealer **assigns** the delta to
+  a player's bank (deposit if +, withdrawal if -; candidate list = current
+  players, then any other `PlayerStatsStore` row for someone who already left the
+  table) - recovering it into the ledger - or **dismisses** it as non-game gil,
+  which nudges `config.GilStart` by the delta so the reconciliation re-zeros.
+- **PhantomCredit** (`DrawPhantomCreditModal`): dealer **reverses** the
+  over-credit (opposite-sign `ApplyBank` on the tagged player) or **keeps** it
+  (gil may still be in flight).
+
+All paths write an `[Audit]` narration line and an `AuditLog.Prompt` record.
+
+### GilReconciler (continuous on-hand-gil reconciliation)
+
+`TwentyOne.Game/GilReconciler.cs` - pure, Dalamud-free, unit-tested. Matches
+*expected* on-hand changes (trades the plugin detected) against *observed* ones
+(the framework-tick wallet poll). Only trades move on-hand gil (bets / wins /
+double / split / credit are internal bank relabeling), so every observed delta
+should pair with a recorded trade.
+
+- `RecordExpected(signedDelta, now)` - called in `OnChatMessage` beside each
+  `AuditTrade`, for every detected trade (auto-committed or not). +deposit /
+  -withdrawal / net two-sided.
+- `Observe(actualDelta, now)` - called by the gil poll on each real wallet change.
+- `Tick(now)` - returns `Finding(Delta, Phantom, Tag)` for any entry unmatched
+  past the **grace window** (default 3s; trade chat lines land ~10-40ms after the
+  gil moves). Two FIFO queues; each new event greedily cancels an opposite-side
+  entry of equal signed amount (whole-entry, trades are discrete).
+  - **Observed unmatched** -> `Phantom = false`: gil moved, no trade -> the
+    `Unexplained` prompt (assign / dismiss).
+  - **Expected unmatched** -> `Phantom = true`: a trade was recorded but no gil
+    arrived (bank over-credited) -> the `PhantomCredit` prompt (reverse / keep);
+    `Tag` is the credited player's stats-key so the modal can name / reverse it.
+- The shared instance lives on `Plugin` (`Reconciler`), passed to `MainWindow`.
+  `Plugin.OnFrameworkUpdate` feeds `Observe`/`Tick` and calls
+  `MainWindow.RaiseUnexplained` per finding; `MainWindow.OnChatMessage` feeds
+  `RecordExpected`. This is the runtime catcher for the dropped-chat-line trade
+  miss that caused the 2026-06-26 +1M silent drift (diagnosed offline from the
+  audit log: one `wallet` delta with no `trade` line).
 
 ### Drift chip (main-window top bar)
 
@@ -377,6 +430,13 @@ the single live wallet-tracking site; `SessionLedgerWindow` only mirrors
 `config.GilEnd` into its display buffer. First poll after enabling adopts the
 live value as a baseline (no delta logged against a stale `GilEnd`); each
 subsequent real change writes an `AuditLog.Wallet` checkpoint.
+
+- **Login gate:** the poll is skipped (and re-baselined) when
+  `!ClientState.IsLoggedIn` - the wallet reads 0 while not logged in, which
+  previously logged spurious ~32M log-out/log-in `wallet` deltas.
+- **Reconciler feed:** each real change calls `Reconciler.Observe(delta)`, and
+  every frame calls `Reconciler.Tick`, raising `MainWindow.RaiseUnexplained` for
+  any unmatched delta (see GilReconciler above).
 
 ### Audit log (disk-only forensic trail)
 

@@ -56,14 +56,22 @@ public partial class MainWindow : Window, IDisposable
     private string bankDepositBuf        = string.Empty;
     private string bankWithdrawBuf       = string.Empty;
     private string bankCreditBuf         = string.Empty;
-    // Discriminated prompt for trade-result modals. Only one may be active at a time.
+    // Modal prompt. Trades now auto-commit (no confirm step), so the only prompt
+    // left is an unexplained on-hand gil change surfaced by the reconciler.
     private abstract record PendingPrompt
     {
-        public sealed record BankDeposit(int Pi, long Gil) : PendingPrompt;
-        public sealed record BankWithdraw(int Pi, long Gil) : PendingPrompt;
-        public sealed record TwoSided(int Pi, long Gave, long Received) : PendingPrompt;
+        // Signed on-hand delta with no matching detected trade (+received,
+        // -given). Assigned to a player's bank or dismissed as non-game gil.
+        public sealed record Unexplained(long Delta) : PendingPrompt;
+        // A recorded trade with no matching on-hand gil change: the player's bank
+        // was likely over-credited (gil never arrived). Reverse or keep. StatsKey
+        // locates the player in PlayerStatsStore.
+        public sealed record PhantomCredit(long Delta, string StatsKey) : PendingPrompt;
     }
     private PendingPrompt? pendingPrompt;
+    // Findings queue from the framework-tick reconciler; surfaced one at a time.
+    private readonly Queue<GilReconciler.Finding> findingQueue = new();
+    private int unexplainedAssignIndex;
 
     // pending hit: null = not waiting; IsPublic=true means /random was sent, false means /dice
     private (bool IsDealer, int PlayerIndex, int HandIndex, bool IsPublic)? pendingHit;
@@ -92,6 +100,9 @@ public partial class MainWindow : Window, IDisposable
     private List<string> currentRoundActions = [];
     // chat-stream trade-detection state (partner / received-gil / given-gil) lives in TradeMonitor.
     private readonly TradeMonitor              tradeMonitor = new();
+    // shared with Plugin's gil poll: detected trades are recorded here; the poll
+    // observes on-hand deltas and surfaces unmatched ones via RaiseUnexplained.
+    private readonly GilReconciler             reconciler;
     // auto-deal queue: populated by StartDeal; QueueHitRoll is called one at a time as rolls resolve
     // IsFirstCard=true → emit AnnouncePlayerDeal before rolling
     private readonly Queue<(bool IsDealer, int PlayerIndex, int HandIndex, bool IsFirstCard)> autoDealQueue = new();
@@ -110,7 +121,7 @@ public partial class MainWindow : Window, IDisposable
 
     public MainWindow(Configuration config, ConfigWindow configWindow, SessionLedgerWindow sessionLedgerWindow,
                       IChatGui chatGui, IObjectTable objectTable,
-                      IClientState clientState)
+                      IClientState clientState, GilReconciler reconciler)
         : base("Twenty One##TwentyOneMain")
     {
         this.config              = config;
@@ -119,6 +130,7 @@ public partial class MainWindow : Window, IDisposable
         this.chatGui           = chatGui;
         this.objectTable       = objectTable;
         this.clientState       = clientState;
+        this.reconciler        = reconciler;
         SizeConstraints   = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(640, 320),
@@ -631,23 +643,31 @@ public partial class MainWindow : Window, IDisposable
         // ── Trade detection (bet auto-fill + bank deposit/withdraw) ──────────
         var msgText = message.TextValue;
         var payload = message.Payloads.OfType<PlayerPayload>().FirstOrDefault();
+        // Detected trades auto-commit to the player's bank (no confirm step). The
+        // reconciler records the expected on-hand change; if a trade is *missed*
+        // (OnChat returns None - a dropped chat line, the 2026-06-26 +1M drift),
+        // nothing is recorded here and the poll's observed delta surfaces as an
+        // unexplained-gil prompt instead of vanishing silently.
         switch (tradeMonitor.OnChat(msgText, payload, State, config))
         {
             case TradeMonitor.Outcome.PromptBankDeposit pbd:
                 AuditTrade(pbd.Pi, 0, pbd.Gil, "Deposit");
+                reconciler.RecordExpected(pbd.Gil, DateTime.Now, State.Players[pbd.Pi].StatsKey());
                 if (!TryAutoDoubleOrSplitDeposit(pbd.Pi, pbd.Gil)
                     && !TryAutoMaintainBetDeposit(pbd.Pi, pbd.Gil))
-                    pendingPrompt = new PendingPrompt.BankDeposit(pbd.Pi, pbd.Gil);
+                    CommitTradeDeposit(pbd.Pi, pbd.Gil);
                 break;
             case TradeMonitor.Outcome.PromptBankWithdraw pbw:
                 AuditTrade(pbw.Pi, pbw.Gil, 0, "Withdraw");
+                reconciler.RecordExpected(-pbw.Gil, DateTime.Now, State.Players[pbw.Pi].StatsKey());
                 if (!TryAutoCashOutWithdraw(pbw.Pi, pbw.Gil)
                     && !TryAutoMaintainBetWithdraw(pbw.Pi, pbw.Gil))
-                    pendingPrompt = new PendingPrompt.BankWithdraw(pbw.Pi, pbw.Gil);
+                    CommitTradeWithdraw(pbw.Pi, pbw.Gil);
                 break;
             case TradeMonitor.Outcome.PromptTwoSided pts:
                 AuditTrade(pts.Pi, pts.Gave, pts.Received, "TwoSided");
-                pendingPrompt = new PendingPrompt.TwoSided(pts.Pi, pts.Gave, pts.Received);
+                reconciler.RecordExpected(pts.Received - pts.Gave, DateTime.Now, State.Players[pts.Pi].StatsKey());
+                CommitTwoSided(pts.Pi, pts.Gave, pts.Received);
                 break;
         }
 
@@ -672,6 +692,45 @@ public partial class MainWindow : Window, IDisposable
         pendingHit   = null;
         LogRoll(isDealer, pi2, roll);
         deferredRoll = (isDealer, pi2, hi, roll);
+    }
+
+    // Auto-commit a one-sided trade deposit to the player's bank. Replaces the
+    // old confirm modal; a mis-detected trade can't be lost here because the
+    // reconciler backstops any on-hand change with no recorded trade.
+    private void CommitTradeDeposit(int pi, long gil)
+    {
+        var stat = State.Players[pi].GetOrCreateStat(config);
+        ApplyBank(stat, new BankDeposit(gil));
+        if (!stat.MaintainBet)
+            Apply(new AnnounceBankDeposit(pi, gil, stat.Bank));
+        config.Save();
+    }
+
+    private void CommitTradeWithdraw(int pi, long gil)
+    {
+        var stat = State.Players[pi].GetOrCreateStat(config);
+        ApplyBank(stat, new BankWithdrawal(gil));
+        if (!stat.MaintainBet)
+            Apply(new AnnounceBankWithdraw(pi, gil, stat.Bank));
+        config.Save();
+    }
+
+    private void CommitTwoSided(int pi, long gave, long received)
+    {
+        var stat = State.Players[pi].GetOrCreateStat(config);
+        ApplyBank(stat, new BankWithdrawal(gave));
+        if (!stat.MaintainBet) Apply(new AnnounceBankWithdraw(pi, gave, stat.Bank));
+        ApplyBank(stat, new BankDeposit(received));
+        if (!stat.MaintainBet) Apply(new AnnounceBankDeposit(pi, received, stat.Bank));
+        config.Save();
+    }
+
+    // Called from Plugin's framework-tick reconciler with an unmatched finding.
+    // Queued; surfaced one at a time by the finding modals (unexplained gil /
+    // phantom credit).
+    public void RaiseFinding(GilReconciler.Finding f)
+    {
+        if (f.Delta != 0) findingQueue.Enqueue(f);
     }
 
     // Forensic audit for a completed trade. partner resolved from the player

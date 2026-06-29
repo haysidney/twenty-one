@@ -1138,43 +1138,127 @@ public partial class MainWindow
         }
     }
 
-    // Bidirectional trade: the dealer handed gil over (a withdrawal/cashout) and
-    // received gil back in the same window. Confirm both legs so neither is lost.
-    private void DrawTwoSidedPromptModal()
+    // Pull the next reconciler finding into a prompt when idle, then render
+    // whichever modal matches.
+    private void DrawFindingModals()
     {
-        if (pendingPrompt is PendingPrompt.TwoSided)
-            ImGui.OpenPopup("Two-sided trade##twoSided");
+        if (pendingPrompt is null && findingQueue.Count > 0)
+        {
+            var f = findingQueue.Dequeue();
+            pendingPrompt = f.Phantom
+                ? new PendingPrompt.PhantomCredit(f.Delta, f.Tag ?? string.Empty)
+                : new PendingPrompt.Unexplained(f.Delta);
+            unexplainedAssignIndex = 0;
+        }
+        DrawUnexplainedPromptModal();
+        DrawPhantomCreditModal();
+    }
+
+    // An on-hand gil change the reconciler could not match to a detected trade
+    // (a missed trade, or non-game wallet movement). The dealer either assigns it
+    // to a player's bank (recovers it into the ledger) or dismisses it as
+    // non-game gil (nudges GilStart so the books re-zero).
+    private void DrawUnexplainedPromptModal()
+    {
+        if (pendingPrompt is PendingPrompt.Unexplained)
+            ImGui.OpenPopup("Unexplained gil##unexplained");
         ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
-        var show = ImGui.BeginPopupModal("Two-sided trade##twoSided", ImGuiWindowFlags.AlwaysAutoResize);
+        var show = ImGui.BeginPopupModal("Unexplained gil##unexplained", ImGuiWindowFlags.AlwaysAutoResize);
         ImGui.PopStyleColor();
         if (!show) return;
 
-        var ts     = (PendingPrompt.TwoSided)pendingPrompt!;
-        var player = State.Players[ts.Pi];
-        var stat   = player.GetOrCreateStat(config);
-        ImGui.Text($"Two-sided trade with {player.DisplayName}:");
-        ImGui.BulletText($"You gave {ts.Gave:N0} gil  ->  withdraw from bank");
-        ImGui.BulletText($"You received {ts.Received:N0} gil  ->  deposit to bank");
+        var ue   = (PendingPrompt.Unexplained)pendingPrompt!;
+        var sign = ue.Delta > 0 ? "+" : "";
+        ImGui.Text($"Unexplained {sign}{ue.Delta:N0} gil");
+        ImGui.TextWrapped(ue.Delta > 0
+            ? "Your on-hand gil rose with no detected trade. Assign it to a player's bank, or dismiss it as non-game gil."
+            : "Your on-hand gil fell with no detected trade. Assign it to a player's bank, or dismiss it as non-game gil.");
         ImGui.Spacing();
-        if (ImGui.Button("Confirm both##twoSidedYes"))
+
+        // Candidates: current players first, then any other known banking row
+        // (a player who already left the table before the drift was noticed).
+        var candidates = State.Players
+            .Where(pl => !pl.SittingOut)
+            .Select(pl => (Label: pl.DisplayName, Stat: pl.GetOrCreateStat(config)))
+            .ToList();
+        candidates.AddRange(config.PlayerStatsStore.Values
+            .Where(s => candidates.All(c => !ReferenceEquals(c.Stat, s)))
+            .Select(s => ($"{s.DisplayName} (not at table)", s)));
+
+        var canAssign = candidates.Count > 0;
+        if (canAssign)
         {
-            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), "TwoSided", player.DisplayName, ts.Received - ts.Gave, "Confirm");
-            ApplyBank(stat, new BankWithdrawal(ts.Gave));
-            if (!stat.MaintainBet)
-                Apply(new AnnounceBankWithdraw(ts.Pi, ts.Gave, stat.Bank));
-            ApplyBank(stat, new BankDeposit(ts.Received));
-            if (!stat.MaintainBet)
-                Apply(new AnnounceBankDeposit(ts.Pi, ts.Received, stat.Bank));
+            if (unexplainedAssignIndex >= candidates.Count) unexplainedAssignIndex = 0;
+            ImGui.SetNextItemWidth(220);
+            ImGui.Combo("##ueTarget", ref unexplainedAssignIndex,
+                candidates.ConvertAll(c => c.Label).ToArray(), candidates.Count);
+        }
+        ImGui.Spacing();
+
+        if (!canAssign) ImGui.BeginDisabled();
+        if (ImGui.Button("Assign to bank##ueAssign"))
+        {
+            var (_, tstat) = candidates[unexplainedAssignIndex];
+            ApplyBank(tstat, ue.Delta > 0 ? new BankDeposit(ue.Delta) : new BankWithdrawal(-ue.Delta));
+            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), "Unexplained", tstat.DisplayName, ue.Delta, "Assign");
+            config.NarrationLog.Add($"[Audit] Assigned unexplained {sign}{ue.Delta:N0} gil to {tstat.DisplayName}'s bank.");
+            config.Save();
             pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
+        if (!canAssign) ImGui.EndDisabled();
         ImGui.SameLine();
-        if (ImGui.Button("Cancel##twoSidedNo"))
+        if (ImGui.Button("Not game-related (dismiss)##ueDismiss"))
         {
-            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), "TwoSided", player.DisplayName, ts.Received - ts.Gave, "Cancel");
-            config.NarrationLog.Add(
-                $"[Audit] Dismissed two-sided trade with {player.DisplayName}: " +
-                $"gave {ts.Gave:N0}, received {ts.Received:N0} (no ledger change)");
+            // Nudge GilStart by the delta so the GilEnd-GilStart reconciliation
+            // re-zeros (the gil moved for a non-game reason).
+            config.GilStart += ue.Delta;
+            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), "Unexplained", "-", ue.Delta, "Dismiss");
+            config.NarrationLog.Add($"[Audit] Dismissed unexplained {sign}{ue.Delta:N0} gil as non-game (baseline adjusted).");
+            config.Save();
+            pendingPrompt = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.EndPopup();
+    }
+
+    // A trade was recorded but the dealer's on-hand gil never changed to match -
+    // the player's bank was likely over-credited (gil never actually arrived).
+    // Reverse the bank entry, or keep it (gil may still be in flight).
+    private void DrawPhantomCreditModal()
+    {
+        if (pendingPrompt is PendingPrompt.PhantomCredit)
+            ImGui.OpenPopup("Phantom credit##phantom");
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
+        var show = ImGui.BeginPopupModal("Phantom credit##phantom", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.PopStyleColor();
+        if (!show) return;
+
+        var pc   = (PendingPrompt.PhantomCredit)pendingPrompt!;
+        var stat = config.PlayerStatsStore.GetValueOrDefault(pc.StatsKey);
+        var name = stat?.DisplayName ?? "a player";
+        var sign = pc.Delta > 0 ? "+" : "";
+        ImGui.Text($"Phantom trade: {sign}{pc.Delta:N0} gil");
+        ImGui.TextWrapped($"A trade with {name} was recorded but your on-hand gil never changed to match. " +
+            $"{name}'s bank may be over-credited. Reverse the bank entry, or keep it (gil may still arrive).");
+        ImGui.Spacing();
+        if (stat is null) ImGui.BeginDisabled();
+        if (ImGui.Button("Reverse bank##phantomReverse"))
+        {
+            ApplyBank(stat!, pc.Delta > 0 ? new BankWithdrawal(pc.Delta) : new BankDeposit(-pc.Delta));
+            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), "Phantom", name, pc.Delta, "Reverse");
+            config.NarrationLog.Add($"[Audit] Reversed phantom {sign}{pc.Delta:N0} gil credit to {name} (gil never arrived).");
+            config.Save();
+            pendingPrompt = null;
+            ImGui.CloseCurrentPopup();
+        }
+        if (stat is null) ImGui.EndDisabled();
+        ImGui.SameLine();
+        if (ImGui.Button("Keep##phantomKeep"))
+        {
+            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), "Phantom", name, pc.Delta, "Keep");
+            config.NarrationLog.Add($"[Audit] Kept phantom {sign}{pc.Delta:N0} gil credit to {name}.");
+            config.Save();
             pendingPrompt = null;
             ImGui.CloseCurrentPopup();
         }
@@ -1391,44 +1475,6 @@ public partial class MainWindow
         ImGui.EndPopup();
     }
 
-    private void DrawBankTradePromptModal()
-    {
-        if (pendingPrompt is PendingPrompt.BankDeposit or PendingPrompt.BankWithdraw)
-            ImGui.OpenPopup("Bank trade##bankTradePrompt");
-        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
-        var show = ImGui.BeginPopupModal("Bank trade##bankTradePrompt", ImGuiWindowFlags.AlwaysAutoResize);
-        ImGui.PopStyleColor();
-        if (!show) return;
-
-        var isWd   = pendingPrompt is PendingPrompt.BankWithdraw;
-        var btpi   = isWd ? ((PendingPrompt.BankWithdraw)pendingPrompt!).Pi : ((PendingPrompt.BankDeposit)pendingPrompt!).Pi;
-        var btamt  = isWd ? ((PendingPrompt.BankWithdraw)pendingPrompt!).Gil : ((PendingPrompt.BankDeposit)pendingPrompt!).Gil;
-        var btplayer = State.Players[btpi];
-        var btStat   = btplayer.GetOrCreateStat(config);
-        var verb = isWd ? "Withdraw" : "Deposit";
-        ImGui.Text($"{verb} {btamt:N0} gil {(isWd ? "from" : "to")} {btplayer.DisplayName}'s bank?");
-        ImGui.Spacing();
-        if (ImGui.Button("Yes##bankTradeYes"))
-        {
-            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), verb, btplayer.DisplayName, btamt, "Confirm");
-            ApplyBank(btStat, isWd ? new BankWithdrawal(btamt) : new BankDeposit(btamt));
-            if (!btStat.MaintainBet)
-                Apply(isWd
-                    ? new AnnounceBankWithdraw(btpi, btamt, btStat.Bank)
-                    : new AnnounceBankDeposit (btpi, btamt, btStat.Bank));
-            pendingPrompt = null;
-            ImGui.CloseCurrentPopup();
-        }
-        ImGui.SameLine();
-        if (ImGui.Button("No##bankTradeNo"))
-        {
-            AuditLog.Prompt(config.ActiveVenue.Id.ToString(), verb, btplayer.DisplayName, btamt, "Cancel");
-            pendingPrompt = null;
-            ImGui.CloseCurrentPopup();
-        }
-        ImGui.EndPopup();
-    }
-
     // ── Draw ──────────────────────────────────────────────────────────────────
 
     public override void Draw()
@@ -1481,8 +1527,7 @@ public partial class MainWindow
         var uiBusy = chatQueue.Count > 0 || pendingHit != null || deferredRoll.HasValue;
 
         DrawBankManageWindow(uiBusy);
-        DrawTwoSidedPromptModal();
-        DrawBankTradePromptModal();
+        DrawFindingModals();
         DrawUndoConfirmModal();
 
         DrawHistoryViewBanner();
