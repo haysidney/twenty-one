@@ -105,17 +105,35 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         var prev = Configuration.GilEnd;
+        // The reconciler only makes sense while the dealer is actually running the
+        // table (window open) - you can't deal with it closed, so real trade-drift
+        // is still caught. When it's closed we keep polling GilEnd (books stay
+        // live) and keep the audit checkpoint, but we do NOT feed Observe/Tick:
+        // otherwise every between-game wallet change (vendors, repairs, retainer,
+        // market board) queues an unexplained-gil finding that floods the next time
+        // the window opens. Because GilEnd still tracks every frame while closed,
+        // the accumulated non-game delta folds silently into the baseline instead.
+        //
+        // Gate on IsOpen, not draw-freshness: the dealer collapses the window
+        // mid-game to free up screen space, and collapsed still means live. IsOpen
+        // stays true while collapsed (only the close button flips it), which is
+        // exactly what we want. A collapsed window can't surface findings until
+        // un-collapsed (DrawFindingModals lives in Draw()), but they queue and show
+        // on expand - correct, since those are real in-game trades.
+        var tableLive = MainWindow.IsOpen;
         if (liveGil != prev)
         {
             Configuration.GilEnd = liveGil;
             AuditLog.Wallet(Configuration.ActiveVenue.Id.ToString(), liveGil, liveGil - prev);
-            Reconciler.Observe(liveGil - prev, DateTime.Now);
+            if (tableLive)
+                Reconciler.Observe(liveGil - prev, DateTime.Now);
         }
 
         // Tick every frame (even when gil is unchanged) so pending observations
-        // age out into findings.
-        foreach (var finding in Reconciler.Tick(DateTime.Now))
-            MainWindow.RaiseFinding(finding);
+        // age out into findings - but only while the table is live.
+        if (tableLive)
+            foreach (var finding in Reconciler.Tick(DateTime.Now))
+                MainWindow.RaiseFinding(finding);
     }
 
     public Configuration Configuration { get; init; }

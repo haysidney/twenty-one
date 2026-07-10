@@ -436,10 +436,20 @@ writes an `AuditLog.Wallet` checkpoint.
 - **Login gate:** the poll is skipped (and re-baselined) when
   `!ClientState.IsLoggedIn` - the wallet reads 0 while not logged in, which
   previously logged spurious ~32M log-out/log-in `wallet` deltas.
-- **Reconciler feed:** each real change calls `Reconciler.Observe(delta)`, and
-  every frame calls `Reconciler.Tick`, raising `MainWindow.RaiseFinding` for
-  any unmatched delta (see GilReconciler above). Because the poll is always on,
-  the reconciler always has its observation feed.
+- **Reconciler feed (gated on `MainWindow.IsOpen`):** while the main window is
+  open, each real change calls `Reconciler.Observe(delta)` and every frame calls
+  `Reconciler.Tick`, raising `MainWindow.RaiseFinding` for any unmatched delta
+  (see GilReconciler above). While the window is **closed** the reconciler is not
+  fed - you can't deal with it closed, so real trade-drift is still caught, but
+  between-game wallet moves (vendors, repairs, retainer, market board) no longer
+  queue unexplained-gil findings that would flood the next time the window opens.
+  `GilEnd` keeps polling regardless (books stay live), so the accumulated non-game
+  delta folds silently into the baseline instead of surfacing. Note the gate is
+  `IsOpen`, **not** draw-freshness: a **collapsed** window (double-click titlebar,
+  used mid-game to free screen space) keeps `IsOpen` true and counts as live - its
+  findings simply queue and surface on expand, since they are real in-game trades.
+  A future "night finished" session concept may replace window-open as the live
+  gate.
 
 ### Audit log (disk-only forensic trail)
 
