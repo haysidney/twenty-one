@@ -1171,7 +1171,7 @@ public partial class MainWindow
         var sign = ue.Delta > 0 ? "+" : "";
         ImGui.Text($"Unexplained {sign}{ue.Delta:N0} gil");
         ImGui.TextWrapped(ue.Delta > 0
-            ? "Your on-hand gil rose with no detected trade. Assign it to a player's bank, or dismiss it as non-game gil."
+            ? "Your on-hand gil rose with no detected trade. Assign it to a player's bank, record it as a tip, or dismiss it as non-game gil."
             : "Your on-hand gil fell with no detected trade. Assign it to a player's bank, or dismiss it as non-game gil.");
         ImGui.Spacing();
 
@@ -1207,6 +1207,25 @@ public partial class MainWindow
             ImGui.CloseCurrentPopup();
         }
         if (!canAssign) ImGui.EndDisabled();
+
+        // Tips are positive gil the dealer keeps (not a player's banked chips).
+        // Record into config.Tips so it counts toward settlement; TipTotal is
+        // subtracted in the reconciliation, so the books stay zeroed without a
+        // GilStart nudge (unlike dismiss).
+        if (ue.Delta > 0)
+        {
+            ImGui.SameLine();
+            if (ImGui.Button("Add as tip##ueTip"))
+            {
+                config.Tips.Add(ue.Delta);
+                AuditLog.Prompt(config.ActiveVenue.Id.ToString(), "Unexplained", "-", ue.Delta, "Tip");
+                config.NarrationLog.Add($"[Audit] Recorded unexplained {sign}{ue.Delta:N0} gil as a tip.");
+                config.Save();
+                pendingPrompt = null;
+                ImGui.CloseCurrentPopup();
+            }
+        }
+
         ImGui.SameLine();
         if (ImGui.Button("Not game-related (dismiss)##ueDismiss"))
         {

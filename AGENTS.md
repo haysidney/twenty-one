@@ -371,7 +371,9 @@ next finding into the matching prompt:
 - **Unexplained** (`DrawUnexplainedPromptModal`): dealer **assigns** the delta to
   a player's bank (deposit if +, withdrawal if -; candidate list = current
   players, then any other `PlayerStatsStore` row for someone who already left the
-  table) - recovering it into the ledger - or **dismisses** it as non-game gil,
+  table) - recovering it into the ledger - **records it as a tip** (positive
+  deltas only; appends to `config.Tips`, which `AdjustedDiff` subtracts, so the
+  books re-zero with no `GilStart` nudge) - or **dismisses** it as non-game gil,
   which nudges `config.GilStart` by the delta so the reconciliation re-zeros.
 - **PhantomCredit** (`DrawPhantomCreditModal`): dealer **reverses** the
   over-credit (opposite-sign `ApplyBank` on the tagged player) or **keeps** it
