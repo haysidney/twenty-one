@@ -149,6 +149,7 @@ public sealed class Plugin : IDalamudPlugin
     private HistoryWindow          HistoryWindow          { get; init; }
     private NarrationEditorWindow  NarrationEditorWindow  { get; init; }
     private RulesEditorWindow      RulesEditorWindow      { get; init; }
+    private HelpWindow             HelpWindow             { get; init; }
 #if DEBUG
     private DebugWindow            DebugWindow            { get; init; }
 #endif
@@ -190,7 +191,9 @@ public sealed class Plugin : IDalamudPlugin
         ConfigWindow          = new ConfigWindow(Configuration, SessionLedgerWindow, NarrationEditorWindow, RulesEditorWindow);
         MainWindow            = new MainWindow(Configuration, ConfigWindow, SessionLedgerWindow, ChatGui, ObjectTable, ClientState, Reconciler);
         HistoryWindow       = new HistoryWindow(Configuration, MainWindow);
+        HelpWindow          = new HelpWindow(OpenWindowById);
         MainWindow.SetHistoryWindow(HistoryWindow);
+        MainWindow.SetHelpWindow(HelpWindow);
         SessionLedgerWindow.SetHistoryWindow(HistoryWindow);
 #if DEBUG
         DebugWindow = new DebugWindow(Configuration, MainWindow);
@@ -204,6 +207,7 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(HistoryWindow);
         WindowSystem.AddWindow(NarrationEditorWindow);
         WindowSystem.AddWindow(RulesEditorWindow);
+        WindowSystem.AddWindow(HelpWindow);
 #if DEBUG
         WindowSystem.AddWindow(DebugWindow);
 #endif
@@ -211,7 +215,7 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Opens the Twenty One blackjack table."
+            HelpMessage = "Opens the Twenty One blackjack table. \"/twentyone help\" opens the guide."
         });
 
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
@@ -355,7 +359,30 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(CommandName);
     }
 
-    private void OnCommand(string command, string args) => MainWindow.Toggle();
+    // Targets for the guide's [[open:win:*]] buttons.
+    private void OpenWindowById(string id)
+    {
+        switch (id)
+        {
+            case "win:table":     MainWindow.IsOpen            = true; break;
+            case "win:ledger":    SessionLedgerWindow.IsOpen    = true; break;
+            case "win:history":   HistoryWindow.IsOpen          = true; break;
+            case "win:settings":  ConfigWindow.IsOpen           = true; break;
+            case "win:rules":     RulesEditorWindow.IsOpen      = true; break;
+            case "win:narration": NarrationEditorWindow.IsOpen  = true; break;
+            default: Log.Warning($"Unknown help action id: {id}"); break;
+        }
+    }
+
+    private void OnCommand(string command, string args)
+    {
+        if (args.Trim().Equals("help", StringComparison.OrdinalIgnoreCase))
+        {
+            HelpWindow.IsOpen = true;
+            return;
+        }
+        MainWindow.Toggle();
+    }
     public void ToggleMainUi() => MainWindow.Toggle();
     public void ToggleConfigUi() => ConfigWindow.Toggle();
 }

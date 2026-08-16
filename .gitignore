@@ -5,3 +5,11 @@ Plans/
 Dalamud/
 FFXIVClientStructs/
 .*.kate-swp
+
+# Working notes - drafts, handoffs, captured debug state. docs/ otherwise holds
+# committed long-form design notes.
+docs/*-plan.md
+docs/handoff.md
+docs/test-checklist.md
+docs/archive/
+docs/snapshots/

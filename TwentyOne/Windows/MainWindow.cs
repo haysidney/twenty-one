@@ -25,6 +25,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly ConfigWindow       configWindow;
     private readonly SessionLedgerWindow sessionLedgerWindow;
     private          HistoryWindow historyWindow = null!;
+    private          HelpWindow    helpWindow    = null!;
 
     // History viewer mode: non-null when viewing a historical round.
     private GameState?       savedCurrentState;
@@ -143,6 +144,7 @@ public partial class MainWindow : Window, IDisposable
     }
 
     public void SetHistoryWindow(HistoryWindow w) => historyWindow = w;
+    public void SetHelpWindow(HelpWindow w)       => helpWindow    = w;
 
     // Returns (venueIndex, venueName) if VenueMemory has a suggestion for the current location.
     private (int Index, string Name)? GetVenueMemorySuggestion()

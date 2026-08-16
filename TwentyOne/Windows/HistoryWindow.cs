@@ -196,7 +196,7 @@ public class HistoryWindow : Window
     {
         if (sessions.Count == 0)
         {
-            ImGui.TextUnformatted("No sessions recorded yet. Use \"New Session\" in Session Ledger to begin tracking sessions.");
+            ImGui.TextUnformatted("No sessions recorded yet. A night is archived here when you start the next one.");
             return;
         }
 

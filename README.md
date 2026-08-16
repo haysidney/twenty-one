@@ -4,7 +4,12 @@ A Dalamud plugin for running a blackjack table in an FFXIV venue. The dealer
 drives the game from a window; the plugin narrates each beat to chat, draws
 cards from `/random 13` rolls, and keeps the night's money straight.
 
-Type `/twentyone` to open the table.
+Type `/twentyone` to open the table, or `/twentyone help` for the built-in
+dealer's guide (also reachable from the **Help** button in the table's top bar).
+
+New to the plugin? Read the guide - it walks through setup, running a night,
+player banks, the books, and settling up. Its pages live in
+[`TwentyOne/Help/`](TwentyOne/Help) if you would rather read them here.
 
 ## What it does
 

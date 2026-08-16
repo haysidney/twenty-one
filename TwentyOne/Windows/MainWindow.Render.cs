@@ -1440,6 +1440,11 @@ public partial class MainWindow
         ImGui.SameLine();
         if (ImGui.SmallButton("History"))
             historyWindow.Toggle();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Help"))
+            helpWindow.Toggle();
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("The dealer's guide - how to run a night with this plugin."u8);
 #if DEBUG
         ImGui.SameLine();
         if (ImGui.SmallButton("Debug"))

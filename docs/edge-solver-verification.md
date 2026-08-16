@@ -15,7 +15,7 @@ pays 3:2, no Charlie, infinite deck, ENHC.
 | Wizard of Odds calculator, 8-deck, with "loses only original bet vs dealer BJ = Yes" (peek-equivalent) | 0.64493% |
 | Same calculator with "loses only original bet vs dealer BJ = No" (matches our ENHC) | **0.75620%** |
 | Add ~0.08% for 8-deck → infinite-deck extrapolation | ~0.836% |
-| EdgeSolver computes | **0.83970%** |
+| EdgeSolver computes | **0.83973%** |
 
 Match within **~0.005%** (half a basis point). The observed ENHC vs peek delta
 of 0.7562% - 0.6449% = **0.1113%** also matches the published ~0.11% figure
@@ -99,3 +99,38 @@ enum changes:
 
 The published numbers will not change; only the solver might drift. Anchor
 all future comparisons against the values recorded above.
+
+## Re-run: dealer stand threshold (2026-08-16, v0.7.0)
+
+`DealerStandsOnSoft17` (bool) became `DealerStandThreshold` (int) +
+`DealerHitsSoftThreshold` (bool), so the dealer draw rule and the outcome
+buckets both changed. Verified as a pure refactor at threshold 17: the same
+verification cell computed **0.83973% (H17)** and **0.62301% (S17)** both
+before and after the change - bit-identical, checked by building the previous
+commit in a scratch worktree. (The 0.83970% previously recorded above was
+stale; the current code and the pre-change code agree exactly.)
+
+**One real bug found and fixed by this work.** The dealer outcome distribution
+bucketed standing totals 17-21 only, with a `_ => OBust` default arm. That was
+unreachable while the dealer always stood on 17+, but a sub-17 threshold made
+it live: a dealer standing on 15 or 16 was scored as a **bust**, crediting the
+player a win against every hand. Buckets `O15`/`O16` were added.
+`EdgeSolverTests.StandOn16_DealerSixteenIsNotScoredAsABust` guards it.
+
+New reference values for the same cell (3:2, no Charlie, DAS, unlimited
+resplits, no RSA/HSA/surrender, infinite deck, ENHC):
+
+| Stand rule | House edge |
+|---|---|
+| Stand 15 | -4.61456% |
+| Stand 16 | **-0.25576%** |
+| Stand 17, hit soft 17 (H17, default) | 0.83973% |
+| Stand 17, stand soft 17 (S17) | 0.62301% |
+| Stand 18 | -6.58697% |
+
+Note what these say about the non-standard thresholds: **every one of them is
+player-favored**, and 15/18 ruinously so. Standing on 16 forfeits all the
+dealer's draws to 17-21 against a player who has already stood on 17+;
+standing on 18 forces the dealer to draw from 17 and bust constantly. A venue
+asking to "stand on 16" is asking to run a -0.26% game. The Rules Editor's
+live house-edge display shows this, which is the point of surfacing it there.

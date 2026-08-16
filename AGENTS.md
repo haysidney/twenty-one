@@ -296,6 +296,37 @@ Archived sessions (`PlayerStatsSession`) are **not** stored in the main config J
 - A "Recompute Stats" button in History → Previous Sessions detail re-runs `EdgeStats.Aggregate` and rewrites the session file. Useful after solver fixes or new rule axes.
 - `RoundSummary` (the old degraded per-round type) was removed; winner/loser/push classification is now computed on demand by `HistoryWindow.ClassifyRound` from each `RoundHistoryEntry.Snapshot`.
 
+### In-plugin help (dealer's guide)
+
+`HelpWindow` (top-bar **Help** button, or `/twentyone help`) renders a set of
+Markdown pages embedded in the assembly from `TwentyOne/Help/*.md`. The prose is
+edited as prose and the same files render on GitHub, so there is one source, not
+a doc plus a UI copy.
+
+- `TwentyOne.Game/HelpMarkdown.cs` - the pure part: `Parse` (Markdown subset ->
+  `MdBlock` list) and `Wrap` (greedy word wrap taking an injected measure
+  function). In `TwentyOne.Game` for the usual reason - the plugin project is
+  unreachable from tests. Covered by `HelpMarkdownTests`.
+- `TwentyOne/Windows/MarkdownView.cs` - the ImGui drawing. Dalamud ships no bold
+  font, so `**bold**` renders as a brighter colour. Inline styling is why each
+  word is its own ImGui item (`SameLine(0, 0)`): one `Text` call cannot change
+  colour mid-line.
+- Supported subset: ATX headings, paragraphs, `-` bullets, `N.` items, `>`
+  quotes, fenced code, `---` rules, pipe tables, `**bold**`, `` `code` ``.
+- `[[open:id|Label]]` **on a line of its own** renders as a button. `win:*` ids
+  (`win:ledger`, `win:settings`, `win:rules`, `win:narration`, `win:history`,
+  `win:table`) open that window via `Plugin.OpenWindowById`; any other id is a
+  help topic and navigates in-page. **Inline directives are not parsed** - one
+  inside a sentence renders as literal text.
+- Pages are embedded with an explicit `LogicalName` (`TwentyOne.Help.{file}.md`)
+  so resource-name mangling can't break lookup, and parsed lazily per page.
+- Adding a page: drop the `.md` in `TwentyOne/Help/` (the csproj glob picks it
+  up) and add a row to `HelpWindow.Topics`.
+
+The guide is user-facing prose about the *current* UI. When a label, button or
+flow changes, the affected page changes with it - a stale guide is worse than
+none.
+
 ### Docs
 
 `docs/` holds long-form notes about rule decisions and design rationale.
