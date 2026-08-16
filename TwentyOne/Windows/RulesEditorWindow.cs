@@ -24,7 +24,7 @@ public class RulesEditorWindow : Window
     }
 
     private double?   _cachedHouseEdge;
-    private double?   _edgeS17AtDefault;
+    private double?   _edgeDealerStandAtDefault;
     private double?   _edgeDASAtDefault;
     private double?   _edgeHSAAtDefault;
     private double?   _edgeRSAAtDefault;
@@ -93,15 +93,31 @@ public class RulesEditorWindow : Window
             DrawDefaultDelta(_edgeCharliePayoutAtDefault, "1:1");
         }
 
-        var s17 = config.DealerStandsOnSoft17;
-        if (ImGui.Checkbox("Dealer stands on soft 17", ref s17))
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text("Dealer stands on");
+        ImGui.SameLine();
+        var thresholdOptions = new[] { "15", "16", "17", "18" };
+        var thresholdIdx     = Math.Clamp(config.DealerStandThreshold - 15, 0, 3);
+        ImGui.SetNextItemWidth(60);
+        if (ImGui.Combo("##dealerstand", ref thresholdIdx, thresholdOptions, thresholdOptions.Length))
         {
-            config.DealerStandsOnSoft17 = s17;
+            config.DealerStandThreshold = thresholdIdx + 15;
             config.Save();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("When off (default), dealer hits soft 17 (H17). When on, dealer stands on soft 17 (S17).");
-        DrawDefaultDelta(_edgeS17AtDefault, "off");
+            ImGui.SetTooltip("The total at which the dealer stops drawing. 17 is standard;\nsome venues stand on 16.");
+        ImGui.SameLine();
+        var hitsSoft = config.DealerHitsSoftThreshold;
+        if (ImGui.Checkbox($"Hit soft {config.DealerStandThreshold}", ref hitsSoft))
+        {
+            config.DealerHitsSoftThreshold = hitsSoft;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip($"When on (default), the dealer draws again on a SOFT {config.DealerStandThreshold}\n"
+                + $"(an ace counted as 11). When off, they stand on it.\n"
+                + "Stand on 17 with this on is the classic H17; off is S17.");
+        DrawDefaultDelta(_edgeDealerStandAtDefault, "17, hit soft");
 
         var das = config.DoubleAfterSplit;
         if (ImGui.Checkbox("Allow double after split", ref das))
@@ -187,7 +203,8 @@ public class RulesEditorWindow : Window
             config.BjPayout             = defaults.BjPayout;
             config.CharliePayout        = defaults.CharliePayout;
             config.FiveCardCharlie      = defaults.FiveCardCharlie;
-            config.DealerStandsOnSoft17 = defaults.DealerStandsOnSoft17;
+            config.DealerStandThreshold    = defaults.DealerStandThreshold;
+            config.DealerHitsSoftThreshold = defaults.DealerHitsSoftThreshold;
             config.DoubleAfterSplit     = defaults.DoubleAfterSplit;
             config.HitSplitAces         = defaults.HitSplitAces;
             config.ResplitAces          = defaults.ResplitAces;
@@ -198,7 +215,7 @@ public class RulesEditorWindow : Window
         }
         if (!ctrlHeld) ImGui.EndDisabled();
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
-            ImGui.SetTooltip("Hold Ctrl to reset all rules to their default values\n(3:2 BJ, Charlie disabled, H17, DAS on, no HSA / RSA / Surrender)."u8);
+            ImGui.SetTooltip("Hold Ctrl to reset all rules to their default values\n(3:2 BJ, Charlie disabled, stand on 17 hitting soft 17, DAS on, no HSA / RSA / Surrender)."u8);
     }
 
     private void EnsureEdgeCache()
@@ -207,7 +224,8 @@ public class RulesEditorWindow : Window
             config.BjPayout,
             config.CharliePayout,
             config.FiveCardCharlie,
-            config.DealerStandsOnSoft17,
+            config.DealerStandThreshold,
+            config.DealerHitsSoftThreshold,
             config.DoubleAfterSplit,
             config.HitSplitAces,
             config.ResplitAces,
@@ -219,9 +237,10 @@ public class RulesEditorWindow : Window
 
         _cachedHouseEdge = EdgeSolver.ComputeHouseEdge(rules);
 
-        _edgeS17AtDefault = !rules.DealerStandsOnSoft17
+        _edgeDealerStandAtDefault = rules is { DealerStandThreshold: 17, DealerHitsSoftThreshold: true }
             ? null
-            : EdgeSolver.ComputeHouseEdge(rules with { DealerStandsOnSoft17 = false });
+            : EdgeSolver.ComputeHouseEdge(
+                rules with { DealerStandThreshold = 17, DealerHitsSoftThreshold = true });
         _edgeDASAtDefault = rules.DoubleAfterSplit
             ? null
             : EdgeSolver.ComputeHouseEdge(rules with { DoubleAfterSplit = true });

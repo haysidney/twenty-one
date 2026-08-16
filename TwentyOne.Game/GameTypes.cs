@@ -100,8 +100,12 @@ public sealed record class GameState
     public double BjPayout { get; set; } = 1.5;
     public PayoutRatio CharliePayout { get; set; } = PayoutRatio.EvenMoney;
     public FiveCardCharlieRule FiveCardCharlie { get; set; } = FiveCardCharlieRule.Disabled;
-    // When true, dealer stands on soft 17 (S17). When false (default), dealer hits soft 17 (H17).
-    public bool DealerStandsOnSoft17 { get; set; } = false;
+    // Total at which the dealer stops drawing (17 = standard). Venues run
+    // variants - standing on 16 is common in FFXIV houses.
+    public int DealerStandThreshold { get; set; } = 17;
+    // Whether the dealer hits a SOFT hand exactly at the threshold. True (default)
+    // with threshold 17 is the classic H17; false is S17.
+    public bool DealerHitsSoftThreshold { get; set; } = true;
     // When true (default), the player may double after splitting. When false, doubling
     // is restricted to non-split hands.
     public bool DoubleAfterSplit { get; set; } = true;

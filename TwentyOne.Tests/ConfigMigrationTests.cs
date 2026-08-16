@@ -110,6 +110,62 @@ public class ConfigMigrationTests
     }
 
     [Fact]
+    public void Migrate_v4_SplitsS17BoolIntoThresholdPair()
+    {
+        var root = LoadFixture("config-v4.json");
+        var venues = (JArray)root["Venues"]!;
+
+        ConfigMigrations.Migrate(root);
+
+        Assert.Equal(ConfigMigrations.CurrentSchemaVersion, (int)root["SchemaVersion"]!);
+
+        // S17 venue: stands on 17 and does NOT hit soft 17.
+        Assert.Null(venues[0]["DealerStandsOnSoft17"]);
+        Assert.Equal(17, (int)venues[0]["DealerStandThreshold"]!);
+        Assert.False((bool)venues[0]["DealerHitsSoftThreshold"]!);
+
+        // H17 venue (explicit false) and a venue that never touched the rule both
+        // land on the H17 defaults - which is what they were already playing.
+        Assert.Equal(17, (int)venues[1]["DealerStandThreshold"]!);
+        Assert.True((bool)venues[1]["DealerHitsSoftThreshold"]!);
+        Assert.Equal(17, (int)venues[2]["DealerStandThreshold"]!);
+        Assert.True((bool)venues[2]["DealerHitsSoftThreshold"]!);
+    }
+
+    [Fact]
+    public void Migrate_v4_CarriesRuleIntoRoundHistorySnapshotsAndLiveState()
+    {
+        // GameState is a record (no ExtensionData), so an unmigrated snapshot would
+        // silently fall back to the H17 default and misreport an S17 night.
+        var root = LoadFixture("config-v4.json");
+
+        ConfigMigrations.Migrate(root);
+
+        var rounds = (JArray)root["Venues"]![0]!["RoundHistory"]!;
+        Assert.All(rounds, r =>
+        {
+            var snap = r["Snapshot"]!;
+            Assert.Null(snap["DealerStandsOnSoft17"]);
+            Assert.Equal(17, (int)snap["DealerStandThreshold"]!);
+            Assert.False((bool)snap["DealerHitsSoftThreshold"]!);
+        });
+
+        var live = root["GameState"]!;
+        Assert.Equal(17, (int)live["DealerStandThreshold"]!);
+        Assert.True((bool)live["DealerHitsSoftThreshold"]!); // fixture's live state was H17
+    }
+
+    [Fact]
+    public void Migrate_v4_FixtureIsIdempotent()
+    {
+        var root = LoadFixture("config-v4.json");
+        ConfigMigrations.Migrate(root);
+        var afterFirst = root.DeepClone();
+        ConfigMigrations.Migrate(root);
+        Assert.True(JToken.DeepEquals(afterFirst, root));
+    }
+
+    [Fact]
     public void DedupRoundHistory_CollapsesRepeatedBlocks_KeepingFirst()
     {
         // Two distinct rounds, list tripled by the doubling bug: [1,2,1,2,1,2].

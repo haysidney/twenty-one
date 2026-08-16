@@ -55,7 +55,7 @@ public static class EdgeStats
 
     public static EdgeRules RulesFromState(GameState s) => new(
         s.BjPayout, s.CharliePayout, s.FiveCardCharlie,
-        s.DealerStandsOnSoft17, s.DoubleAfterSplit,
+        s.DealerStandThreshold, s.DealerHitsSoftThreshold, s.DoubleAfterSplit,
         s.HitSplitAces, s.ResplitAces, s.AllowSurrender, s.ResplitCap, s.DoubleRestriction);
 }
 

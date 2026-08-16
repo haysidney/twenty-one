@@ -22,8 +22,11 @@ public class EdgeSolverTests
         bool das = true,
         bool hsa = false,
         bool rsa = false,
-        bool surrender = false)
-        => new(bj, charlie, cr, s17, das, hsa, rsa, surrender);
+        bool surrender = false,
+        int standThreshold = 17)
+        // s17 stays the ergonomic knob for these tests: "stand on soft 17" is the
+        // same thing as "do not hit the soft threshold".
+        => new(bj, charlie, cr, standThreshold, !s17, das, hsa, rsa, surrender);
 
     [Fact]
     public void H17_3to2_NoCharlie_EdgeInPublishedRange()
@@ -170,6 +173,46 @@ public class EdgeSolverTests
         // infinite-deck + ENHC.
         Assert.True(s17 < h17, "S17 should lower house edge vs H17");
         Assert.InRange(h17 - s17, 0.0015, 0.0035);
+    }
+
+    [Fact]
+    public void StandOn16_HandsTheEdgeToThePlayer()
+    {
+        // A venue standing on 16 gives up every dealer draw to 17-21 against a
+        // player who has already stood on 17+, so the game flips player-favored.
+        // Worth a test because it is a rule real venues ask for.
+        var stand17 = EdgeSolver.ComputeHouseEdge(Rules(standThreshold: 17));
+        var stand16 = EdgeSolver.ComputeHouseEdge(Rules(standThreshold: 16));
+        _out.WriteLine($"stand 17 = {stand17 * 100:F4}%, stand 16 = {stand16 * 100:F4}%");
+
+        Assert.True(stand16 < stand17, "Standing on 16 should lower the house edge");
+        Assert.True(stand16 < 0, "Standing on 16 should be player-favored");
+    }
+
+    [Fact]
+    public void StandOn16_DealerSixteenIsNotScoredAsABust()
+    {
+        // Regression guard for the dealer-outcome buckets: they originally covered
+        // 17-21 only, so a dealer standing on 16 fell into the default arm and was
+        // counted as a bust - crediting the player a win against every hand. That
+        // bug drove the edge far below the true value, so a sane band pins it.
+        var stand16 = EdgeSolver.ComputeHouseEdge(Rules(standThreshold: 16));
+        _out.WriteLine($"stand 16 = {stand16 * 100:F4}%");
+        Assert.InRange(stand16, -0.02, 0.0);
+    }
+
+    [Fact]
+    public void ExtremeStandThresholds_AreRuinousForTheHouse()
+    {
+        // Both directions cost the house badly: standing on 15 finishes with a
+        // total that loses to almost anything, and standing on 18 forces the
+        // dealer to draw from 17 and bust constantly.
+        var stand15 = EdgeSolver.ComputeHouseEdge(Rules(standThreshold: 15));
+        var stand18 = EdgeSolver.ComputeHouseEdge(Rules(standThreshold: 18));
+        _out.WriteLine($"stand 15 = {stand15 * 100:F4}%, stand 18 = {stand18 * 100:F4}%");
+
+        Assert.True(stand15 < -0.02, "Standing on 15 should be heavily player-favored");
+        Assert.True(stand18 < -0.02, "Standing on 18 should be heavily player-favored");
     }
 
     [Fact]

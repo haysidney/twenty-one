@@ -1638,7 +1638,7 @@ public partial class MainWindow
             else
             {
                 ImGui.Text($"= {scoreStr}");
-                var rec     = GameEngine.DealerRecommendation(State.DealerHand, State.DealerStandsOnSoft17);
+                var rec     = GameEngine.DealerRecommendation(State.DealerHand, State);
                 var allBust = State.IsAllBust();
                 if (rec.Length > 0 && Phase == GamePhase.DealerTurn && !allBust)
                 {

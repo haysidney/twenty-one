@@ -37,7 +37,8 @@ All debug tooling is `#if DEBUG` - absent in Release builds. Enable via the **De
   "bjPayout": 1.5,
   "charliePayout": "ThreeToTwo",
   "fiveCardCharlie": "Disabled",
-  "dealerStandsOnSoft17": false,
+  "dealerStandThreshold": 17,
+  "dealerHitsSoftThreshold": true,
   "doubleAfterSplit": true,
   "hitSplitAces": false,
   "resplitAces": false,
@@ -56,7 +57,7 @@ All debug tooling is `#if DEBUG` - absent in Release builds. Enable via the **De
 }
 ```
 
-Each rule override is optional; omitted fields use the standard defaults (3:2 BJ, EvenMoney Charlie, Charlie disabled, H17, DAS-on, no HSA / RSA / Surrender, ResplitCap Max4, DoubleRestriction Any). Scenarios are intentionally insulated from the active venue's rules so they stay reproducible.
+Each rule override is optional; omitted fields use the standard defaults (3:2 BJ, EvenMoney Charlie, Charlie disabled, stand on 17 hitting soft 17 (H17), DAS-on, no HSA / RSA / Surrender, ResplitCap Max4, DoubleRestriction Any). Scenarios are intentionally insulated from the active venue's rules so they stay reproducible.
 
 **Action strings:**
 
@@ -647,7 +648,15 @@ The old `GameEngine.With(...)` optional-parameter helper has been removed.
 
 ## Design Decisions
 
-- Dealer hits on soft 17 by default; `DealerStandsOnSoft17` venue rule flips to S17.
+- Dealer draw rule is a (threshold, hits-soft) pair: `DealerStandThreshold` (int,
+  default 17) and `DealerHitsSoftThreshold` (bool, default true). The dealer hits
+  below the threshold, and hits a *soft* hand exactly at it when the flag is set -
+  so 17 + hits-soft is the classic H17 and 17 without it is S17. The UI offers
+  15/16/17/18 because venues run variants (standing on 16 is common). Schema v5
+  migrates the old `DealerStandsOnSoft17` bool, including `GameState` snapshots in
+  RoundHistory (records carry no ExtensionData, so an unmigrated snapshot would
+  silently read as H17). `EdgeSolver` solves every threshold; note that all
+  non-17 thresholds are player-favored - see `docs/edge-solver-verification.md`.
 - Surrender (`AllowSurrender`, off by default) is **early-style** because the engine is ENHC: the player forfeits exactly half their bet even when the dealer ends up with Blackjack. New `HandState.Surrendered`, new `PayoutResult.Surrender`, new `SurrenderHand` action. Surrender is only offered on the initial 2-card hand (not post-hit/split/double). Bank pays back `bet - ceil(bet/2)` at settlement; odd bets round in the house's favor by 1 gil.
 - `BjPayout` is a free-form `double` multiplier (e.g. 1.5 = 3:2, 1.2 = 6:5, 1.0 = even money). Canonical on `VenueSettings`, mirrored on `GameState` so it is snapshotted with each undo entry. Edited via the `config.BjPayout` proxy (writes to the active venue); seeded into the live `GameState` by `Configuration.SeedRulesIntoGameState()` on `StartDeal`. Edits during Deal or later do not affect the running round. Engine payout uses `Math.Ceiling(bet * (decimal)state.BjPayout)`. CharliePayout remains an enum (3:2 / 6:5 / 1:1) since each value requires a full solver re-solve.
 - `Player.Hands` supports multiple hands for splits. `GameState.ActiveHandIndex` tracks which hand is currently active alongside `ActivePlayerIndex`. `AdvanceFrom` iterates all `(player, hand)` pairs in order.

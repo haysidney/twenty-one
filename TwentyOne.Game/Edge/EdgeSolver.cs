@@ -8,7 +8,8 @@ public readonly record struct EdgeRules(
     double BjPayout,
     PayoutRatio CharliePayout,
     FiveCardCharlieRule FiveCardCharlie,
-    bool DealerStandsOnSoft17 = false,
+    int DealerStandThreshold = 17,
+    bool DealerHitsSoftThreshold = true,
     bool DoubleAfterSplit = true,
     bool HitSplitAces = false,
     bool ResplitAces = false,
@@ -66,14 +67,19 @@ public static class EdgeSolver
         private readonly Dictionary<int, double>   _playerCache = new();
 
         // Dealer outcome bucket indices.
+        // Standing totals get one bucket each. 15/16 exist because a venue may set
+        // DealerStandThreshold below 17 - without them a dealer standing on 16 fell
+        // into the default arm and was scored as a bust, wildly overstating player EV.
         private const int OBust = 0;
-        private const int O17   = 1;
-        private const int O18   = 2;
-        private const int O19   = 3;
-        private const int O20   = 4;
-        private const int O21   = 5; // 21 from 3+ cards
-        private const int OBJ   = 6; // natural 2-card 21
-        private const int NumOutcomes = 7;
+        private const int O15   = 1;
+        private const int O16   = 2;
+        private const int O17   = 3;
+        private const int O18   = 4;
+        private const int O19   = 5;
+        private const int O20   = 6;
+        private const int O21   = 7; // 21 from 3+ cards
+        private const int OBJ   = 8; // natural 2-card 21
+        private const int NumOutcomes = 9;
 
         public Solver(EdgeRules rules)
         {
@@ -134,11 +140,14 @@ public static class EdgeSolver
                 dist[OBust] += prob;
                 return;
             }
-            bool hit = total < 17 || (total == 17 && isSoft && !_rules.DealerStandsOnSoft17);
+            bool hit = total < _rules.DealerStandThreshold
+                    || (total == _rules.DealerStandThreshold && isSoft && _rules.DealerHitsSoftThreshold);
             if (!hit)
             {
                 int bucket = total switch
                 {
+                    15 => O15,
+                    16 => O16,
                     17 => O17,
                     18 => O18,
                     19 => O19,
@@ -438,8 +447,8 @@ public static class EdgeSolver
             double ev = 0;
             ev += dist[OBust] *  1.0;
             ev += dist[OBJ]   * -1.0;
-            int[] totals  = { 17, 18, 19, 20, 21 };
-            int[] buckets = { O17, O18, O19, O20, O21 };
+            int[] totals  = { 15, 16, 17, 18, 19, 20, 21 };
+            int[] buckets = { O15, O16, O17, O18, O19, O20, O21 };
             for (int i = 0; i < totals.Length; i++)
             {
                 double p = dist[buckets[i]];

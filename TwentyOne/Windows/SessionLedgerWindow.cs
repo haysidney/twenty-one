@@ -268,7 +268,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         // observational - bank net per gil wagered.
         var currentRules = new EdgeRules(
             config.BjPayout, config.CharliePayout, config.FiveCardCharlie,
-            config.DealerStandsOnSoft17, config.DoubleAfterSplit,
+            config.DealerStandThreshold, config.DealerHitsSoftThreshold, config.DoubleAfterSplit,
             config.HitSplitAces, config.ResplitAces, config.AllowSurrender,
             config.ResplitCap, config.DoubleRestriction);
         var liveStats = _edgeCache.Get(config.RoundHistory, currentRules);

@@ -63,8 +63,6 @@ public class PlayerStat
     public long    TotalNet    { get; set; } = 0;
     public long    Bank        { get; set; } = 0;
     public bool    MaintainBet { get; set; } = false;
-    // When true, trade-detected withdrawals up to the current balance are applied
-    // silently (no prompt). Auto-clears when Bank reaches 0.
     public List<BankTransactionEntry> BankLog { get; set; } = [];
 
     [JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; } = new();
@@ -155,7 +153,8 @@ public class VenueSettings
     public double              BjPayout             { get; set; } = 1.5;
     public PayoutRatio         CharliePayout        { get; set; } = PayoutRatio.EvenMoney;
     public FiveCardCharlieRule FiveCardCharlie      { get; set; } = FiveCardCharlieRule.Disabled;
-    public bool                DealerStandsOnSoft17 { get; set; } = false;
+    public int                 DealerStandThreshold    { get; set; } = 17;
+    public bool                DealerHitsSoftThreshold { get; set; } = true;
     public bool                DoubleAfterSplit     { get; set; } = true;
     public bool                HitSplitAces         { get; set; } = false;
     public bool                ResplitAces          { get; set; } = false;
@@ -258,7 +257,8 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public double              BjPayout             { get => ActiveVenue.BjPayout;             set => ActiveVenue.BjPayout = value; }
     [JsonIgnore] public PayoutRatio         CharliePayout        { get => ActiveVenue.CharliePayout;        set => ActiveVenue.CharliePayout = value; }
     [JsonIgnore] public FiveCardCharlieRule FiveCardCharlie      { get => ActiveVenue.FiveCardCharlie;      set => ActiveVenue.FiveCardCharlie = value; }
-    [JsonIgnore] public bool                DealerStandsOnSoft17 { get => ActiveVenue.DealerStandsOnSoft17; set => ActiveVenue.DealerStandsOnSoft17 = value; }
+    [JsonIgnore] public int                 DealerStandThreshold    { get => ActiveVenue.DealerStandThreshold;    set => ActiveVenue.DealerStandThreshold = value; }
+    [JsonIgnore] public bool                DealerHitsSoftThreshold { get => ActiveVenue.DealerHitsSoftThreshold; set => ActiveVenue.DealerHitsSoftThreshold = value; }
     [JsonIgnore] public bool                DoubleAfterSplit     { get => ActiveVenue.DoubleAfterSplit;     set => ActiveVenue.DoubleAfterSplit = value; }
     [JsonIgnore] public bool                HitSplitAces         { get => ActiveVenue.HitSplitAces;         set => ActiveVenue.HitSplitAces = value; }
     [JsonIgnore] public bool                ResplitAces          { get => ActiveVenue.ResplitAces;          set => ActiveVenue.ResplitAces = value; }
@@ -279,7 +279,8 @@ public class Configuration : IPluginConfiguration
         GameState.BjPayout             = ActiveVenue.BjPayout;
         GameState.CharliePayout        = ActiveVenue.CharliePayout;
         GameState.FiveCardCharlie      = ActiveVenue.FiveCardCharlie;
-        GameState.DealerStandsOnSoft17 = ActiveVenue.DealerStandsOnSoft17;
+        GameState.DealerStandThreshold    = ActiveVenue.DealerStandThreshold;
+        GameState.DealerHitsSoftThreshold = ActiveVenue.DealerHitsSoftThreshold;
         GameState.DoubleAfterSplit     = ActiveVenue.DoubleAfterSplit;
         GameState.HitSplitAces         = ActiveVenue.HitSplitAces;
         GameState.ResplitAces          = ActiveVenue.ResplitAces;

@@ -23,7 +23,8 @@ internal sealed class GameStateBuilder
     private FiveCardCharlieRule  _fiveCardCharlie       = FiveCardCharlieRule.Disabled;
     private double               _bjPayout              = 1.5;
     private PayoutRatio          _charliePayout         = PayoutRatio.EvenMoney;
-    private bool                 _dealerStandsOnSoft17  = false;
+    private int                  _dealerStandThreshold    = 17;
+    private bool                 _dealerHitsSoftThreshold = true;
     private bool                 _doubleAfterSplit      = true;
     private bool                 _hitSplitAces          = false;
     private bool                 _resplitAces           = false;
@@ -109,9 +110,18 @@ internal sealed class GameStateBuilder
         return this;
     }
 
+    /// <summary>S17: stand on 17 without hitting soft 17.</summary>
     public GameStateBuilder DealerStandsOnSoft17(bool value = true)
     {
-        _dealerStandsOnSoft17 = value;
+        _dealerHitsSoftThreshold = !value;
+        return this;
+    }
+
+    /// <summary>Arbitrary stand rule, e.g. venues that stand on 16.</summary>
+    public GameStateBuilder DealerStands(int threshold, bool hitsSoft = true)
+    {
+        _dealerStandThreshold    = threshold;
+        _dealerHitsSoftThreshold = hitsSoft;
         return this;
     }
 
@@ -193,7 +203,8 @@ internal sealed class GameStateBuilder
             FiveCardCharlie          = _fiveCardCharlie,
             BjPayout                 = _bjPayout,
             CharliePayout            = _charliePayout,
-            DealerStandsOnSoft17     = _dealerStandsOnSoft17,
+            DealerStandThreshold     = _dealerStandThreshold,
+            DealerHitsSoftThreshold  = _dealerHitsSoftThreshold,
             DoubleAfterSplit         = _doubleAfterSplit,
             HitSplitAces             = _hitSplitAces,
             ResplitAces              = _resplitAces,

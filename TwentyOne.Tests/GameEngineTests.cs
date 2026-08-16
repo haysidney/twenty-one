@@ -101,40 +101,59 @@ public class DealerRecommendationTests
     [Fact]
     public void Under17_ReturnsHit()
     {
-        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(10, 6), standsOnSoft17: false));
-        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(10, 6), standsOnSoft17: true));
+        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(10, 6), 17, hitsSoftThreshold: true));
+        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(10, 6), 17, hitsSoftThreshold: false));
     }
 
     [Fact]
     public void Hard17_ReturnsStand()
     {
-        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(10, 7), standsOnSoft17: false));
-        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(10, 7), standsOnSoft17: true));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(10, 7), 17, hitsSoftThreshold: true));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(10, 7), 17, hitsSoftThreshold: false));
     }
 
     [Fact]
     public void Soft17_H17_ReturnsHit()
     {
-        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(1, 6), standsOnSoft17: false));
+        Assert.Equal("HIT", GameEngine.DealerRecommendation(MakeHand(1, 6), 17, hitsSoftThreshold: true));
     }
 
     [Fact]
     public void Soft17_S17_ReturnsStand()
     {
-        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 6), standsOnSoft17: true));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 6), 17, hitsSoftThreshold: false));
     }
 
     [Fact]
     public void Soft18_ReturnsStand()
     {
-        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 7), standsOnSoft17: false));
-        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 7), standsOnSoft17: true));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 7), 17, hitsSoftThreshold: true));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 7), 17, hitsSoftThreshold: false));
     }
 
     [Fact]
     public void EmptyHand_ReturnsEmpty()
     {
-        Assert.Equal(string.Empty, GameEngine.DealerRecommendation(new Hand(), standsOnSoft17: false));
+        Assert.Equal(string.Empty, GameEngine.DealerRecommendation(new Hand(), 17, hitsSoftThreshold: true));
+    }
+
+    [Fact]
+    public void StandOn16_HitsFifteenStandsOnHardSixteen()
+    {
+        Assert.Equal("HIT",   GameEngine.DealerRecommendation(MakeHand(10, 5), 16, hitsSoftThreshold: true));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(10, 6), 16, hitsSoftThreshold: true));
+        // Above the threshold is always a stand.
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(10, 7), 16, hitsSoftThreshold: true));
+    }
+
+    [Fact]
+    public void StandOn16_SoftSixteenFollowsTheHitSoftFlag()
+    {
+        // A,5 = soft 16.
+        Assert.Equal("HIT",   GameEngine.DealerRecommendation(MakeHand(1, 5), 16, hitsSoftThreshold: true));
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 5), 16, hitsSoftThreshold: false));
+        // Soft 17 is above a 16 threshold, so it stands either way.
+        Assert.Equal("STAND", GameEngine.DealerRecommendation(MakeHand(1, 6), 16, hitsSoftThreshold: true));
     }
 }
 
@@ -1061,7 +1080,8 @@ public class VenueRulesDontLeakTests
         Assert.Equal(a.BjPayout,             b.BjPayout);
         Assert.Equal(a.CharliePayout,        b.CharliePayout);
         Assert.Equal(a.FiveCardCharlie,      b.FiveCardCharlie);
-        Assert.Equal(a.DealerStandsOnSoft17, b.DealerStandsOnSoft17);
+        Assert.Equal(a.DealerStandThreshold, b.DealerStandThreshold);
+        Assert.Equal(a.DealerHitsSoftThreshold, b.DealerHitsSoftThreshold);
         Assert.Equal(a.DoubleAfterSplit,     b.DoubleAfterSplit);
         Assert.Equal(a.HitSplitAces,         b.HitSplitAces);
         Assert.Equal(a.ResplitAces,          b.ResplitAces);

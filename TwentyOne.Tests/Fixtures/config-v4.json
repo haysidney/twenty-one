@@ -1,0 +1,55 @@
+{
+  "Version": 0,
+  "SchemaVersion": 4,
+  "PluginVersion": "0.6.0.0",
+  "GameState": {
+    "Phase": 0,
+    "BjPayout": 1.5,
+    "DealerStandsOnSoft17": false
+  },
+  "UndoStack": [],
+  "RedoStack": [],
+  "NarrationLog": [],
+  "ActiveVenueIndex": 0,
+  "Venues": [
+    {
+      "Name": "Eden",
+      "Id": "11111111-1111-1111-1111-111111111111",
+      "ChatEnabled": true,
+      "ChatChannel": "/p",
+      "VenueCutPct": 70,
+      "BjPayout": 1.5,
+      "DealerStandsOnSoft17": true,
+      "DoubleAfterSplit": true,
+      "RoundHistory": [
+        {
+          "RoundNumber": 1,
+          "Snapshot": { "Phase": 4, "BjPayout": 1.5, "DealerStandsOnSoft17": true }
+        },
+        {
+          "RoundNumber": 2,
+          "Snapshot": { "Phase": 4, "BjPayout": 1.5, "DealerStandsOnSoft17": true }
+        }
+      ],
+      "Tips": [ 1000 ]
+    },
+    {
+      "Name": "Elysium",
+      "Id": "22222222-2222-2222-2222-222222222222",
+      "ChatEnabled": true,
+      "ChatChannel": "/say",
+      "VenueCutPct": 50,
+      "BjPayout": 1.2,
+      "DealerStandsOnSoft17": false,
+      "RoundHistory": [],
+      "Tips": []
+    },
+    {
+      "Name": "Never Edited",
+      "Id": "33333333-3333-3333-3333-333333333333",
+      "ChatEnabled": true,
+      "RoundHistory": [],
+      "Tips": []
+    }
+  ]
+}

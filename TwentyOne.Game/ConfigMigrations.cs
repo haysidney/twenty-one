@@ -25,7 +25,7 @@ namespace TwentyOne.Game;
 /// </summary>
 public static class ConfigMigrations
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     /// <summary>
     /// Runs all pending migrations on <paramref name="root"/> in-place and
@@ -80,8 +80,46 @@ public static class ConfigMigrations
             version = 4;
         }
 
+        if (version < 5)
+        {
+            // The S17 boolean became a (threshold, hits-soft) pair so venues can
+            // stand on 16 or 18. Value-preserving rename:
+            //   DealerStandsOnSoft17 = true  -> stand on 17, do NOT hit soft 17
+            //   DealerStandsOnSoft17 = false -> stand on 17, hit soft 17 (H17)
+            // Venues that never touched the rule have no key and pick up the
+            // H17 defaults, which is what they were playing.
+            if (root["Venues"] is JArray v5Venues)
+            {
+                foreach (var venue in v5Venues.OfType<JObject>())
+                {
+                    RenameDealerStandRule(venue);
+                    // GameState mirrors the rule so historical rounds replay under
+                    // the rules they were played with. Records carry no
+                    // ExtensionData, so an unmigrated snapshot would silently fall
+                    // back to the H17 default and misreport an S17 night.
+                    if (venue["RoundHistory"] is JArray rounds)
+                        foreach (var entry in rounds.OfType<JObject>())
+                            RenameDealerStandRule(entry["Snapshot"] as JObject);
+                }
+            }
+            RenameDealerStandRule(root["GameState"] as JObject);
+            version = 5;
+        }
+
         root["SchemaVersion"] = version;
         return root;
+    }
+
+    // v5 helper: DealerStandsOnSoft17 (bool) -> DealerStandThreshold (int) +
+    // DealerHitsSoftThreshold (bool). Null-tolerant so callers can pass an
+    // optional node directly.
+    private static void RenameDealerStandRule(JObject? node)
+    {
+        if (node == null) return;
+        var s17 = (bool?)node["DealerStandsOnSoft17"] ?? false;
+        node.Remove("DealerStandsOnSoft17");
+        node["DealerStandThreshold"]    = 17;
+        node["DealerHitsSoftThreshold"] = !s17;
     }
 
     /// <summary>

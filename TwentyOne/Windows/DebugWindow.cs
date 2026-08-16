@@ -24,7 +24,8 @@ public class DebugScenarioFile
     public FiveCardCharlieRule?      FiveCardCharlie      { get; set; }
     public PayoutRatio?              CharliePayout        { get; set; }
     public double?                   BjPayout             { get; set; }
-    public bool?                     DealerStandsOnSoft17 { get; set; }
+    public int?                      DealerStandThreshold    { get; set; }
+    public bool?                     DealerHitsSoftThreshold { get; set; }
     public bool?                     DoubleAfterSplit     { get; set; }
     public bool?                     HitSplitAces         { get; set; }
     public bool?                     ResplitAces          { get; set; }
@@ -241,7 +242,8 @@ public class DebugWindow : Window
         if (file.BjPayout.HasValue)             state.BjPayout             = file.BjPayout.Value;
         if (file.CharliePayout.HasValue)        state.CharliePayout        = file.CharliePayout.Value;
         if (file.FiveCardCharlie.HasValue)      state.FiveCardCharlie      = file.FiveCardCharlie.Value;
-        if (file.DealerStandsOnSoft17.HasValue) state.DealerStandsOnSoft17 = file.DealerStandsOnSoft17.Value;
+        if (file.DealerStandThreshold.HasValue)    state.DealerStandThreshold    = file.DealerStandThreshold.Value;
+        if (file.DealerHitsSoftThreshold.HasValue) state.DealerHitsSoftThreshold = file.DealerHitsSoftThreshold.Value;
         if (file.DoubleAfterSplit.HasValue)     state.DoubleAfterSplit     = file.DoubleAfterSplit.Value;
         if (file.HitSplitAces.HasValue)         state.HitSplitAces         = file.HitSplitAces.Value;
         if (file.ResplitAces.HasValue)          state.ResplitAces          = file.ResplitAces.Value;
