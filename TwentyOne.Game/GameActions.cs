@@ -87,6 +87,13 @@ public record SetPlayerBet(int PlayerIndex, string Bet) : GameAction;
 // does NOT push undo: bank entries are append-only, so a state-only revert would leave the
 // player's recorded bet inconsistent with their actual bank deductions.
 public record AdjustBet(int PlayerIndex, string Bet) : GameAction { public override bool PushesUndo => false; }
+// Pulls a player out of the round already in progress (they cashed out right
+// after the deal, went AFK, or disconnected): sits them out, discards their
+// hand(s), and clears their bet. The bank refund is the caller's responsibility
+// (MainWindow), which is why - like AdjustBet - this does NOT push undo: bank
+// entries are append-only, so a state-only revert would resurrect a hand whose
+// bet has already been returned.
+public record WithdrawFromRound(int PlayerIndex) : GameAction { public override bool PushesUndo => false; }
 public record RenamePlayer(int PlayerIndex, string Nickname) : GameAction;
 public record ReorderPlayers(List<int> NewOrder) : GameAction;
 public record ToggleSittingOut(int PlayerIndex) : GameAction;

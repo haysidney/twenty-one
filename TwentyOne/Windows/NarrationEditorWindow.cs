@@ -223,6 +223,7 @@ public class NarrationEditorWindow : Window
             NtListRow("Stand##ntPS",       "{name}  {cards}  {score}",                                          Defaults.PlayerStand,       ctrlHeld, t.PlayerStand);
             NtListRow("Surrender##ntPSR",  "{name}",                                                            Defaults.PlayerSurrender,   ctrlHeld, t.PlayerSurrender);
             NtListRow("Charlie##ntPC",     "{name}  {card}  {cards}  {score}",                                  Defaults.PlayerCharlie,     ctrlHeld, t.PlayerCharlie);
+            NtListRow("Withdraw##ntPW",    "{name}",                                                            Defaults.PlayerWithdraw,    ctrlHeld, t.PlayerWithdraw);
 
             ImGui.EndTabItem();
         }

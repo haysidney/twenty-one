@@ -196,6 +196,49 @@ public partial class MainWindow : Window, IDisposable
         Apply(new AddPlayer(Nickname: "", FullName: fullName, World: world));
     }
 
+    // ── Withdraw from round ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Pulls a player out of the round in progress and returns everything they put
+    /// in. Refunds the base bet plus any double/split top-ups (a doubled hand
+    /// carries its effective bet on <see cref="Hand.Bet"/>), drops any cards still
+    /// queued for them, then hands off to the engine.
+    /// </summary>
+    private void WithdrawPlayerFromRound(int pi)
+    {
+        if (pi < 0 || pi >= State.Players.Length) return;
+        var p = State.Players[pi];
+        if (p.SittingOut) return;
+
+        var refund = p.Hands
+            .Select(h => string.IsNullOrWhiteSpace(h.Bet) ? p.Bet : h.Bet)
+            .Sum(bet => (long)Math.Ceiling(GameEngine.ParseBet(bet)));
+
+        if (refund > 0 && p.TryGetStat(config, out var stat))
+        {
+            // Negative delta refunds - see BankBetAdjust.
+            ApplyBank(stat, new BankBetAdjust(-refund));
+            config.NarrationLog.Add(
+                $"[Audit] Withdrew {p.DisplayName} from the round: {refund:N0} gil refunded " +
+                $"(bank now {stat.Bank:N0}).");
+        }
+
+        PurgeAutoDealQueue(pi);
+        Apply(new WithdrawFromRound(pi));
+        config.Save();
+    }
+
+    // Drops any not-yet-dealt cards queued for a player who has left the round.
+    // An in-flight roll for them is harmless: AddPlayerCard no-ops on a sitting-out
+    // player, and the deal chain still advances to the next queue entry.
+    private void PurgeAutoDealQueue(int pi)
+    {
+        if (autoDealQueue.Count == 0) return;
+        var kept = autoDealQueue.Where(e => e.IsDealer || e.PlayerIndex != pi).ToList();
+        autoDealQueue.Clear();
+        foreach (var e in kept) autoDealQueue.Enqueue(e);
+    }
+
     // ── Pump ──────────────────────────────────────────────────────────────────
 
     /// <summary>

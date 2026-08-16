@@ -99,6 +99,11 @@ public static class GameEngine
 
         var activePlayers = state.ActivePlayers().ToList();
 
+        // Every player at the table withdrew or sat out mid-round: nothing left to
+        // resolve against, so the dealer never has to play. Mirrors IsAllBust in
+        // requiring a non-empty roster - an empty table is not a round to evaluate.
+        if (state.Players.Length > 0 && activePlayers.Count == 0) return true;
+
         if (AllHaveState(activePlayers, HandState.Blackjack))
             return DealerHoleCardRevealedOrSafe(state);
 
@@ -519,6 +524,7 @@ public static class GameEngine
         [typeof(AdjustBet)]            = (s, a, _) => HandleAdjustBet(s, (AdjustBet)a),
         [typeof(RenamePlayer)]         = (s, a, _) => HandleRenamePlayer(s, (RenamePlayer)a),
         [typeof(ToggleSittingOut)]     = (s, a, _) => HandleToggleSittingOut(s, (ToggleSittingOut)a),
+        [typeof(WithdrawFromRound)]    = (s, a, ctx) => HandleWithdrawFromRound(s, (WithdrawFromRound)a, ctx),
         [typeof(ReorderPlayers)]       = (s, a, _) => HandleReorderPlayers(s, (ReorderPlayers)a),
     };
 
@@ -1138,6 +1144,44 @@ public static class GameEngine
             ActiveHandIndex = nextHi,
             WaitingForNextPlayer = false,
         };
+    }
+
+    /// <summary>
+    /// Pulls a player out of the round in progress. Sitting-out players are
+    /// already skipped by turn advancement, both payout loops, the all-bust check
+    /// and <see cref="CanGoToPayout"/>, so discarding the hand and setting the flag
+    /// is enough to take them cleanly out of play. The caller refunds the bank.
+    /// </summary>
+    private static GameState HandleWithdrawFromRound(GameState state, WithdrawFromRound a, NarrationContext ctx)
+    {
+        var pi = a.PlayerIndex;
+        if (pi < 0 || pi >= state.Players.Length) return state;
+        if (state.Phase is not (GamePhase.Deal or GamePhase.PlayerTurns)) return state;
+
+        var p = state.Players[pi];
+        if (p.SittingOut) return state;
+
+        var newPlayers = WithPlayer(state.Players, pi,
+            p with { SittingOut = true, Bet = string.Empty, Hands = [new Hand()] });
+
+        ctx.Narrate(ctx.Templates.PlayerWithdraw, ("name", p.DisplayName));
+
+        // Deal phase: no active player yet, so nothing to advance past.
+        // PlayerTurns but not the active player: turn order is untouched.
+        if (state.Phase == GamePhase.Deal || pi != state.ActivePlayerIndex)
+            return state with { Players = newPlayers };
+
+        // The active player withdrew - advance exactly as if they had stood.
+        var (nextPi, nextHi, nextPhase) = AdvanceFrom(pi, state.ActiveHandIndex, newPlayers);
+        var advanced = state with { Players = newPlayers };
+
+        // Note AdvanceFrom can report Payout (every remaining hand settled, or
+        // everyone withdrew). Route that through AdvanceToDealerTurn anyway: it
+        // derives WaitingForDealer from CanGoToPayout, so the dealer still clicks
+        // "Go to Payout" and settlement/stat bookkeeping never gets skipped.
+        return nextPhase == GamePhase.PlayerTurns
+            ? AdvanceToPlayerTurns(advanced, ctx, nextPi, nextHi)
+            : AdvanceToDealerTurn(advanced, nextPi, nextHi);
     }
 
     private static GameState AdvanceToDealerTurn(GameState state, int nextPi, int nextHi)

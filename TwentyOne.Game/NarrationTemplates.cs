@@ -79,6 +79,11 @@ public class NarrationTemplates
         ["{name} surrenders this hand ;-;", "/comfort", "Sorry, those cards just weren't it~ Half your bet returns! ♥ <se.10>"],
     ];
 
+    // Withdraw - the dealer pulls a player out of the round mid-hand (cashing out
+    // right after the deal, or gone AFK / disconnected). Bet is refunded in full.
+    public List<List<string>> PlayerWithdraw { get; set; } =
+        [["{name} steps out of this round - bet returned. ♥"]];
+
     // Double down - sent when the card lands and the hand is auto-stood
     // {name} may include "(Hand N)" for split hands
     public List<List<string>> PlayerDouble { get; set; } = [["{name} doubles down -> {card} | {cards} = {score} - forced to stand <se.8>"]];

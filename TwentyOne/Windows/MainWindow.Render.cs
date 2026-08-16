@@ -915,6 +915,23 @@ public partial class MainWindow
                 if (!canSurrender) ImGui.EndDisabled();
             }
 
+            // Withdraw: pull a player out of a round already in progress (cashing
+            // out right after the deal, or gone AFK / disconnected). Rendered once
+            // per player, on their first hand row, so split players get one button.
+            if (ctx.IsFirstHand && Phase is GamePhase.Deal or GamePhase.PlayerTurns && !p.SittingOut)
+            {
+                ImGui.SameLine();
+                // Not undoable (the bank refund is append-only), so Ctrl-gate it the
+                // way the other destructive actions in this UI are gated.
+                var ctrlForOut = ImGui.GetIO().KeyCtrl;
+                if (!ctrlForOut) ImGui.BeginDisabled();
+                if (ImGui.SmallButton($"Out##{pi}withdraw"))
+                    WithdrawPlayerFromRound(pi);
+                if (!ctrlForOut) ImGui.EndDisabled();
+                if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip($"Withdraw {p.DisplayName} from this round - bet refunded, hand discarded.\nHold Ctrl to confirm.");
+            }
+
             if (ctx.IsFirstHand && !ctx.MultiHand)
             {
                 ImGui.SameLine();
@@ -2131,9 +2148,13 @@ public partial class MainWindow
         if (Phase != GamePhase.Payout && Phase != GamePhase.Betting)
         {
             ImGui.SameLine();
-            var ctrlHeld = ImGui.GetIO().KeyCtrl;
+            // In Deal nothing has been played yet: every bank op is refunded and
+            // NewRound preserves each player's bet, so aborting is cheap and fully
+            // recoverable - no Ctrl gate. From PlayerTurns on it destroys real play.
+            var isDeal   = Phase == GamePhase.Deal;
+            var ctrlHeld = isDeal || ImGui.GetIO().KeyCtrl;
             if (!ctrlHeld) ImGui.BeginDisabled();
-            if (ImGui.Button("Abort Round"))
+            if (ImGui.Button(isDeal ? "Abort Deal" : "Abort Round"))
             {
                 RefundRoundBankOps(); // return this round's bets/doubles/splits to player banks
                 config.NarrationLog.Add("Round aborted.");
@@ -2142,8 +2163,10 @@ public partial class MainWindow
                 Apply(new NewRound());
             }
             if (!ctrlHeld) ImGui.EndDisabled();
-            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !ctrlHeld)
-                ImGui.SetTooltip("Hold Ctrl to abort the round."u8);
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip(isDeal
+                    ? "Scrap this deal and return to betting. Every bet is refunded and kept for the re-deal."u8
+                    : "Hold Ctrl to abort the round."u8);
         }
 
     }

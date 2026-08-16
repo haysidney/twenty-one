@@ -326,6 +326,38 @@ An existing config mid-night upgrades to Open, which is correct.
 `SessionManager` (in `TwentyOne.Game/SessionManager.cs`) - pure static class:
 `CheckClose`, `ShouldShowSessionBanner`, `ResetGameStats`.
 
+### Withdraw from round / Abort
+
+Two ways out of a round in progress:
+
+- **Abort Deal / Abort Round** (phase action bar). Refunds every bank op of the
+  round (`RefundRoundBankOps`), clears the chat queue and pending roll, and runs
+  `NewRound` - which **preserves each player's `Bet`**, so a re-deal needs no
+  re-entry. In `Deal` it is labelled "Abort Deal" and needs no Ctrl (nothing has
+  been played; fully recoverable). From `PlayerTurns` on it stays Ctrl-gated.
+- **`WithdrawFromRound(pi)`** - pulls a single player out (cashed out right after
+  the deal, went AFK, disconnected) without disturbing anyone else. Sits them out,
+  discards their hand(s), clears their bet. `PushesUndo => false` for the same
+  reason as `AdjustBet`: the refund is an append-only bank entry, so a state-only
+  revert would resurrect a hand whose bet was already returned.
+  - `MainWindow.WithdrawPlayerFromRound` computes the refund as the sum over hands
+    of the effective bet (`Hand.Bet` when doubled, else `Player.Bet`, so splits and
+    doubles are covered), posts one `BankBetAdjust(-refund)`, writes an `[Audit]`
+    line, and calls `PurgeAutoDealQueue(pi)` to drop cards still queued for them.
+    An in-flight roll is harmless - `AddPlayerCard` no-ops on a sitting-out player
+    and the deal chain still advances.
+  - Works in `Deal` and `PlayerTurns` only. If the **active** player withdraws, the
+    engine advances exactly as if they had stood (`AdvanceToPlayerTurns` /
+    `AdvanceToDealerTurn`), so `WaitingForDealer` stays derived from
+    `CanGoToPayout` and the dealer never skips the "Go to Payout" click where
+    settlement runs.
+  - UI: Ctrl-gated "Out" button on the player's first hand row.
+
+`CanGoToPayout` gained an **everyone-withdrew** case: a non-empty roster with zero
+active players returns true (nothing left to resolve, so the dealer never has to
+play). The `Players.Length > 0` guard mirrors `IsAllBust` - an empty table is not a
+round to evaluate, and synthetic empty-roster states must keep behaving as before.
+
 ### Venue memory
 
 `Configuration.VenueMemory` maps housing address key (`"{territory}:{ward}:{plot}"`) to venue GUID. `Plugin.GetCurrentHousingAddressKey()` handles outdoor housing districts and indoor interiors. When deleting a venue, all `VenueMemory` entries referencing its GUID must be removed.
