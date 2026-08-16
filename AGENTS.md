@@ -428,8 +428,10 @@ Detected trades **auto-commit** to the player's bank - there is no per-trade
 confirm modal. `OnChatMessage`'s switch over `TradeMonitor.Outcome` calls the
 relevant `CommitTrade*` helper: `CommitTradeDeposit` (incoming -> `BankDeposit`),
 `CommitTradeWithdraw` (outgoing -> `BankWithdrawal`), `CommitTwoSided` (both legs).
-The special auto-helpers (`TryAutoDoubleOrSplitDeposit`, `TryAutoMaintainBet*`,
-`TryAutoCashOutWithdraw`) still get first refusal; the commit is the fall-through.
+The special auto-helpers (`TryAutoDoubleOrSplitDeposit`, `TryAutoMaintainBet*`)
+still get first refusal; the commit is the fall-through. (There is no "Cash Out"
+mode any more - it predated always-on wallet tracking and the reconciler, and an
+outgoing trade is simply a withdrawal. Orphan config key, cleaned on load.)
 
 Removing the prompt killed the prompt-overwrite money-loss bug (a second trade
 clobbering an unconfirmed first prompt) by construction. It is **safe only
