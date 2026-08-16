@@ -314,6 +314,10 @@ Archived sessions (`PlayerStatsSession`) are **not** stored in the main config J
   (memoization, split fixed-point) and a rule-by-rule cost table for adding
   new rule axes (S17, DAS toggle, HSA, RSA, peek, surrender, continuous
   payouts). Read before plumbing a new rule into `EdgeRules`.
+- `docs/releasing.md` - step-by-step release runbook (bump, gate, tag, cut the
+  GitHub release, bump `repo.json` in `haysidney/DalamudPlugins`). There is no
+  CI; every step is manual. Note the ordering rule: **cut the release before
+  touching the manifest**, or every install 404s until the asset exists.
 - `docs/troubleshooting/` - operational runbooks for plugin failures in the
   field (symptom -> root cause -> recovery -> prevention). Start at
   `docs/troubleshooting/README.md`. Notably
