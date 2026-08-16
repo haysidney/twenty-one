@@ -285,6 +285,30 @@ Archived sessions (`PlayerStatsSession`) are **not** stored in the main config J
 
 The two live views (Session Ledger, History > Rounds This Session) cache their `EdgeStats.Aggregate` result via `EdgeStatsCache` (in `TwentyOne/Windows/EdgeStatsCache.cs`). The cache is keyed on `(EdgeRules?, RoundHistory.Count, last RoundNumber)` so it invalidates on rules edit, new round, history clear, or venue switch. Without it, the solver re-runs every frame the window is open. Any new per-frame edge display should reuse this helper.
 
+### RoundStats (pure per-round stats derivation)
+
+`TwentyOne.Game/RoundStats.cs` - `PerPlayer(GameState) ->
+IReadOnlyList<PlayerRoundResult>` (counters: net, won/lost/pushed, blackjack,
+charlies) and `Classify(GameState) -> RoundClassification` (winner / loser /
+pusher display names). `Player.StatsKey()` lives here too.
+
+Extracted from `MainWindow.UpdatePlayerStats` and `HistoryWindow.ClassifyRound`,
+which had drifted apart on who counts as being in the round. `PlayedThisRound`
+is the single rule: not sitting out **and** holding cards - which also excludes a
+player withdrawn mid-round.
+
+**Bug this fixed:** `ClassifyRound` did not skip sitting-out players. An empty
+hand yields `PayoutResult.None`, which matched none of its win/lose/push arms and
+fell through to `else -> losers`, so every sat-out player was listed as losing
+that round in History. (This is the standing `ToDo.txt` question about sat-out
+players in statistics - answered: yes, it was real.) `Classify` also now counts
+`Surrender` as a loss rather than letting it fall through.
+
+Note the two views legitimately disagree on one case, and this is intended: a
+split with one winning and one losing hand nets to zero, so the **counters** call
+it a push while the **History classifier** shows a win, which is what a dealer
+scanning the round list expects. `RoundStatsTests` pins both.
+
 ### Sessions (explicit open/close lifecycle)
 
 Two states, and "no session yet" is just Closed with no data:

@@ -580,34 +580,26 @@ public partial class MainWindow : Window, IDisposable
                 prePayoutBanks[k] = st.Bank;
         }
 
-        for (var pi = 0; pi < state.Players.Length; pi++)
+        // Counting rules live in RoundStats (pure, unit-tested) so this window and
+        // the History view can't drift apart on who counts as a loser.
+        foreach (var r in RoundStats.PerPlayer(state))
         {
-            var p   = state.Players[pi];
-            if (p.SittingOut) continue;
-            var key = p.StatsKey();
-            if (!config.PlayerStatsStore.TryGetValue(key, out var stat))
+            if (!config.PlayerStatsStore.TryGetValue(r.StatsKey, out var stat))
             {
-                stat = new PlayerStat { DisplayName = p.DisplayName };
-                config.PlayerStatsStore[key] = stat;
+                stat = new PlayerStat { DisplayName = r.DisplayName };
+                config.PlayerStatsStore[r.StatsKey] = stat;
             }
-            stat.DisplayName = p.DisplayName; // refresh in case nickname changed
-
-            var net = 0m;
-            for (var hi = 0; hi < p.Hands.Length; hi++)
-                net += GameEngine.PayoutDelta(state, pi, hi) ?? 0m;
+            stat.DisplayName = r.DisplayName; // refresh in case nickname changed
 
             stat.GamesPlayed++;
-            if      (net > 0) stat.GamesWon++;
-            else if (net < 0) stat.GamesLost++;
-            else               stat.GamesPushed++;
-            stat.TotalNet += (long)net;
-            if (p.Hands.Any(h => h.State == HandState.Blackjack))
-                stat.Blackjacks++;
-            for (var chi = 0; chi < p.Hands.Length; chi++)
-                if (GameEngine.GetPayoutResult(state, pi, chi) == PayoutResult.CharlieWin)
-                    stat.Charlies++;
+            if      (r.Won)  stat.GamesWon++;
+            else if (r.Lost) stat.GamesLost++;
+            else             stat.GamesPushed++;
+            stat.TotalNet  += (long)r.Net;
+            if (r.HadBlackjack) stat.Blackjacks++;
+            stat.Charlies  += r.Charlies;
 
-            bankNet -= net; // bank gains when player loses
+            bankNet -= r.Net; // bank gains when player loses
         }
 
         // Auto-settle player banks and snapshot balances after settlement

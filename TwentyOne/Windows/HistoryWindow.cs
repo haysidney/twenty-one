@@ -416,27 +416,12 @@ public class HistoryWindow : Window
     // Splits a round's players into (winners, losers, pushes) by inspecting each
     // hand's PayoutResult. A player with any winning hand counts as a winner
     // unless they also had a loss, in which case they're a winner-with-mixed.
-    private static (List<string> Winners, List<string> Losers, List<string> Pushes) ClassifyRound(GameState state)
+    // Delegates to the shared, unit-tested classifier so the History view and the
+    // stats counters agree on who played and who lost.
+    private static (IReadOnlyList<string> Winners, IReadOnlyList<string> Losers, IReadOnlyList<string> Pushes) ClassifyRound(GameState state)
     {
-        var winners = new List<string>();
-        var losers  = new List<string>();
-        var pushes  = new List<string>();
-        for (var pi = 0; pi < state.Players.Length; pi++)
-        {
-            var p       = state.Players[pi];
-            var results = Enumerable.Range(0, p.Hands.Length)
-                .Select(hi => GameEngine.GetPayoutResult(state, pi, hi))
-                .ToList();
-            var anyWin  = results.Any(r => r is PayoutResult.Win or PayoutResult.BjWin or PayoutResult.CharlieWin);
-            var anyLose = results.Any(r => r == PayoutResult.Lose);
-            var allPush = results.All(r => r == PayoutResult.Push);
-            if      (anyWin && !anyLose) winners.Add(p.DisplayName);
-            else if (anyLose && !anyWin) losers.Add(p.DisplayName);
-            else if (allPush)            pushes.Add(p.DisplayName);
-            else if (anyWin)             winners.Add(p.DisplayName);
-            else                         losers.Add(p.DisplayName);
-        }
-        return (winners, losers, pushes);
+        var c = RoundStats.Classify(state);
+        return (c.Winners, c.Losers, c.Pushes);
     }
 
     private static void DrawNetCell(long net)

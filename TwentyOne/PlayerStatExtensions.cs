@@ -10,13 +10,8 @@ namespace TwentyOne;
 /// </summary>
 internal static class PlayerStatExtensions
 {
-    /// <summary>
-    /// Stable identity key used by <see cref="Configuration.PlayerStatsStore"/>:
-    /// <c>"FullName@World"</c> for FFXIV characters, the nickname for manually
-    /// added players.
-    /// </summary>
-    public static string StatsKey(this Player p) =>
-        p.FullName.Length > 0 ? $"{p.FullName}@{p.World}" : p.Nickname;
+    // StatsKey moved to TwentyOne.Game (RoundStats) so the pure stats derivation
+    // can key its results; it is still in scope here via `using TwentyOne.Game`.
 
     /// <summary>
     /// Look up the player's stats, if any. Mirrors <see cref="System.Collections.Generic.Dictionary{TKey, TValue}.TryGetValue"/>.
