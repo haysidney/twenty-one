@@ -31,6 +31,10 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
 
     private readonly EdgeStatsCache _edgeCache = new();
 
+    // Order must match the LossCoverage enum.
+    private static readonly string[] LossCoverageLabels =
+        ["Venue covers the loss", "Venue covers its cut %", "You absorb the loss"];
+
     public void SetHistoryWindow(HistoryWindow w) => _historyWindow = w;
 
     public SessionLedgerWindow(Configuration config)
@@ -112,6 +116,25 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             config.VenueCutPct = Math.Clamp(cut, 0, 100);
             config.Save();
         }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("The venue's share of the table's winnings."u8);
+
+        // Losing nights are a venue-policy question - wins split by the cut, but
+        // who eats a loss is an arrangement between dealer and venue.
+        ImGui.AlignTextToFramePadding(); ImGui.Text("On a losing night"); ImGui.SameLine();
+        ImGui.SetNextItemWidth(220);
+        var lossIdx = (int)config.LossCoverage;
+        if (ImGui.Combo("##losscoverage", ref lossIdx, LossCoverageLabels, LossCoverageLabels.Length))
+        {
+            config.LossCoverage = (LossCoverage)lossIdx;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(
+                "How a losing night is split.\n\n" +
+                "Venue covers the loss - you walk away whole.\n" +
+                $"Venue covers its {config.VenueCutPct}% - the loss splits the way a win would.\n" +
+                "You absorb the loss - the venue pays nothing back.");
 
         ImGui.Separator();
         ImGui.Text("Tips");
@@ -232,7 +255,9 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         {
             ImGui.Text("Credits issued:"); ImGui.SameLine(130); ImGui.Text($"{creditIssued:N0} gil");
         }
-        ImGui.Text("Adjusted:");         ImGui.SameLine(130); ColoredGilText(adjustedDiff);
+        // This is the same figure the settlement block below calls "Table net" -
+        // shown here because it is the left side of the books-balance check.
+        ImGui.Text("Table net:");         ImGui.SameLine(130); ColoredGilText(adjustedDiff);
         ImGui.SameLine(0, 20);
         ImGui.Text("Player Net:"); ImGui.SameLine();
         ColoredGilText(grandTotal);
@@ -250,16 +275,15 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
             ImGui.PopStyleColor();
         }
 
-        var profit      = difference - betsHeld - banksHeld - tipTotal - serviceTotal;
-        var venueOwes   = profit > 0 ? (long)Math.Floor(profit * config.VenueCutPct / 100.0) : 0;
-        var dealerKeeps = profit > 0 ? profit - venueOwes + tipTotal : tipTotal;
-        venueOwes   += serviceToVenueTotal;
-        dealerKeeps += serviceToDealerTotal;
-        ImGui.Separator();
-        CopyableGilRow("Profit", profit);
-        ImGui.Separator();
-        CopyableGilRow("Dealer receives", dealerKeeps);
-        CopyableGilRow("Venue receives", venueOwes);
+        DrawSettlement(
+            Settlement.Compute(
+                tableNet:        adjustedDiff,
+                tips:            tipTotal,
+                serviceToDealer: serviceToDealerTotal,
+                serviceToVenue:  serviceToVenueTotal,
+                venueCutPct:     config.VenueCutPct,
+                lossCoverage:    config.LossCoverage),
+            creditIssued);
 
         ImGui.Separator();
 
@@ -570,6 +594,107 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         config.Save();
     }
 
+    /// <summary>
+    /// End-of-night settlement block. The dealer already physically holds every
+    /// gil on this screen, so the only thing they actually <em>do</em> is one
+    /// trade with the venue - which is why the headline is a single signed
+    /// transfer with an explicit direction, not a pair of "receives" figures the
+    /// dealer has to subtract in their head.
+    /// </summary>
+    private void DrawSettlement(Settlement s, long creditIssued)
+    {
+        const float col = 170f;
+
+        ImGui.Separator();
+        ImGui.TextUnformatted("Settlement");
+
+        // Section 1: everything sitting in the dealer's pile tonight.
+        SettlementRow("Table net", s.TableNet, col,
+            "What the table won or lost against the players.\nBets in play, player banks, tips and service charges are already out of this.");
+
+        if (s.Tips != 0)
+            SettlementRow("Tips", s.Tips, col, "Tips are never split - they pass straight to your take.");
+        if (s.ServiceToDealer != 0)
+            SettlementRow("Service (to you)", s.ServiceToDealer, col, "Service charges routed to the dealer.");
+        if (s.ServiceToVenue != 0)
+            SettlementRow("Service (to venue)", s.ServiceToVenue, col, "Service charges routed to the venue.\nDeducted again below - it is collected by you but owed onward.");
+
+        // Credit moves no real gil when issued, so it is not a settlement line -
+        // it reaches the books only through gil that actually left the pile,
+        // which Table net already measures. Informational only.
+        if (creditIssued > 0)
+        {
+            ImGui.TextDisabled("Credits issued");
+            ImGui.SameLine(col);
+            ImGui.TextDisabled($"{creditIssued:N0} gil");
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip(
+                    "Venue-funded free play, for reference.\n\n" +
+                    "Not settled separately: credit the player lost back never left your pile,\n" +
+                    "and credit they cashed out is already in Table net as a real loss.");
+        }
+
+        ImGui.Separator();
+
+        // Section 2: what leaves the pile for the venue. Rendered negated, so a
+        // deduction reads red/negative rather than as a gain the dealer pockets.
+        var cutLabel = s.TableNet < 0 ? $"Venue covers ({config.VenueCutPct}%)" : $"Venue cut ({config.VenueCutPct}%)";
+        SettlementRow(cutLabel, -s.VenueShare, col,
+            s.TableNet < 0
+                ? "The venue's share of tonight's loss, per the loss-coverage setting.\nPositive here means the venue is paying you back."
+                : "The venue's share of the table's winnings.");
+        if (s.ServiceToVenue != 0)
+            SettlementRow("Service to venue", -s.ServiceToVenue, col, "Venue-routed service charges, owed on top of the cut.");
+
+        ImGui.Separator();
+
+        // Headline: one direction, one amount, click to copy into a trade window.
+        string transferLabel;
+        Vector4 transferColor;
+        if (s.NetTransfer > 0)
+        {
+            transferLabel = "Pay venue";
+            transferColor = GameColors.BannerGold;
+        }
+        else if (s.NetTransfer < 0)
+        {
+            transferLabel = "Collect from venue";
+            transferColor = GameColors.ProfitGreen;
+        }
+        else
+        {
+            transferLabel = "Nothing to settle";
+            transferColor = GameColors.PushGrey;
+        }
+
+        ImGui.TextColored(transferColor, transferLabel);
+        ImGui.SameLine(col);
+        ImGui.TextColored(transferColor, $"{s.TransferAmount:N0} gil");
+        if (ImGui.IsItemClicked()) ImGui.SetClipboardText(s.TransferAmount.ToString());
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(s.NetTransfer >= 0
+                ? "Trade this much to the venue. Click to copy."u8
+                : "The venue owes you this much. Click to copy."u8);
+
+        SettlementRow("Your take", s.DealerTake, col,
+            "What you are left with after settling up, tips included.");
+    }
+
+    // Settlement figures get typed into a trade window, so they print in full
+    // (250,000) rather than through GameEngine.FormatGil's abbreviation (250K).
+    private static void SettlementRow(string label, long value, float col, string tooltip)
+    {
+        ImGui.TextUnformatted(label);
+        ImGui.SameLine(col);
+        Vector4 color;
+        if (value > 0)      color = GameColors.ProfitGreen;
+        else if (value < 0) color = GameColors.BustRed;
+        else                color = GameColors.PushGrey;
+        ImGui.TextColored(color, value > 0 ? $"+{value:N0} gil" : $"{value:N0} gil");
+        if (ImGui.IsItemClicked()) ImGui.SetClipboardText(value.ToString());
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip($"{tooltip}\n\nClick to copy.");
+    }
+
     private static void ColoredGilText(long value)
     {
         Vector4 color;
@@ -707,13 +832,6 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
                           .Where(e => e.Kind == BankTransactionKind.Credit)
                           .Sum(e => e.Amount),
         GrandTotal:   config.PlayerStatsStore.Values.Sum(s => s.TotalNet));
-
-    private static void CopyableGilRow(string label, long value)
-    {
-        ImGui.Text($"{label}: {value:N0} gil");
-        if (ImGui.IsItemClicked()) ImGui.SetClipboardText(value.ToString());
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Click to copy"u8);
-    }
 
     private string BuildExportText()
     {

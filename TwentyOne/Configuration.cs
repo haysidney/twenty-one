@@ -110,6 +110,11 @@ public class VenueSettings
     public long       GilStart          { get; set; } = 0;
     public long       GilEnd            { get; set; } = 0;
     public int        VenueCutPct { get; set; } = 70;
+    // What the venue does with a losing night. Wins always split by VenueCutPct;
+    // losses are venue policy, since the dealer is the one holding (and short)
+    // the gil. Default matches the common arrangement where the venue banks the
+    // table and the dealer walks away whole.
+    public LossCoverage LossCoverage { get; set; } = LossCoverage.VenueCoversAll;
     public List<long> Tips         { get; set; } = [];
 
     // Side revenue (VIP memberships, table service, etc.) recorded separately
@@ -236,6 +241,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public long   GilStart                   { get => ActiveVenue.GilStart;                   set => ActiveVenue.GilStart = value; }
     [JsonIgnore] public long   GilEnd                     { get => ActiveVenue.GilEnd;                     set => ActiveVenue.GilEnd = value; }
     [JsonIgnore] public int    VenueCutPct                { get => ActiveVenue.VenueCutPct;                set => ActiveVenue.VenueCutPct = value; }
+    [JsonIgnore] public LossCoverage LossCoverage         { get => ActiveVenue.LossCoverage;               set => ActiveVenue.LossCoverage = value; }
     [JsonIgnore] public List<long> Tips                   { get => ActiveVenue.Tips;                       set => ActiveVenue.Tips = value; }
     [JsonIgnore] public List<ServiceCharge> ServiceCharges { get => ActiveVenue.ServiceCharges;            set => ActiveVenue.ServiceCharges = value; }
     [JsonIgnore] public Dictionary<string, PlayerStat> PlayerStatsStore { get => ActiveVenue.PlayerStatsStore; set => ActiveVenue.PlayerStatsStore = value; }

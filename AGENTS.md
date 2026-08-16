@@ -133,7 +133,7 @@ attributes "work in tests but not in-game".
 - Bank mutations are intentionally outside `GameState` and the undo stack - they represent real-money ledger entries.
 - Double/split bank deduction happens at **Confirm** time (not at Dbl/Spl button click).
 - `BankBetAdjust` carries a **signed** `Delta`: positive deducts (bet went up), negative refunds (bet went down). The stored `BankTransactionEntry.Amount` keeps the sign so the audit log shows direction.
-- `BankCredit` is a venue-funded deposit (VIP / free play). Conceptually the venue pre-loads the dealer's starting gil with a credit pool; "issuing credit" relabels that gil into the player's bank without any physical trade. The bank ledger treats it like a deposit (real balance goes up). The session-ledger reconciliation includes `creditIssued` (sum of `BankCredit` entries this session) in the balance check: `adjustedDiff + grandTotal + creditIssued == 0`. The "Credits issued" line appears in the ledger for venue settlement reporting - the venue covers this cost out-of-band (e.g., off their cut).
+- `BankCredit` is a venue-funded deposit (VIP / free play). Conceptually the venue pre-loads the dealer's starting gil with a credit pool; "issuing credit" relabels that gil into the player's bank without any physical trade. The bank ledger treats it like a deposit (real balance goes up). The session-ledger reconciliation includes `creditIssued` (sum of `BankCredit` entries this session) in the balance check: `adjustedDiff + grandTotal + creditIssued == 0`. The "Credits issued" line appears in the ledger for reference. **Credit gets no settlement line of its own, and adding one is a mistake** - see the Settlement section. This is the model from `25148d7`: the venue pre-loads the dealer's gil, so issuing credit only relabels gil that the venue already funded, and that funding is already inside `GilStart`.
 
 ### GameEngine (pure functional core)
 
@@ -226,6 +226,65 @@ Records (`GameState`, `Player`, `Hand`) are deliberately excluded: extension dat
 - **Migrations operate on raw `JObject`, not the typed `Configuration`.** This lets a migration handle fields that no longer exist as CLR properties.
 - **Idempotency:** writing the new version into the JObject at the end of each step guarantees a re-run from any partial state still converges.
 - **`$type` markers** (from Newtonsoft's `TypeNameHandling`) are recognized by the serializer and consumed before extension-data capture - they should not appear in `ExtraData`. If you see one, suspect a serializer setting drift.
+
+### Settlement (end-of-night dealer/venue split)
+
+`TwentyOne.Game/Settlement.cs` - pure, Dalamud-free, unit-tested
+(`SettlementTests`). `Settlement.Compute(tableNet, tips, serviceToDealer,
+serviceToVenue, venueCutPct, lossCoverage) -> Settlement`.
+
+The framing that drives the whole design: **the dealer already physically holds
+every gil in the ledger.** Nobody "receives" anything - the night ends with one
+trade. So the headline is a single signed `NetTransfer` (>0 dealer pays venue,
+<0 venue pays dealer) with `TransferAmount` / `DealerPaysVenue` for display, plus
+`DealerTake` for what the dealer walks away with.
+
+This replaced a pair of "Dealer receives" / "Venue receives" rows that the dealer
+had to subtract in their head, and which had **no losing-night answer at all** -
+the old ternaries collapsed to `venueOwes = 0, dealerKeeps = tips` whenever
+profit was negative, so a loss silently vanished off screen.
+
+- `tableNet` is the ledger's `Reconciliation.AdjustedDiff` - the reconciliation
+  block now labels that row "Table net" instead of "Adjusted", and the old
+  duplicate "Profit" row is gone (it was the identical expression, displayed
+  twice under two names).
+- **Tips never enter the split.** They pass straight through to `DealerTake`.
+  (The old code subtracted them out of profit and added them back into
+  "Dealer receives", netting correct but making that figure an unlabelled mix of
+  cut share + tips + service.)
+- **Rounding always favours the dealer**: `Math.Floor` on the venue's slice of a
+  win, `Math.Ceiling` on the magnitude of its slice of a loss.
+- `LossCoverage` (venue setting, default `VenueCoversAll`) decides who eats a
+  losing night: venue covers all (dealer walks away whole), venue covers its cut
+  %, or dealer absorbs it (the old hardcoded behavior). Additive field with a
+  default, so **no schema migration**. Note the default *changes* behavior for
+  existing configs - intentional, it is the arrangement where the venue banks the
+  table.
+- **Credit is deliberately absent from `Compute`, and a reimbursement line is a
+  double-pay bug.** This is counterintuitive enough to be worth re-deriving
+  before anyone "fixes" it. Issuing credit moves no real gil, and
+  `SessionManager.CheckClose` forbids closing with player banks outstanding, so
+  by settlement time every credit has resolved into exactly one of two cases:
+  - **Lost back** - the gil never left the pile, `tableNet` is unaffected, and
+    there is genuinely nothing to settle.
+  - **Cashed out** - real gil left the pile, so it is already in `tableNet` as an
+    ordinary loss and `LossCoverage` handles it. Under the default
+    `VenueCoversAll` this makes the dealer whole by itself.
+
+  Both hold whether the credit came from a venue pre-load or the dealer's own
+  pocket. Since `GilStart` is polled from the live wallet, a pre-loaded pool is
+  already inside it - paying `creditIssued` again at settlement would hand the
+  dealer the venue's own money a second time. `SettlementTests` pins both cases.
+  - Note the mid-session transient: with credit outstanding, `banksHeld` rises
+    with no matching gil, so `tableNet` dips by that amount. It is never the
+    settlement figure precisely because `CheckClose` gates on banks being zero.
+  - The `creditIssued` term in the reconciliation identity is a *bookkeeping*
+    artifact (it balances the phantom bank inflation), **not** a debt owed.
+- The venue-side rows render **negated** (`-s.VenueShare`), so a deduction reads
+  red rather than as a gain the dealer pockets.
+- Settlement figures print in full (`250,000`), *not* through
+  `GameEngine.FormatGil`, which abbreviates to `250K` - these numbers get typed
+  into a trade window.
 
 ### Session persistence
 
