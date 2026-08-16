@@ -420,6 +420,22 @@ vanish from the ledger.
   no migration - the version-gated `ExtensionDataCleaner` drops the orphan key on
   load. `AutoDepositFromTrades` alone gates trade detection.
 
+### ChatRouting (pure outgoing-line shaping)
+
+`TwentyOne.Game/ChatRouting.cs` - `Resolve(text, configChannel, crossChannel) ->
+OutgoingChat { Message, MinWaitBeforeMs, MinWaitAfterMs, IsSlashRateLimited }`.
+Strips `<wait.N>` markers and resolves cross-channel slash commands (Block ->
+`/echo`, Redirect -> the configured channel, Allow -> untouched). Extracted from
+`ChatQueue` for the same reason as `TradeRouting`: the plugin project is
+unreachable from tests, and this is the branchy part that decides what gets
+broadcast where. `ChatQueue.EnqueueChat` now just calls it and queues the result;
+cooldown/pacing policy stays in `ChatQueue`. Covered by `ChatRoutingTests`.
+
+A **bare channel command** (`/y` with no body) is dropped rather than rewritten -
+it carries nothing to redirect and sending it would silently switch the dealer's
+active chat channel. It also used to throw `IndexOutOfRangeException` on the body
+split, which would have killed the chat pump mid-round.
+
 ### TradeRouting (pure trade -> ledger decision)
 
 `TwentyOne.Game/TradeRouting.cs` - `Resolve(long gaveGil, long receivedGil) ->

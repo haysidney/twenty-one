@@ -79,9 +79,6 @@ public class VenueSettings
     // not used for migration logic.
     public string LastModifiedPluginVersion { get; set; } = string.Empty;
 
-    // ── Narration ──────────────────────────────────────────────────────────────
-    public bool NarrationUseChannelCommand { get; set; } = false;
-
     // ── Trade ──────────────────────────────────────────────────────────────────
     public bool AutoTradeEnabled       { get; set; } = true;
     public bool AutoDepositFromTrades  { get; set; } = true;
@@ -223,7 +220,6 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public VenueSettings ActiveVenue => Venues[ActiveVenueIndex];
 
     // ── Proxy properties (delegate to ActiveVenue, not serialized) ────────────
-    [JsonIgnore] public bool   NarrationUseChannelCommand { get => ActiveVenue.NarrationUseChannelCommand; set => ActiveVenue.NarrationUseChannelCommand = value; }
     [JsonIgnore] public bool   AutoTradeEnabled           { get => ActiveVenue.AutoTradeEnabled;            set => ActiveVenue.AutoTradeEnabled = value; }
     [JsonIgnore] public bool   AutoDepositFromTrades      { get => ActiveVenue.AutoDepositFromTrades;       set => ActiveVenue.AutoDepositFromTrades = value; }
     [JsonIgnore] public bool   AutoBeginPlayerTurns       { get => ActiveVenue.AutoBeginPlayerTurns;       set => ActiveVenue.AutoBeginPlayerTurns = value; }

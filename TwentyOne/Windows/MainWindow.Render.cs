@@ -2156,37 +2156,30 @@ public partial class MainWindow
 
     }
 
+    // Collapsed by default: the log is a diagnostic tail, not something the dealer
+    // reads every round, and it competes with the table for vertical space.
     private void DrawNarrationPanel()
     {
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
-        ImGui.Text("Chat Narration");
-        ImGui.Separator();
-        var narUseCmd = config.NarrationUseChannelCommand;
-        if (ImGui.Checkbox("Add channel command", ref narUseCmd))
-        {
-            config.NarrationUseChannelCommand = narUseCmd;
-            config.Save();
-        }
+        var open = ImGui.CollapsingHeader($"Chat Narration ({config.NarrationLog.Count})##narHeader");
+        if (!open) return;
 
-        ImGui.SameLine();
         if (config.NarrationLog.Count == 0) ImGui.BeginDisabled();
-        if (ImGui.Button("Copy All"))
+        if (ImGui.SmallButton("Copy All"))
         {
             var sb = new StringBuilder();
             foreach (var line in config.NarrationLog)
             {
                 if (sb.Length > 0) sb.Append('\n');
-                sb.Append(config.NarrationUseChannelCommand
-                    ? config.ChatChannel + " " + line
-                    : line);
+                sb.Append(line);
             }
             ImGui.SetClipboardText(sb.ToString());
         }
         ImGui.SameLine();
-        if (ImGui.Button("Clear")) { config.NarrationLog.Clear(); config.Save(); }
+        if (ImGui.SmallButton("Clear")) { config.NarrationLog.Clear(); config.Save(); }
         if (config.NarrationLog.Count == 0) ImGui.EndDisabled();
 
         ImGui.Spacing();
@@ -2194,16 +2187,13 @@ public partial class MainWindow
         {
             for (var ni = 0; ni < config.NarrationLog.Count; ni++)
             {
-                var line    = config.NarrationLog[ni];
-                var display = config.NarrationUseChannelCommand
-                    ? config.ChatChannel + " " + line
-                    : line;
+                var line = config.NarrationLog[ni];
                 ImGui.PushID(ni);
-                if (ImGui.SmallButton("Copy")) ImGui.SetClipboardText(display);
+                if (ImGui.SmallButton("Copy")) ImGui.SetClipboardText(line);
                 if (ImGui.IsItemHovered()) ImGui.SetTooltip("Copy to clipboard"u8);
                 ImGui.PopID();
                 ImGui.SameLine();
-                ImGui.TextUnformatted(display);
+                ImGui.TextUnformatted(line);
             }
             if (ImGui.GetScrollY() >= ImGui.GetScrollMaxY())
                 ImGui.SetScrollHereY(1.0f);
