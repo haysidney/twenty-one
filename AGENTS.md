@@ -388,6 +388,13 @@ and left an arriving `/random` result stuck in `deferredRoll` until the dealer
 expanded the window. (This was a real, long-lived bug - collapsing the window mid-round
 silently froze the table.)
 
+`TryAutoBeginPlayerTurns` (venue setting `AutoBeginPlayerTurns`, default off) is
+also driven from the pump: once the deal is complete and the deal queue, chat
+queue, pending roll and deferred roll have all drained, it fires `BeginPlayerTurns`
+so the dealer need not click through. Waiting for the queue to empty keeps the deal
+summary ahead of the first player's prompt. Suppressed while a scenario is active -
+scenarios script their own `BeginPlayerTurns` step.
+
 `MainWindow.paused` is the dealer-facing hold that replaces collapse-as-pause:
 `Pump()` returns early while set, so queued narration stays queued and the deal
 queue stops advancing, while table buttons stay clickable and their narration
@@ -593,6 +600,16 @@ Use only these player names in test cases: Lorah, Bekki, Nolla. If more than 3 n
 - `TwentyOne.Tests/SessionTests.cs` - unit tests for `SessionManager`: banner logic, archive building, stat reset, auto-session tracking.
 - `TwentyOne.Tests/Helpers/GameStateBuilder.cs` - fluent builder for assembling `GameState` in tests. Supports `.Phase()`, `.Dealer()`, `.Player()`, `.ActiveHand()`, `.Charlie()`, `.BjPayout()`, `.DealerStandsOnSoft17()`, `.WaitingForNextPlayer()`, `.WaitingForDealer()`, `.SkipDealSummaryOnePlayer()`, `.LastRoundWinners()`, `.LastRoundPushers()`. Use the `Player(Player)` overload for complex cases (split hands, sitting out, doubled hands).
 - `Scenarios/*.json` - human-replay integration tests. Loaded via DebugWindow in-game. Test the full stack: `MainWindow` orchestration (autoDealQueue deal sequence, deferred rolls, `AutoHit` side effects, button gating). Cannot be automated without replicating `MainWindow` logic separately, which creates a divergence risk. Run manually by loading and stepping/fast-forwarding in-game.
+
+### Turn prompts
+
+`PlayerTurnStart` is sent **both** when a player's turn begins and after each hit
+that leaves the hand Playing. It used to be two templates (`PlayerTurnStart` /
+`PlayerAfterHit`) that were functionally identical except that only the
+start-of-turn one mentioned the dealer - so a player who hit three times saw the
+upcard once. `PlayerAfterHit` is gone (orphan key, no migration) and the default
+wording reads naturally in both positions. Accepted tradeoff: the table loses the
+"a new player is up" cue the old "{name}'s turn:" phrasing gave.
 
 ## Narration Templates
 

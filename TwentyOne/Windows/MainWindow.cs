@@ -269,6 +269,10 @@ public partial class MainWindow : Window, IDisposable
         if (Scenario.ActiveScenario?.PeekNext() == null) Scenario.FastForward = false;
 #endif
 
+        // Runs before the deferred-roll early-return: the deal's last card resolves
+        // on one tick, and this fires a few ticks later once its narration drains.
+        TryAutoBeginPlayerTurns();
+
         // Process deferred roll from OnChatMessage
         if (!deferredRoll.HasValue) return;
 
@@ -289,6 +293,29 @@ public partial class MainWindow : Window, IDisposable
             Apply(new AnnouncePlayerDeal(next.PlayerIndex));
         }
         QueueHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
+    }
+
+    /// <summary>
+    /// Optional convenience: fire BeginPlayerTurns as soon as the deal is complete
+    /// and its narration has drained, so the dealer need not click through. Waiting
+    /// for the queue to empty keeps the deal summary ahead of the first player's
+    /// prompt, and keeps the roll/chat pacing intact.
+    /// </summary>
+    private void TryAutoBeginPlayerTurns()
+    {
+        if (!config.AutoBeginPlayerTurns)   return;
+        if (Phase != GamePhase.Deal)        return;
+        if (autoDealQueue.Count > 0)        return;
+        if (chatQueue.Count > 0)            return;
+        if (pendingHit != null)             return;
+        if (deferredRoll.HasValue)          return;
+        if (!GameEngine.IsDealComplete(State)) return;
+#if DEBUG
+        // A scenario scripts its own BeginPlayerTurns step; auto-firing here would
+        // desync the expected action sequence.
+        if (Scenario.ActiveScenario != null) return;
+#endif
+        Apply(new BeginPlayerTurns());
     }
 
     // ── Apply / Undo ──────────────────────────────────────────────────────────

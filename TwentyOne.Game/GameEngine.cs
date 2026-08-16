@@ -704,11 +704,17 @@ public static class GameEngine
             {
                 var cd2 = CanDouble(newHand, state.Players[pi].Bet, state.DoubleAfterSplit, state.DoubleRestriction);
                 var cs2 = CanSplit(newHand, state.Players[pi], state.ResplitAces, state.ResplitCap);
-                ctx.Narrate(t.PlayerAfterHit,
-                    ("name",    displayName),
-                    ("cards",   cards),
-                    ("score",   score),
-                    ("actions", ValidActionsString(newHand, cd2, cs2)));
+                // Same template as the start-of-turn prompt: the two were
+                // functionally identical except that only the start-of-turn one
+                // showed the dealer's card, so a player who hit three times saw
+                // the upcard once.
+                ctx.Narrate(t.PlayerTurnStart,
+                    ("name",        displayName),
+                    ("cards",       cards),
+                    ("score",       score),
+                    ("dealerCards", HandString(state.DealerHand.Cards)),
+                    ("dealerScore", ScoreString(state.DealerHand.Cards)),
+                    ("actions",     ValidActionsString(newHand, cd2, cs2)));
             }
             else if (newHand.State == HandState.Stand)
             {

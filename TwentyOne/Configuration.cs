@@ -86,6 +86,11 @@ public class VenueSettings
     public bool AutoTradeEnabled       { get; set; } = true;
     public bool AutoDepositFromTrades  { get; set; } = true;
 
+    // When true, the dealer does not have to click "Begin Player Turns" - once the
+    // deal finishes and its narration has drained, the first player is prompted
+    // automatically.
+    public bool AutoBeginPlayerTurns { get; set; } = false;
+
     // ── Targeting ──────────────────────────────────────────────────────────────
     public bool AutoTargetEnabled   { get; set; } = true;
     public bool RemindTargetEnabled { get; set; } = true;
@@ -221,6 +226,7 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public bool   NarrationUseChannelCommand { get => ActiveVenue.NarrationUseChannelCommand; set => ActiveVenue.NarrationUseChannelCommand = value; }
     [JsonIgnore] public bool   AutoTradeEnabled           { get => ActiveVenue.AutoTradeEnabled;            set => ActiveVenue.AutoTradeEnabled = value; }
     [JsonIgnore] public bool   AutoDepositFromTrades      { get => ActiveVenue.AutoDepositFromTrades;       set => ActiveVenue.AutoDepositFromTrades = value; }
+    [JsonIgnore] public bool   AutoBeginPlayerTurns       { get => ActiveVenue.AutoBeginPlayerTurns;       set => ActiveVenue.AutoBeginPlayerTurns = value; }
     [JsonIgnore] public bool   AutoTargetEnabled          { get => ActiveVenue.AutoTargetEnabled;           set => ActiveVenue.AutoTargetEnabled = value; }
     [JsonIgnore] public bool   RemindTargetEnabled        { get => ActiveVenue.RemindTargetEnabled;         set => ActiveVenue.RemindTargetEnabled = value; }
     [JsonIgnore] public bool   ChatEnabled                { get => ActiveVenue.ChatEnabled;                 set => ActiveVenue.ChatEnabled = value; }

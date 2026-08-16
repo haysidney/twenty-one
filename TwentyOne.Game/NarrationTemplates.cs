@@ -54,10 +54,10 @@ public class NarrationTemplates
         ["Card incoming for {name}! ♠ <se.3>",                 "/battlestance"],
         ["Drawing for {name}!~ <se.3>",                        "/battlestance"],
     ];
-    public List<List<string>> PlayerTurnStart   { get; set; } = [["{name}'s turn: {cards} ({score}) - Dealer has {dealerScore}. {actions} <se.3>"]];
-    // After a hit that leaves the hand still Playing: show score and ask what to do next
-    // {name} {cards} {score} {actions}
-    public List<List<string>> PlayerAfterHit    { get; set; } = [["{name}, you have {cards} = {score} - {actions}? <se.3>"]];
+    // Sent both when a player's turn begins and after each hit - the two used to
+    // be separate templates that differed only in whether the dealer's card was
+    // mentioned. Worded to read naturally in both positions.
+    public List<List<string>> PlayerTurnStart   { get; set; } = [["{name}: {cards} ({score}) - Dealer has {dealerScore}. {actions} <se.3>"]];
     public List<List<string>> PlayerBust        { get; set; } =
     [
         ["<wait.1> /huh",       "Oh no! You busted ;-; <wait.1>", "{name} busts with a total of {score} - {cards} <se.11>"],

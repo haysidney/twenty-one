@@ -217,8 +217,8 @@ public class ApplyAddPlayerCardTests
     [Fact]
     public void AddPlayerCard_NarratesAfterHit()
     {
-        // After the v2 PlayerHit removal, a hit that leaves the hand Playing
-        // produces a single PlayerAfterHit narration line.
+        // A hit that leaves the hand Playing produces a single turn-prompt line
+        // (PlayerTurnStart, shared with the start-of-turn prompt).
         var (_, effects) = GameEngine.Apply(ActivePlayerState(), new AddPlayerCard(0, 0, 3));
         Assert.Single(effects);
         Assert.Contains("Lorah", ((SendChat)effects[0]).Text);
@@ -442,7 +442,10 @@ public class ApplyPhaseTransitionTests
             .Build();
         var (newState, effects) = GameEngine.Apply(state, new BeginPlayerTurns());
         Assert.Single(effects);
-        Assert.Contains("Lorah's turn", ((SendChat)effects[0]).Text);
+        // The prompt names the player whose turn it is - asserted without pinning
+        // the default's exact prose.
+        Assert.Contains("Lorah", ((SendChat)effects[0]).Text);
+        Assert.DoesNotContain("Bekki", ((SendChat)effects[0]).Text);
         Assert.Equal(0, newState.ActivePlayerIndex);
         Assert.Equal(GamePhase.PlayerTurns, newState.Phase);
     }
@@ -884,13 +887,24 @@ public class NarrationTemplateTests
     }
 
     [Fact]
-    public void CustomPlayerAfterHit_UsesTemplate()
+    public void AfterHitPrompt_UsesTurnPromptTemplate()
     {
-        var t = new NarrationTemplates { PlayerAfterHit = [["SCORE:{score} DO:{actions}"]] };
+        var t = new NarrationTemplates { PlayerTurnStart = [["SCORE:{score} DO:{actions}"]] };
         var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3), t);
         Assert.Single(effects);
         Assert.Contains("SCORE:14", ((SendChat)effects[0]).Text);
         Assert.Contains("DO:", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void AfterHitPrompt_ShowsTheDealersCard()
+    {
+        // The whole point of merging the two prompts: a player who hits several
+        // times used to see the dealer's upcard only on the first prompt.
+        var t = new NarrationTemplates { PlayerTurnStart = [["dealer has {dealerScore}"]] };
+        var (_, effects) = GameEngine.Apply(PlayerTurnsState(), new AddPlayerCard(0, 0, 3), t);
+        Assert.Contains(effects, e => e is SendChat c && c.Text.Contains("dealer has"));
+        Assert.DoesNotContain(effects, e => e is SendChat c && c.Text.Contains("{dealerScore}"));
     }
 
     [Fact]

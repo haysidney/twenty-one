@@ -89,6 +89,15 @@ public class ConfigWindow : Window, IDisposable
             config.Save();
         }
 
+        var autoBeginTurns = config.AutoBeginPlayerTurns;
+        if (ImGui.Checkbox("Start player turns automatically after the deal", ref autoBeginTurns))
+        {
+            config.AutoBeginPlayerTurns = autoBeginTurns;
+            config.Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Skips the \"Begin Player Turns\" click. The deal summary is still\nnarrated first, then the first player is prompted.");
+
         var autoTarget = config.AutoTargetEnabled;
         if (ImGui.Checkbox("Auto-target active player on their turn", ref autoTarget))
         {
