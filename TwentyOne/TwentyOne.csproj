@@ -2,13 +2,15 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.8.0.0</Version>
+    <Version>0.8.1.0</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
     <Name>Twenty One</Name>
     <Author>HaySidney</Author>
     <Punchline>Run a Blackjack table in your FFXIV venue.</Punchline>
-    <Description>Facilitates Blackjack games via Chat. Type /twentyone to open the table.</Description>
+    <!-- Must stay identical to the Description in haysidney/DalamudPlugins
+         repo.json - see docs/releasing.md. -->
+    <Description>Run a blackjack table in your FFXIV venue. Narrates each beat to chat, draws cards from /random rolls, tracks every player's bank, and reconciles the night's gil against your wallet. Type /twentyone to open the table.</Description>
     <Tags>Blackjack;Black Jack;Cards;Dealer;Croupier;Casino;Venue;Game</Tags>
   </PropertyGroup>
   <ItemGroup>

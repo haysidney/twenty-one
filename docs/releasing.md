@@ -84,9 +84,11 @@ Must print `200`.
 ### 7. Bump the manifest
 
 No local clone needed - patch it through the API. **Only the version and the
-three URLs change.** Do not regenerate `repo.json` from the build output: the
-manifest's `Description` is hand-maintained and longer than the csproj one, and
-regenerating would clobber it (see Known drift).
+three URLs change.**
+
+Still patch rather than regenerate, even though the csproj metadata now matches
+(see Metadata parity): `repo.json` is an array covering several plugins, so a
+single plugin's build output cannot produce the whole file.
 
 ```bash
 gh api repos/haysidney/DalamudPlugins/contents/repo.json --jq '.content' \
@@ -120,12 +122,28 @@ gh api repos/haysidney/DalamudPlugins/contents/repo.json --jq '.content' | base6
 
 `AssemblyVersion`, the three URLs, and an intact `Description`.
 
-## Known drift
+## Metadata parity
 
-`TwentyOne.csproj` generates a short description ("Facilitates Blackjack games
-via Chat.") while `repo.json` carries a longer hand-written one that users see
-in the installer list. They diverge further each release. Syncing the csproj to
-match would remove the trap in step 7.
+`Name`, `Author`, `Punchline` and `Description` are duplicated between
+`TwentyOne.csproj` and `repo.json`, and are currently identical. Keep them that
+way: the csproj values are what the plugin reports in-game, the manifest values
+are what users read in the installer list, and nothing enforces the match.
+
+They were out of sync until 0.8.1 - the csproj carried a one-line description
+while the manifest had a longer hand-written one - which is why step 7 warns
+against regenerating the manifest from build output.
+
+Check after any metadata edit:
+
+```bash
+python3 -c "
+import json
+b = json.load(open('TwentyOne/bin/Release/TwentyOne/TwentyOne.json'))
+e = next(x for x in json.load(open('/dev/stdin')) if x['InternalName'] == 'TwentyOne')
+for k in ('Description', 'Punchline', 'Author', 'Name'):
+    print(('MATCH ' if b[k] == e[k] else 'DIFFER'), k)
+" < <(gh api repos/haysidney/DalamudPlugins/contents/repo.json --jq '.content' | base64 -d)
+```
 
 ## If it goes wrong
 
