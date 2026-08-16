@@ -75,8 +75,11 @@ public partial class MainWindow : Window, IDisposable
 
     // pending hit: null = not waiting; IsPublic=true means /random was sent, false means /dice
     private (bool IsDealer, int PlayerIndex, int HandIndex, bool IsPublic)? pendingHit;
-    // deferred roll: set by OnChatMessage, applied at the start of the next Draw()
+    // deferred roll: set by OnChatMessage, applied by the next Pump()
     private (bool IsDealer, int PlayerIndex, int HandIndex, int Roll)?      deferredRoll;
+    // Dealer-controlled hold on narration + dealing. Transient by design: a
+    // plugin reload must never leave the table stuck paused.
+    private bool paused;
 #if DEBUG
     // Scenario runtime state (active scenario, gating, fast-forward, roll queue).
     public readonly TwentyOne.Debug.ScenarioRunner Scenario = new();
@@ -191,6 +194,58 @@ public partial class MainWindow : Window, IDisposable
     public void AddPlayerFromContext(string fullName, string world)
     {
         Apply(new AddPlayer(Nickname: "", FullName: fullName, World: world));
+    }
+
+    // ── Pump ──────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Drains the outgoing chat queue and applies any deferred roll. Driven by
+    /// <c>Plugin.OnFrameworkUpdate</c>, NOT by <c>Draw()</c>: ImGui does not call
+    /// Draw on a collapsed window, so running this there stalled every outgoing
+    /// narration line and left an arriving /random result stuck in deferredRoll
+    /// until the dealer expanded the window again.
+    /// </summary>
+    public void Pump()
+    {
+        // Paused: hold everything in place. Queued narration stays queued, an
+        // arrived roll stays in deferredRoll, and the auto-deal queue stops
+        // advancing. Table buttons remain clickable - their narration simply
+        // stacks up and flushes on resume.
+        if (paused) return;
+
+        // Drain outgoing queue - hold a roll entry until the previous roll's response has arrived.
+        var isPublicChannel = config.ChatChannel is "/say" or "/yell" or "/shout";
+        var cooldownMs      = isPublicChannel ? config.PublicChatCooldownMs : config.PrivateChatCooldownMs;
+        chatQueue.TryDrain(DateTime.UtcNow, cooldownMs, config.SlashCommandCooldownMs, blockedByPendingHit: pendingHit != null);
+
+#if DEBUG
+        // Fast-forward: fire the next scenario step as soon as the chat queue and pending state drain
+        if (Scenario.FastForward && Scenario.ActiveScenario?.PeekNext() != null
+            && chatQueue.Count == 0 && pendingHit == null && !deferredRoll.HasValue)
+            ExecuteNextScenarioStep();
+        if (Scenario.ActiveScenario?.PeekNext() == null) Scenario.FastForward = false;
+#endif
+
+        // Process deferred roll from OnChatMessage
+        if (!deferredRoll.HasValue) return;
+
+        var (isDealer, pi, hi, roll) = deferredRoll.Value;
+        deferredRoll = null;
+        Apply(isDealer ? new AddDealerCard(roll) : new AddPlayerCard(pi, hi, roll));
+        // Advance auto-deal if more cards are needed
+        if (Phase != GamePhase.Deal || !autoDealQueue.TryDequeue(out var next)) return;
+
+        if (next.IsFirstCard)
+        {
+            if (config.AutoTargetEnabled)
+            {
+                var dp = config.GameState.Players[next.PlayerIndex];
+                if (dp.World.Length > 0)
+                    Plugin.TargetPlayer(dp.FullName, dp.World);
+            }
+            Apply(new AnnouncePlayerDeal(next.PlayerIndex));
+        }
+        QueueHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
     }
 
     // ── Apply / Undo ──────────────────────────────────────────────────────────
@@ -528,13 +583,9 @@ public partial class MainWindow : Window, IDisposable
         currentRoundStartedAt = DateTime.MinValue;
         currentRoundActions.Clear();
 
-        var venue = config.ActiveVenue;
-        var startedAt   = venue.ActiveSessionStartedAt;
-        var locationKey = venue.ActiveSessionLocationKey;
-        SessionManager.TryStartSession(ref startedAt, ref locationKey, Plugin.GetCurrentHousingAddressKey(), DateTime.Now);
-        venue.ActiveSessionStartedAt   = startedAt;
-        venue.ActiveSessionLocationKey = locationKey;
-
+        // Sessions are opened explicitly (Session Ledger -> Start Session), so
+        // there is no lazy start here any more - a round can only be dealt inside
+        // an open session.
         config.Save();
     }
 

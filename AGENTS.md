@@ -284,12 +284,47 @@ Archived sessions (`PlayerStatsSession`) are **not** stored in the main config J
 
 The two live views (Session Ledger, History > Rounds This Session) cache their `EdgeStats.Aggregate` result via `EdgeStatsCache` (in `TwentyOne/Windows/EdgeStatsCache.cs`). The cache is keyed on `(EdgeRules?, RoundHistory.Count, last RoundNumber)` so it invalidates on rules edit, new round, history clear, or venue switch. Without it, the solver re-runs every frame the window is open. Any new per-frame edge display should reuse this helper.
 
-### Sessions
+### Sessions (explicit open/close lifecycle)
+
+Two states, and "no session yet" is just Closed with no data:
+
+- **Open** (`ActiveSessionStartedAt != null && SessionClosedAt == null`) - rounds
+  allowed, reconciler fed, books track the live wallet.
+- **Closed** (anything else, including a fresh install) - **no rounds**, books
+  frozen at `SessionClosedGil` so end-of-night trading, vendoring, and cash-outs
+  cannot move the numbers. `ActiveSessionStartedAt` survives Close so the archive
+  written at the next Start Session knows when the night began.
+
+`Configuration.SessionOpen` is the predicate; `Configuration.ReconciliationGil` is
+the on-hand figure the books reconcile against (live `GilEnd` while open, frozen
+`SessionClosedGil` while closed). `SessionLedgerWindow.Compute` reads the latter,
+so the ledger and the drift chip freeze together.
+
+- `SessionLedgerWindow.CloseSession()` - stamps `SessionClosedAt` /
+  `SessionClosedGil`, writes an `[Audit]` narration line.
+- `SessionLedgerWindow.StartSession()` - archives the closed session if there is
+  one (`ArchiveSession`, the old `NewSession` body), then `OpenSession` clears the
+  narration log, re-baselines `GilStart`/`GilEnd` to the live wallet, and stamps
+  `ActiveSessionStartedAt` / location.
+- `SessionManager.CheckClose(sessionOpen, phase, banks) -> CloseCheck` is the pure,
+  unit-tested guard: closing requires `GamePhase.Betting` **and** every player bank
+  settled to zero (`BankHolders` names who still holds gil so the UI can say so).
+  Freezing the books mid-round or with gil still owed out would freeze numbers that
+  are missing gil still in play.
+
+There is **no lazy session start** any more - `UpdatePlayerStats` used to call
+`SessionManager.TryStartSession` on first payout; sessions are opened explicitly.
+
+UI: Start Deal is disabled while closed (tooltip points at the ledger), a
+non-dismissible `DrawNoSessionBanner` explains why, and the drift chip shows a
+gray `Session closed`. The older stale/moved nag (`ShouldShowSessionBanner`) now
+only fires for an *open* session and just opens the ledger.
+
+The new fields are additive with sensible defaults, so **no schema migration**.
+An existing config mid-night upgrades to Open, which is correct.
 
 `SessionManager` (in `TwentyOne.Game/SessionManager.cs`) - pure static class:
-- `TryStartSession`, `ShouldShowSessionBanner`, `BuildArchive`, `ResetGameStats`
-
-`MainWindow` shows a session banner (dismissible, resets on territory change). `SessionLedgerWindow.NewSession()` archives session, resets stat fields, clears round history/tips/gil tracker.
+`CheckClose`, `ShouldShowSessionBanner`, `ResetGameStats`.
 
 ### Venue memory
 
@@ -306,7 +341,25 @@ The two live views (Session Ledger, History > Rounds This Session) cache their `
 
 ### Card input
 
-All cards from FFXIV chat rolls (`/random 13` or `/dice 13`). `OnChatMessage` parses roll result, sets `deferredRoll`; applied at top of next `Draw()` to avoid re-entrancy.
+All cards from FFXIV chat rolls (`/random 13` or `/dice 13`). `OnChatMessage` parses the roll result and sets `deferredRoll`; `MainWindow.Pump()` applies it on the next framework tick (deferred to avoid re-entrancy).
+
+### MainWindow.Pump (framework tick, not Draw)
+
+`Pump()` drains the outgoing `chatQueue` and applies `deferredRoll` (advancing
+`autoDealQueue` as cards resolve). It is driven by `Plugin.OnFrameworkUpdate`,
+**before** the gil poll's login/inventory gates.
+
+It must **never** move back into `Draw()`: ImGui does not call `Draw` on a
+collapsed window, so running the pump there stalled every outgoing narration line
+and left an arriving `/random` result stuck in `deferredRoll` until the dealer
+expanded the window. (This was a real, long-lived bug - collapsing the window mid-round
+silently froze the table.)
+
+`MainWindow.paused` is the dealer-facing hold that replaces collapse-as-pause:
+`Pump()` returns early while set, so queued narration stays queued and the deal
+queue stops advancing, while table buttons stay clickable and their narration
+flushes on resume. Transient by design - a reload must never leave the table
+stuck paused. Top-bar toggle + `DrawPauseBanner`.
 
 ### Bank-only mode (every tracked player banks)
 
@@ -412,6 +465,7 @@ should pair with a recorded trade.
 ### Drift chip (main-window top bar)
 
 `MainWindow.DrawDriftChip()` renders an always-visible books-balance signal:
+gray `Session closed` while no session is open (books frozen - see Sessions),
 green `Books OK` when reconciled, red `Drift: +X` otherwise, clickable to open the
 Session Ledger, suppressed in history view. It and the Session Ledger share one
 source of truth: `SessionLedgerWindow.Compute(Configuration) -> Reconciliation`
@@ -438,20 +492,19 @@ writes an `AuditLog.Wallet` checkpoint.
 - **Login gate:** the poll is skipped (and re-baselined) when
   `!ClientState.IsLoggedIn` - the wallet reads 0 while not logged in, which
   previously logged spurious ~32M log-out/log-in `wallet` deltas.
-- **Reconciler feed (gated on `MainWindow.IsOpen`):** while the main window is
+- **Reconciler feed (gated on `Configuration.SessionOpen`):** while a session is
   open, each real change calls `Reconciler.Observe(delta)` and every frame calls
   `Reconciler.Tick`, raising `MainWindow.RaiseFinding` for any unmatched delta
-  (see GilReconciler above). While the window is **closed** the reconciler is not
-  fed - you can't deal with it closed, so real trade-drift is still caught, but
-  between-game wallet moves (vendors, repairs, retainer, market board) no longer
-  queue unexplained-gil findings that would flood the next time the window opens.
-  `GilEnd` keeps polling regardless (books stay live), so the accumulated non-game
-  delta folds silently into the baseline instead of surfacing. Note the gate is
-  `IsOpen`, **not** draw-freshness: a **collapsed** window (double-click titlebar,
-  used mid-game to free screen space) keeps `IsOpen` true and counts as live - its
-  findings simply queue and surface on expand, since they are real in-game trades.
-  A future "night finished" session concept may replace window-open as the live
-  gate.
+  (see GilReconciler above). While **closed** the reconciler is not fed - between
+  nights the dealer trades, vendors, repairs and cashes out freely, and feeding
+  those deltas in would queue unexplained-gil findings for gil that was never part
+  of a game. `GilEnd` keeps polling regardless, so the accumulated non-game
+  movement folds into the next session's baseline instead of surfacing.
+  This gate used to be `MainWindow.IsOpen`; the explicit session lifecycle is the
+  honest signal for "is the dealer running the table" (it is the "night finished"
+  concept this note used to anticipate). Window state is now irrelevant to the
+  reconciler - findings raised while the window is closed or collapsed simply queue
+  and surface on the next draw.
 
 ### Audit log (disk-only forensic trail)
 

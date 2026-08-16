@@ -30,32 +30,66 @@ public class SessionTests
         Assert.Equal("Lorah", s.DisplayName); // preserved
     }
 
-    // ── TryStartSession ───────────────────────────────────────────────────────
+    // ── CheckClose ────────────────────────────────────────────────────────────
+
+    private static KeyValuePair<string, long>[] Banks(params (string Name, long Bank)[] rows) =>
+        rows.Select(r => new KeyValuePair<string, long>(r.Name, r.Bank)).ToArray();
 
     [Fact]
-    public void TryStartSession_SetsOnFirstCall()
+    public void CheckClose_AllowsAtBettingWithSettledBanks()
     {
-        DateTime? startedAt   = null;
-        string?   locationKey = null;
-        var now = new DateTime(2026, 5, 3, 20, 0, 0);
+        var check = SessionManager.CheckClose(true, GamePhase.Betting,
+            Banks(("Lorah", 0), ("Bekki", 0)));
 
-        SessionManager.TryStartSession(ref startedAt, ref locationKey, "123:1:1", now);
-
-        Assert.Equal(now, startedAt);
-        Assert.Equal("123:1:1", locationKey);
+        Assert.True(check.CanClose);
+        Assert.Null(check.Reason);
+        Assert.Empty(check.BankHolders);
     }
 
     [Fact]
-    public void TryStartSession_NoopIfAlreadySet()
+    public void CheckClose_BlocksWhenNoSessionOpen()
     {
-        var original = new DateTime(2026, 5, 3, 18, 0, 0);
-        DateTime? startedAt   = original;
-        string?   locationKey = "orig";
+        var check = SessionManager.CheckClose(false, GamePhase.Betting, Banks());
 
-        SessionManager.TryStartSession(ref startedAt, ref locationKey, "new", DateTime.Now);
+        Assert.False(check.CanClose);
+        Assert.Equal("No session is open.", check.Reason);
+    }
 
-        Assert.Equal(original, startedAt);
-        Assert.Equal("orig", locationKey);
+    [Theory]
+    [InlineData(GamePhase.Deal)]
+    [InlineData(GamePhase.PlayerTurns)]
+    [InlineData(GamePhase.DealerTurn)]
+    [InlineData(GamePhase.Payout)]
+    public void CheckClose_BlocksMidRound(GamePhase phase)
+    {
+        var check = SessionManager.CheckClose(true, phase, Banks(("Lorah", 0)));
+
+        Assert.False(check.CanClose);
+        Assert.Equal("Finish or abort the current round first.", check.Reason);
+    }
+
+    [Fact]
+    public void CheckClose_BlocksAndNamesPlayersStillHoldingGil()
+    {
+        var check = SessionManager.CheckClose(true, GamePhase.Betting,
+            Banks(("Lorah", 5000), ("Bekki", 0), ("Nolla", 12000)));
+
+        Assert.False(check.CanClose);
+        Assert.Equal(2, check.BankHolders.Count);
+        // Largest balance first - the dealer settles the big one first.
+        Assert.Contains("Nolla", check.BankHolders[0]);
+        Assert.Contains("12,000", check.BankHolders[0]);
+        Assert.Contains("Lorah", check.BankHolders[1]);
+        Assert.DoesNotContain(check.BankHolders, h => h.Contains("Bekki"));
+    }
+
+    [Fact]
+    public void CheckClose_TreatsNegativeBankAsUnsettled()
+    {
+        var check = SessionManager.CheckClose(true, GamePhase.Betting, Banks(("Lorah", -300)));
+
+        Assert.False(check.CanClose);
+        Assert.Single(check.BankHolders);
     }
 
     // ── ShouldShowSessionBanner ───────────────────────────────────────────────

@@ -132,10 +132,21 @@ public class VenueSettings
     [JsonIgnore]
     public List<PlayerStatsSession> StatsSessions { get; set; } = [];
 
-    // ── Active session tracking ────────────────────────────────────────────────
-    // Set on first GoToPayout; null = no session started yet this night.
+    // ── Session lifecycle ──────────────────────────────────────────────────────
+    // Two states, and "no session yet" is just Closed with no data:
+    //   Open   = StartedAt != null && ClosedAt == null - rounds allowed,
+    //            reconciler live, books track the live wallet.
+    //   Closed = anything else (including a fresh install) - no rounds, books
+    //            frozen at SessionClosedGil so end-of-night trading, vendoring,
+    //            and cash-outs cannot move the numbers.
+    // StartedAt survives Close so the archive written at the next Start Session
+    // knows when the night began.
     public DateTime? ActiveSessionStartedAt   { get; set; }
     public string?   ActiveSessionLocationKey { get; set; }
+    public DateTime? SessionClosedAt          { get; set; }
+    // On-hand gil at the moment of close. The reconciliation reads this instead
+    // of the live wallet while closed.
+    public long      SessionClosedGil         { get; set; }
 
     // ── House rules ────────────────────────────────────────────────────────────
     // Canonical home for the rules that apply to the next round. The current
@@ -230,6 +241,16 @@ public class Configuration : IPluginConfiguration
     [JsonIgnore] public Dictionary<string, PlayerStat> PlayerStatsStore { get => ActiveVenue.PlayerStatsStore; set => ActiveVenue.PlayerStatsStore = value; }
     [JsonIgnore] public List<RoundHistoryEntry> RoundHistory { get => ActiveVenue.RoundHistory; set => ActiveVenue.RoundHistory = value; }
     [JsonIgnore] public List<PlayerStatsSession> StatsSessions { get => ActiveVenue.StatsSessions; set => ActiveVenue.StatsSessions = value; }
+
+    // ── Session lifecycle (see VenueSettings) ──────────────────────────────────
+    [JsonIgnore] public bool SessionOpen =>
+        ActiveVenue.ActiveSessionStartedAt != null && ActiveVenue.SessionClosedAt == null;
+
+    // On-hand gil the books reconcile against: the live wallet while a session is
+    // open, the frozen close-time snapshot once it is closed. Single source of
+    // truth for SessionLedgerWindow.Compute and therefore the drift chip.
+    [JsonIgnore] public long ReconciliationGil =>
+        SessionOpen ? ActiveVenue.GilEnd : ActiveVenue.SessionClosedGil;
 
     // House rules - canonical on VenueSettings. Editing these does NOT affect a
     // round that has already started (Deal phase or later). SeedRulesIntoGameState

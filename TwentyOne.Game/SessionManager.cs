@@ -18,21 +18,42 @@ public class PlayerStatData
     public long   TotalNet    { get; set; }
 }
 
+/// <summary>
+/// Result of asking whether the dealer may close the session right now.
+/// <see cref="BankHolders"/> names the players who still hold gil, so the UI can
+/// tell the dealer exactly who to settle up with.
+/// </summary>
+public sealed record CloseCheck(bool CanClose, string? Reason, IReadOnlyList<string> BankHolders);
+
 // Pure static session logic - no Dalamud dependency, fully unit-testable.
 public static class SessionManager
 {
     private static readonly TimeSpan StaleThreshold = TimeSpan.FromHours(8);
 
-    // No-op if startedAt already set.
-    public static void TryStartSession(
-        ref DateTime? startedAt,
-        ref string?   locationKey,
-        string?       currentLocation,
-        DateTime      now)
+    /// <summary>
+    /// Closing freezes the books, so it is only safe at a clean boundary: between
+    /// rounds, with every player's bank settled to zero. Otherwise the frozen
+    /// numbers would be missing gil that is still in play or still owed out.
+    /// </summary>
+    public static CloseCheck CheckClose(
+        bool                                 sessionOpen,
+        GamePhase                            phase,
+        IEnumerable<KeyValuePair<string, long>> banks)
     {
-        if (startedAt != null) return;
-        startedAt   = now;
-        locationKey = currentLocation;
+        if (!sessionOpen)
+            return new CloseCheck(false, "No session is open.", []);
+
+        if (phase != GamePhase.Betting)
+            return new CloseCheck(false, "Finish or abort the current round first.", []);
+
+        var holders = banks.Where(b => b.Value != 0)
+                           .OrderByDescending(b => b.Value)
+                           .Select(b => $"{b.Key} ({b.Value:N0} gil)")
+                           .ToList();
+
+        return holders.Count > 0
+            ? new CloseCheck(false, "Players still hold gil in their banks. Cash them out first.", holders)
+            : new CloseCheck(true, null, []);
     }
 
     public static bool ShouldShowSessionBanner(

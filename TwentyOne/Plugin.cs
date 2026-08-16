@@ -81,7 +81,17 @@ public sealed class Plugin : IDalamudPlugin
     // surfaced to MainWindow as an "unexplained gil" prompt. Shared instance.
     internal readonly GilReconciler Reconciler = new();
 
-    private unsafe void OnFrameworkUpdate(IFramework framework)
+    private void OnFrameworkUpdate(IFramework framework)
+    {
+        // Runs unconditionally (and before the gil poll's login/inventory gates):
+        // narration and card processing must keep flowing whether or not the main
+        // window is being drawn. ImGui skips Draw() on a collapsed window, which is
+        // why this cannot live there.
+        MainWindow.Pump();
+        PollGil();
+    }
+
+    private unsafe void PollGil()
     {
         // While not logged in the wallet reads 0 (or a stale value); polling it
         // produced the spurious 32M log-out/log-in deltas in the audit log. Skip
@@ -105,22 +115,16 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         var prev = Configuration.GilEnd;
-        // The reconciler only makes sense while the dealer is actually running the
-        // table (window open) - you can't deal with it closed, so real trade-drift
-        // is still caught. When it's closed we keep polling GilEnd (books stay
-        // live) and keep the audit checkpoint, but we do NOT feed Observe/Tick:
-        // otherwise every between-game wallet change (vendors, repairs, retainer,
-        // market board) queues an unexplained-gil finding that floods the next time
-        // the window opens. Because GilEnd still tracks every frame while closed,
-        // the accumulated non-game delta folds silently into the baseline instead.
-        //
-        // Gate on IsOpen, not draw-freshness: the dealer collapses the window
-        // mid-game to free up screen space, and collapsed still means live. IsOpen
-        // stays true while collapsed (only the close button flips it), which is
-        // exactly what we want. A collapsed window can't surface findings until
-        // un-collapsed (DrawFindingModals lives in Draw()), but they queue and show
-        // on expand - correct, since those are real in-game trades.
-        var tableLive = MainWindow.IsOpen;
+        // The reconciler only makes sense while a session is open. Between nights
+        // the dealer trades, vendors, repairs and cashes out freely; feeding those
+        // deltas in would queue unexplained-gil findings for gil that was never
+        // part of a game. GilEnd keeps polling regardless, so the accumulated
+        // non-game movement folds into the next session's baseline instead.
+        // (This replaced an older gate on MainWindow.IsOpen - "is a session open"
+        // is the honest signal for "is the dealer running the table".)
+        // Findings raised while the main window is closed or collapsed simply queue
+        // and surface on next draw - they are real in-game trades either way.
+        var tableLive = Configuration.SessionOpen;
         if (liveGil != prev)
         {
             Configuration.GilEnd = liveGil;

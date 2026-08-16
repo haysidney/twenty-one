@@ -65,26 +65,7 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
     {
         _fileDialogManager.Draw();
 
-        if (ImGui.Button("New Session"))
-            ImGui.OpenPopup("NewSessionConfirm##TwentyOne");
-
-        if (ImGui.BeginPopup("NewSessionConfirm##TwentyOne"))
-        {
-            ImGui.TextUnformatted("Save current stats as a session and start fresh?");
-            ImGui.TextUnformatted("This will also clear tips, reset the bank tracker, and remove all players from the table.");
-            ImGui.Spacing();
-            if (ImGui.Button("Confirm"))
-            {
-                NewSession();
-                ImGui.CloseCurrentPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("Cancel"))
-                ImGui.CloseCurrentPopup();
-            ImGui.EndPopup();
-        }
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Save the current session's stats and reset for a new session."u8);
+        DrawSessionControls();
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -115,11 +96,13 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         // closed). Read-only display - no manual entry.
         ImGui.Text("Ending Gil"); ImGui.SameLine(110);
         ImGui.AlignTextToFramePadding();
-        ImGui.Text($"{config.GilEnd:N0}");
+        ImGui.Text($"{config.ReconciliationGil:N0}");
         ImGui.SameLine();
-        ImGui.TextDisabled("(live)");
+        ImGui.TextDisabled(config.SessionOpen ? "(live)" : "(frozen)");
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Tracks your on-hand gil automatically."u8);
+            ImGui.SetTooltip(config.SessionOpen
+                ? "Tracks your on-hand gil automatically."u8
+                : "Frozen at session close. Trades since then don't affect these numbers."u8);
 
         ImGui.AlignTextToFramePadding(); ImGui.Text("Venue Cut %"); ImGui.SameLine();
         ImGui.SetNextItemWidth(100);
@@ -397,7 +380,134 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         }
     }
 
-    public void NewSession()
+    private void DrawSessionControls()
+    {
+        var venue = config.ActiveVenue;
+
+        if (config.SessionOpen)
+        {
+            var check = SessionManager.CheckClose(
+                true, config.GameState.Phase,
+                venue.PlayerStatsStore.Select(kv =>
+                    new KeyValuePair<string, long>(kv.Value.DisplayName, kv.Value.Bank)));
+
+            if (!check.CanClose) ImGui.BeginDisabled();
+            if (ImGui.Button("Close Session"))
+                ImGui.OpenPopup("CloseSessionConfirm##TwentyOne");
+            if (!check.CanClose) ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            {
+                var holders = check.BankHolders.Count > 0
+                    ? "\n\nStill holding gil:\n- " + string.Join("\n- ", check.BankHolders)
+                    : string.Empty;
+                ImGui.SetTooltip(check.CanClose
+                    ? "Freeze the books for the night. Trades after this won't affect the numbers."
+                    : check.Reason + holders);
+            }
+
+            if (ImGui.BeginPopup("CloseSessionConfirm##TwentyOne"))
+            {
+                ImGui.TextUnformatted("Close the session and freeze the books?");
+                ImGui.TextUnformatted("The numbers stay on screen for settling up. No rounds can be dealt until you start a new session.");
+                ImGui.Spacing();
+                if (ImGui.Button("Confirm##closeSession"))
+                {
+                    CloseSession();
+                    ImGui.CloseCurrentPopup();
+                }
+                ImGui.SameLine();
+                if (ImGui.Button("Cancel##closeSession"))
+                    ImGui.CloseCurrentPopup();
+                ImGui.EndPopup();
+            }
+
+            ImGui.SameLine();
+            ImGui.TextDisabled($"Session open since {venue.ActiveSessionStartedAt:t}");
+            return;
+        }
+
+        var hasDataToArchive = venue.ActiveSessionStartedAt != null;
+
+        if (ImGui.Button("Start Session"))
+        {
+            if (hasDataToArchive) ImGui.OpenPopup("StartSessionConfirm##TwentyOne");
+            else                  StartSession();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(hasDataToArchive
+                ? "Archive the closed session and start a fresh night."u8
+                : "Start a session so you can deal."u8);
+
+        if (ImGui.BeginPopup("StartSessionConfirm##TwentyOne"))
+        {
+            ImGui.TextUnformatted("Archive the closed session and start fresh?");
+            ImGui.TextUnformatted("This saves the night's stats to History, then clears tips, round history, the narration log, and the table.");
+            ImGui.Spacing();
+            if (ImGui.Button("Confirm##startSession"))
+            {
+                StartSession();
+                ImGui.CloseCurrentPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel##startSession"))
+                ImGui.CloseCurrentPopup();
+            ImGui.EndPopup();
+        }
+
+        ImGui.SameLine();
+        ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BannerGold);
+        ImGui.TextUnformatted(venue.SessionClosedAt != null
+            ? $"Session closed {venue.SessionClosedAt:t} - books frozen"
+            : "No session running");
+        ImGui.PopStyleColor();
+    }
+
+    /// <summary>
+    /// Freezes the books and closes the night. The numbers stay on screen (the
+    /// dealer still has to settle up from them); they simply stop tracking the
+    /// live wallet, so post-close trading, vendoring, and cash-outs can't move
+    /// them. Guarded by <see cref="SessionManager.CheckClose"/>.
+    /// </summary>
+    public void CloseSession()
+    {
+        var venue = config.ActiveVenue;
+        venue.SessionClosedAt  = DateTime.Now;
+        venue.SessionClosedGil = venue.GilEnd;
+        config.NarrationLog.Add($"[Audit] Session closed. Books frozen at {venue.GilEnd:N0} gil on hand.");
+        config.Save();
+    }
+
+    /// <summary>
+    /// Archives the closed session (if there is one), clears the night's data,
+    /// re-baselines the gil tracker to the live wallet, and opens a new session.
+    /// A fresh install has nothing to archive and simply opens.
+    /// </summary>
+    public void StartSession()
+    {
+        if (config.ActiveVenue.ActiveSessionStartedAt != null)
+            ArchiveSession();
+        OpenSession();
+    }
+
+    private void OpenSession()
+    {
+        var venue      = config.ActiveVenue;
+        var currentGil = (long)InventoryManager.Instance()->GetGil();
+
+        venue.GilStart = currentGil;
+        venue.GilEnd   = currentGil;
+        SyncBuffers();
+
+        venue.ActiveSessionStartedAt   = DateTime.Now;
+        venue.ActiveSessionLocationKey = Plugin.GetCurrentHousingAddressKey();
+        venue.SessionClosedAt          = null;
+        venue.SessionClosedGil         = 0;
+
+        config.NarrationLog.Clear();
+        config.Save();
+    }
+
+    private void ArchiveSession()
     {
         var venue = config.ActiveVenue;
 
@@ -446,12 +556,6 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         venue.RoundHistory.Clear();
         venue.Tips.Clear();
         venue.ServiceCharges.Clear();
-        var currentGil = (long)InventoryManager.Instance()->GetGil();
-        venue.GilStart = currentGil;
-        venue.GilEnd   = currentGil;
-        SyncBuffers();
-        venue.ActiveSessionStartedAt   = null;
-        venue.ActiveSessionLocationKey = null;
 
         var gs = config.GameState;
         config.GameState = new GameState
@@ -590,8 +694,10 @@ public unsafe class SessionLedgerWindow : Window, IDisposable
         public bool Reconciled   => Drift == 0;
     }
 
+    // ReconciliationGil is the live wallet while open and the frozen close-time
+    // snapshot once closed, so end-of-night trading can't move a closed night's books.
     public static Reconciliation Compute(Configuration config) => new(
-        Difference:   config.GilEnd - config.GilStart,
+        Difference:   config.ReconciliationGil - config.GilStart,
         BetsHeld:     CalcBetsHeld(config),
         BanksHeld:    config.PlayerStatsStore.Values.Sum(s => s.Bank),
         TipTotal:     config.Tips.Sum(),

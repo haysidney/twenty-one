@@ -1284,6 +1284,21 @@ public partial class MainWindow
         ImGui.EndPopup();
     }
 
+    private void DrawPauseBanner()
+    {
+        if (!paused) return;
+        ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ActiveOrange);
+        var held = chatQueue.Count;
+        ImGui.TextUnformatted(held > 0
+            ? $"Paused - {held} line(s) held"
+            : "Paused - narration and dealing held");
+        ImGui.PopStyleColor();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Resume##pauseBanner"))
+            paused = false;
+        ImGui.Separator();
+    }
+
     private void DrawHistoryViewBanner()
     {
         if (!isHistoryView) return;
@@ -1336,9 +1351,39 @@ public partial class MainWindow
         ImGui.Separator();
     }
 
+    // Closed is the resting state (including a fresh install), so this banner is
+    // the dealer's answer to "why can't I deal?" - it is deliberately not
+    // dismissible, unlike the stale/moved nag below.
+    private void DrawNoSessionBanner()
+    {
+        if (config.SessionOpen || isHistoryView) return;
+
+        var venue = config.ActiveVenue;
+        ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BannerGold);
+        ImGui.TextUnformatted(venue.SessionClosedAt != null
+            ? "Session closed - books are frozen. Start a session to deal again."
+            : "No session running - start one to deal.");
+        ImGui.PopStyleColor();
+        ImGui.SameLine();
+        if (ImGui.SmallButton("Start Session##noSessionBanner"))
+        {
+            if (venue.ActiveSessionStartedAt != null)
+            {
+                // There's a closed night still on screen - archiving it is
+                // destructive, so route through the ledger's confirm popup.
+                sessionLedgerWindow.IsOpen = true;
+            }
+            else
+            {
+                sessionLedgerWindow.StartSession();
+            }
+        }
+        ImGui.Separator();
+    }
+
     private void DrawSessionBanner()
     {
-        if (sessionBannerDismissed || isHistoryView) return;
+        if (sessionBannerDismissed || isHistoryView || !config.SessionOpen) return;
 
         var venue   = config.ActiveVenue;
         var addrKey = Plugin.GetCurrentHousingAddressKey();
@@ -1351,7 +1396,7 @@ public partial class MainWindow
             return;
 
         ImGui.PushStyleColor(ImGuiCol.Text, GameColors.BannerGold);
-        ImGui.TextUnformatted("It's been a while (or you're at a new location), want to mark a new session in the ledger?");
+        ImGui.TextUnformatted("This session started a while ago (or at another location). Close it and start a new one?");
         ImGui.PopStyleColor();
         ImGui.SameLine();
         var venueNames      = config.Venues.ConvertAll(v => v.Name).ToArray();
@@ -1370,10 +1415,12 @@ public partial class MainWindow
         }
         if (roundInProgress) ImGui.EndDisabled();
         ImGui.SameLine();
-        if (ImGui.SmallButton("New Session##sessionBannerStart"))
+        // Closing is guarded (betting phase, all banks settled), so send the
+        // dealer to the ledger rather than acting from the banner.
+        if (ImGui.SmallButton("Session Ledger##sessionBannerStart"))
         {
-            sessionLedgerWindow.NewSession();
-            sessionBannerDismissed = true;
+            sessionLedgerWindow.IsOpen = true;
+            sessionBannerDismissed     = true;
         }
         ImGui.SameLine();
         if (ImGui.SmallButton("X##sessionBannerDismiss"))
@@ -1396,6 +1443,15 @@ public partial class MainWindow
         if (ImGui.SmallButton("Debug"))
             debugWindow.Toggle();
 #endif
+        ImGui.SameLine();
+        if (paused) ImGui.PushStyleColor(ImGuiCol.Button, GameColors.ActiveOrange);
+        if (ImGui.SmallButton(paused ? "Resume##pause" : "Pause##pause"))
+            paused = !paused;
+        if (paused) ImGui.PopStyleColor();
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(paused
+                ? "Resume narration and dealing."u8
+                : "Hold narration and dealing. Queued lines send when you resume."u8);
 
         DrawDriftChip();
 
@@ -1430,7 +1486,16 @@ public partial class MainWindow
         if (isHistoryView) return;
         var rec = SessionLedgerWindow.Compute(config);
         ImGui.SameLine();
-        if (rec.Reconciled)
+        if (!config.SessionOpen)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, GameColors.DisabledGrey);
+            var closedClick = ImGui.SmallButton("Session closed");
+            ImGui.PopStyleColor();
+            if (closedClick) sessionLedgerWindow.Toggle();
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Books frozen at close. Trades no longer affect the ledger.\nClick to open the Session Ledger.");
+        }
+        else if (rec.Reconciled)
         {
             ImGui.PushStyleColor(ImGuiCol.Text, GameColors.ProfitGreen);
             var clicked = ImGui.SmallButton("Books OK");
@@ -1507,53 +1572,24 @@ public partial class MainWindow
             sessionBannerDismissed  = false;
         }
 
-        // Drain outgoing queue - hold a roll entry until the previous roll's response has arrived.
-        var isPublicChannel = config.ChatChannel is "/say" or "/yell" or "/shout";
-        var cooldownMs      = isPublicChannel ? config.PublicChatCooldownMs : config.PrivateChatCooldownMs;
-        chatQueue.TryDrain(DateTime.UtcNow, cooldownMs, config.SlashCommandCooldownMs, blockedByPendingHit: pendingHit != null);
-
-#if DEBUG
-        // Fast-forward: fire the next scenario step as soon as the chat queue and pending state drain
-        if (Scenario.FastForward && Scenario.ActiveScenario?.PeekNext() != null
-            && chatQueue.Count == 0 && pendingHit == null && !deferredRoll.HasValue)
-            ExecuteNextScenarioStep();
-        if (Scenario.ActiveScenario?.PeekNext() == null) Scenario.FastForward = false;
-#endif
-
-        // Process deferred roll from OnChatMessage
-        if (deferredRoll.HasValue)
-        {
-            var (isDealer, pi, hi, roll) = deferredRoll.Value;
-            deferredRoll = null;
-            Apply(isDealer ? new AddDealerCard(roll) : new AddPlayerCard(pi, hi, roll));
-            // Advance auto-deal if more cards are needed
-            if (Phase == GamePhase.Deal && autoDealQueue.TryDequeue(out var next))
-            {
-                if (next.IsFirstCard)
-                {
-                    if (config.AutoTargetEnabled)
-                    {
-                        var dp = config.GameState.Players[next.PlayerIndex];
-                        if (dp.World.Length > 0)
-                            Plugin.TargetPlayer(dp.FullName, dp.World);
-                    }
-                    Apply(new AnnouncePlayerDeal(next.PlayerIndex));
-                }
-                QueueHitRoll(next.IsDealer, next.PlayerIndex, next.HandIndex);
-            }
-        }
-
+        // NOTE: the chat drain and deferred-roll processing deliberately do NOT
+        // live here - see MainWindow.Pump, driven by Plugin.OnFrameworkUpdate.
+        // ImGui skips Draw() entirely on a collapsed window, so running them here
+        // froze all narration and card processing whenever the dealer collapsed
+        // the window mid-round.
         var uiBusy = chatQueue.Count > 0 || pendingHit != null || deferredRoll.HasValue;
 
         DrawBankManageWindow(uiBusy);
         DrawFindingModals();
         DrawUndoConfirmModal();
 
+        DrawPauseBanner();
         DrawHistoryViewBanner();
 #if DEBUG
         DrawScenarioBanner();
 #endif
         DrawVenueMemoryBanner();
+        DrawNoSessionBanner();
         DrawSessionBanner();
         DrawTopBar();
 
@@ -1948,7 +1984,8 @@ public partial class MainWindow
                     })
                     .Select(x => x.p.DisplayName)
                     .ToList();
-                var canDeal = State.Players.Length > 0
+                var canDeal = config.SessionOpen
+                           && State.Players.Length > 0
                            && State.Players.Any(p => !p.SittingOut)
                            && State.Players.Select((p, i) => p.SittingOut || !string.IsNullOrWhiteSpace(effectiveBets[i])).All(x => x)
                            && shortfallPlayers.Count == 0
@@ -1993,7 +2030,9 @@ public partial class MainWindow
                 if (!canDeal && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                 {
                     string tooltip;
-                    if (State.Players.Length == 0)
+                    if (!config.SessionOpen)
+                        tooltip = "No session is running. Open the Session Ledger and click Start Session.";
+                    else if (State.Players.Length == 0)
                         tooltip = "Add at least one player first.";
                     else if (shortfallPlayers.Count > 0)
                         tooltip = $"Bank shortfall - resolve before dealing:\n{string.Join("\n", shortfallPlayers)}";
