@@ -1455,10 +1455,14 @@ public partial class MainWindow
             debugWindow.Toggle();
 #endif
         ImGui.SameLine();
-        if (paused) ImGui.PushStyleColor(ImGuiCol.Button, GameColors.ActiveOrange);
-        if (ImGui.SmallButton(paused ? "Resume##pause" : "Pause##pause"))
+        // Latch the flag: the button flips `paused` mid-block, so guarding the push and
+        // the pop on the live field underflows ImGui's global style stack on one edge and
+        // leaks a push on the other - both corrupt every plugin's colours until a restart.
+        var wasPaused = paused;
+        if (wasPaused) ImGui.PushStyleColor(ImGuiCol.Button, GameColors.ActiveOrange);
+        if (ImGui.SmallButton(wasPaused ? "Resume##pause" : "Pause##pause"))
             paused = !paused;
-        if (paused) ImGui.PopStyleColor();
+        if (wasPaused) ImGui.PopStyleColor();
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip(paused
                 ? "Resume narration and dealing."u8
@@ -2186,7 +2190,10 @@ public partial class MainWindow
         var open = ImGui.CollapsingHeader($"Chat Narration ({config.NarrationLog.Count})##narHeader");
         if (!open) return;
 
-        if (config.NarrationLog.Count == 0) ImGui.BeginDisabled();
+        // Latched: Clear empties the log mid-block, so re-reading Count at the End would
+        // pop a disabled scope that was never pushed and corrupt ImGui's global stack.
+        var logEmpty = config.NarrationLog.Count == 0;
+        if (logEmpty) ImGui.BeginDisabled();
         if (ImGui.SmallButton("Copy All"))
         {
             var sb = new StringBuilder();
@@ -2199,7 +2206,7 @@ public partial class MainWindow
         }
         ImGui.SameLine();
         if (ImGui.SmallButton("Clear")) { config.NarrationLog.Clear(); config.Save(); }
-        if (config.NarrationLog.Count == 0) ImGui.EndDisabled();
+        if (logEmpty) ImGui.EndDisabled();
 
         ImGui.Spacing();
         if (ImGui.BeginChild("##narLog", new Vector2(0, 0), true))

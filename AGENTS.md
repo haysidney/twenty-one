@@ -783,6 +783,16 @@ Commit messages follow `type(scope): message` style. Every commit builds (Debug 
 
 - Never use non-ASCII characters (icons, arrows, symbols) on buttons unless explicitly requested. Use plain text labels only.
 - To right-align a button within a cell/region: use `SameLine()` followed by `if (GetCursorPosX() < targetX) SetCursorPosX(targetX)`, where `targetX = cellRight - buttonWidth` (button width = `CalcTextSize(...).X + FramePadding.X * 2`). Do **not** pass a position directly to `SameLine(pos)` - if `pos` is behind the current cursor, ImGui will clip or hide the widget.
+- **Never guard a `Push`/`Pop` (or `BeginDisabled`/`EndDisabled`) pair on a condition
+  that a widget inside the pair can change.** Latch it into a local first
+  (`var wasPaused = paused;`). ImGui's style and disabled stacks are **global and
+  shared with Dalamud and every other plugin**: an extra `Pop` underflows into
+  someone else's push and a missing one leaks, and either way the corruption is
+  process-wide and survives a plugin reload - only a game restart clears it. The
+  Pause toggle shipped this bug in 0.9.1 (clicking it wrecked text colour in every
+  ImGui window in FFXIV); the narration-log Clear button had the same shape. The
+  safe alternative when the mutation is unavoidable is to defer it past the pop
+  (see the `swap` / `toRemove` locals in `NarrationEditorWindow`).
 - For text inputs that need an inline label-when-empty (e.g. an unlabelled "amount" or "description" field), use `ImGui.InputTextWithHint(label, hint, ref buf, maxLen, flags)` instead of `InputText`. The hint string is shown in disabled-text colour while the buffer is empty and vanishes as soon as the user types. Same return value and flags as `InputText` (Dalamud's binding exposes the same overloads). Prefer this over a separate leading `Text("Amount")` whenever the field already lives in a row with other widgets - it keeps the row tight and self-describing.
 
 ### Record types for immutable state
