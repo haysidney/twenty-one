@@ -795,7 +795,11 @@ public partial class MainWindow
         }
         else
         {
+            var showSrn = State.AllowSurrender;
+            var showOut = ctx.IsFirstHand && Phase is GamePhase.Deal or GamePhase.PlayerTurns && !p.SittingOut;
             var total = ABW("Stand") + asp + ABW("Hit") + asp + ABW("Dbl") + asp + ABW("Spl")
+                      + (showSrn ? asp + ABW("Srn") : 0)
+                      + (showOut ? asp + ABW("Out") : 0)
                       + (ctx.IsFirstHand && !ctx.MultiHand ? asp + ABW("X") : 0);
             ImGui.SetCursorPosX(cellRight - total);
 
@@ -891,7 +895,7 @@ public partial class MainWindow
 #endif
             if (!canSplit) ImGui.EndDisabled();
 
-            if (State.AllowSurrender)
+            if (showSrn)
             {
                 ImGui.SameLine();
                 var canSurrender = !hasAnyPending && ctx.IsActiveHand
@@ -918,7 +922,7 @@ public partial class MainWindow
             // Withdraw: pull a player out of a round already in progress (cashing
             // out right after the deal, or gone AFK / disconnected). Rendered once
             // per player, on their first hand row, so split players get one button.
-            if (ctx.IsFirstHand && Phase is GamePhase.Deal or GamePhase.PlayerTurns && !p.SittingOut)
+            if (showOut)
             {
                 ImGui.SameLine();
                 // Not undoable (the bank refund is append-only), so Ctrl-gate it the
@@ -1718,6 +1722,16 @@ public partial class MainWindow
 
         var tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg |
                          ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.Resizable;
+        // Widest actions row: Stand Hit Dbl Spl [Srn] Out X. Measured rather than
+        // hardcoded so a font change (or enabling surrender) cannot clip a button.
+        float BtnW(string s) => ImGui.CalcTextSize(s).X + ImGui.GetStyle().FramePadding.X * 2;
+        var actionLabels = State.AllowSurrender
+            ? new[] { "Stand", "Hit", "Dbl", "Spl", "Srn", "Out", "X" }
+            : new[] { "Stand", "Hit", "Dbl", "Spl", "Out", "X" };
+        var actionsWidth = actionLabels.Sum(BtnW)
+                         + ImGui.GetStyle().ItemSpacing.X * (actionLabels.Length - 1)
+                         + ImGui.GetStyle().CellPadding.X * 2;
+
         if (!ImGui.BeginTable("##players"u8, 7, tableFlags)) return;
         ImGui.TableSetupColumn("Name"u8,      ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Bet"u8,       ImGuiTableColumnFlags.WidthFixed, 70);
@@ -1725,7 +1739,7 @@ public partial class MainWindow
         ImGui.TableSetupColumn("Cards"u8,     ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Score"u8,     ImGuiTableColumnFlags.WidthFixed, 55);
         ImGui.TableSetupColumn("Status"u8,    ImGuiTableColumnFlags.WidthFixed, 100);
-        ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, 190);
+        ImGui.TableSetupColumn("##actions"u8, ImGuiTableColumnFlags.WidthFixed, actionsWidth);
         ImGui.TableHeadersRow();
 
         (int A, int B)? reorderSwap = null;
