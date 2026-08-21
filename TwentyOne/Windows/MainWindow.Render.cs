@@ -1874,6 +1874,13 @@ public partial class MainWindow
                 ImGui.TextDisabled(sp.DisplayName);
                 if (ImGui.IsItemHovered() && sp.World.Length > 0)
                     ImGui.SetTooltip($"{sp.FullName}@{sp.World}");
+                if (sp.PendingJoin)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextColored(new Vector4(0.55f, 0.75f, 0.95f, 1f), "(joining)");
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip("Added mid-round. Joins the table when you click New Round.");
+                }
 
                 ImGui.TableSetColumnIndex(2);
                 var sitBankVal       = sp.BankBalance(config);
@@ -1897,22 +1904,35 @@ public partial class MainWindow
 
                 ImGui.TableSetColumnIndex(5);
                 var sitStatusCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-                var resumeW = ImGui.CalcTextSize("Resume").X + ImGui.GetStyle().FramePadding.X * 2;
-                ImGui.SetCursorPosX(sitStatusCellRight - resumeW);
-                var canResume = Phase == GamePhase.Betting;
-                if (!canResume) ImGui.BeginDisabled();
-                ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.55f, 0.35f, 0.1f, 1f));
-                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.65f, 0.45f, 0.15f, 1f));
-                ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.75f, 0.55f, 0.2f, 1f));
-                if (ImGui.SmallButton($"Resume##{spi}sitresume"))
-                    Apply(new ToggleSittingOut(spi));
-                ImGui.PopStyleColor(3);
-                if (!canResume) ImGui.EndDisabled();
-                if (!canResume && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-                    ImGui.SetTooltip("Players can only resume during the betting phase.");
+                if (sp.PendingJoin)
+                {
+                    var joinLabel = "In next round";
+                    var joinW     = ImGui.CalcTextSize(joinLabel).X;
+                    ImGui.SetCursorPosX(sitStatusCellRight - joinW);
+                    ImGui.AlignTextToFramePadding();
+                    ImGui.TextDisabled(joinLabel);
+                }
+                else
+                {
+                    var resumeW = ImGui.CalcTextSize("Resume").X + ImGui.GetStyle().FramePadding.X * 2;
+                    ImGui.SetCursorPosX(sitStatusCellRight - resumeW);
+                    var canResume = Phase == GamePhase.Betting;
+                    if (!canResume) ImGui.BeginDisabled();
+                    ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.55f, 0.35f, 0.1f, 1f));
+                    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.65f, 0.45f, 0.15f, 1f));
+                    ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.75f, 0.55f, 0.2f, 1f));
+                    if (ImGui.SmallButton($"Resume##{spi}sitresume"))
+                        Apply(new ToggleSittingOut(spi));
+                    ImGui.PopStyleColor(3);
+                    if (!canResume) ImGui.EndDisabled();
+                    if (!canResume && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                        ImGui.SetTooltip("Players can only resume during the betting phase.");
+                }
 
                 ImGui.TableSetColumnIndex(6);
-                if (Phase == GamePhase.Betting)
+                // A pending-join player holds no bet or cards and sits past every
+                // active index, so removing them mid-round disturbs nobody.
+                if (Phase == GamePhase.Betting || sp.PendingJoin)
                 {
                     var sitActCellRight = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
                     var sitRemoveW = ImGui.CalcTextSize("X").X + ImGui.GetStyle().FramePadding.X * 2;
@@ -1932,7 +1952,6 @@ public partial class MainWindow
     private void DrawAddPlayerRow()
     {
         ImGui.Spacing();
-        if (Phase != GamePhase.Betting) return;
 
         var target      = Plugin.TargetManager.Target as Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter;
         var targetName  = target?.Name.TextValue ?? string.Empty;
@@ -1940,11 +1959,15 @@ public partial class MainWindow
         var alreadyIn   = target != null &&
                           config.GameState.Players.Any(p => p.FullName == targetName && p.World == targetWorld);
         var canAdd      = target != null && !alreadyIn;
+        var midRound    = Phase != GamePhase.Betting;
 
         if (!canAdd) ImGui.BeginDisabled();
-        if (ImGui.Button("Add Selected Player"))
+        if (ImGui.Button(midRound ? "Add Selected Player (next round)" : "Add Selected Player"))
             Apply(new AddPlayer(Nickname: string.Empty, FullName: targetName, World: targetWorld));
         if (!canAdd) ImGui.EndDisabled();
+        if (midRound && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("A round is in progress. They wait out this round and join the table on New Round.\n" +
+                             "You can still take their gil into their bank while they wait.");
 
         ImGui.Spacing();
     }

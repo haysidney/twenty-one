@@ -1322,15 +1322,35 @@ public static class GameEngine
     private static GameState HandleNewRound(GameState state) =>
         state with
         {
-            Players = state.Players.Select(p => p with { Hands = [new Hand()] }).ToImmutableArray(),
+            // Players added mid-round were parked as sitting out; the new round is
+            // where they actually join.
+            Players = state.Players.Select(p => p.PendingJoin
+                                                    ? p with { Hands = [new Hand()], SittingOut = false, PendingJoin = false }
+                                                    : p with { Hands = [new Hand()] }).ToImmutableArray(),
             DealerHand        = new Hand(),
             Phase             = GamePhase.Betting,
             ActivePlayerIndex = -1,
             ActiveHandIndex   = -1,
         };
 
-    private static GameState HandleAddPlayer(GameState state, AddPlayer a) =>
-        state with { Players = [..state.Players, new Player { Nickname = a.Nickname, FullName = a.FullName, World = a.World, Hands = [new Hand()] }] };
+    private static GameState HandleAddPlayer(GameState state, AddPlayer a)
+    {
+        // Joining mid-round would hand out a bet-less hand in a deal already under
+        // way, so park them as sitting out and let NewRound seat them.
+        var midRound = state.Phase != GamePhase.Betting;
+        return state with
+        {
+            Players = [..state.Players, new Player
+            {
+                Nickname    = a.Nickname,
+                FullName    = a.FullName,
+                World       = a.World,
+                Hands       = [new Hand()],
+                SittingOut  = midRound,
+                PendingJoin = midRound,
+            }]
+        };
+    }
 
     private static GameState HandleRemovePlayer(GameState state, RemovePlayer a)
     {

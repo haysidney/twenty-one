@@ -662,6 +662,53 @@ public class RosterManagementTests
     }
 
     [Fact]
+    public void AddPlayer_DuringBetting_JoinsImmediately()
+    {
+        var (ns, _) = GameEngine.Apply(BettingState(), new AddPlayer("Lorah"));
+        Assert.False(ns.Players[0].SittingOut);
+        Assert.False(ns.Players[0].PendingJoin);
+    }
+
+    [Theory]
+    [InlineData(GamePhase.Deal)]
+    [InlineData(GamePhase.PlayerTurns)]
+    [InlineData(GamePhase.DealerTurn)]
+    [InlineData(GamePhase.Payout)]
+    public void AddPlayer_MidRound_ParksAsPendingJoin(GamePhase phase)
+    {
+        var state   = new GameStateBuilder().Phase(phase).Player("Bekki").Build();
+        var (ns, _) = GameEngine.Apply(state, new AddPlayer("Lorah"));
+
+        var added = ns.Players[1];
+        Assert.Equal("Lorah", added.Nickname);
+        Assert.True(added.SittingOut);
+        Assert.True(added.PendingJoin);
+        // Existing players are untouched.
+        Assert.False(ns.Players[0].SittingOut);
+    }
+
+    [Fact]
+    public void NewRound_SeatsPendingJoinPlayers()
+    {
+        var state   = new GameStateBuilder().Phase(GamePhase.Payout).Player("Bekki").Build();
+        var (s1, _) = GameEngine.Apply(state, new AddPlayer("Lorah"));
+        var (s2, _) = GameEngine.Apply(s1, new NewRound());
+
+        Assert.False(s2.Players[1].SittingOut);
+        Assert.False(s2.Players[1].PendingJoin);
+    }
+
+    [Fact]
+    public void NewRound_LeavesDeliberatelySatOutPlayersSittingOut()
+    {
+        var state   = new GameStateBuilder().Phase(GamePhase.Betting).Player("Bekki").Build();
+        var (s1, _) = GameEngine.Apply(state, new ToggleSittingOut(0));
+        var (s2, _) = GameEngine.Apply(s1, new NewRound());
+
+        Assert.True(s2.Players[0].SittingOut);
+    }
+
+    [Fact]
     public void RemovePlayer_RemovesCorrectIndex()
     {
         var state = new GameStateBuilder()

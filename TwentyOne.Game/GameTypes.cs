@@ -72,6 +72,10 @@ public sealed record class Player
     public string Bet { get; set; } = string.Empty;
     public ImmutableArray<Hand> Hands { get; set; } = [];
     public bool SittingOut { get; set; } = false;
+    // Set when the player was added while a round was already in progress. They are
+    // parked as sitting out for the remainder of that round and automatically join
+    // the table on the next NewRound (which clears both flags).
+    public bool PendingJoin { get; set; } = false;
 
     // Nickname if set; else first name from FullName; else Nickname (empty for edge cases).
     public string DisplayName

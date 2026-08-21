@@ -477,6 +477,28 @@ active players returns true (nothing left to resolve, so the dealer never has to
 play). The `Players.Length > 0` guard mirrors `IsAllBust` - an empty table is not a
 round to evaluate, and synthetic empty-roster states must keep behaving as before.
 
+### Mid-round joins (PendingJoin)
+
+`Player.PendingJoin` lets the dealer add someone while a round is running.
+`HandleAddPlayer` checks the phase: outside `Betting` the new player is appended
+with `SittingOut = true, PendingJoin = true`, so they take no cards and count in
+no statistic for the round already in progress. `HandleNewRound` seats them
+(clears both flags); a *deliberately* sat-out player has `PendingJoin = false`
+and stays sitting out, which is the whole reason for the second flag.
+
+`WithdrawFromRound` also sets `SittingOut` but leaves `PendingJoin` false, so a
+withdrawn player is not resurrected by the next round.
+
+Additive field with a `false` default - **no schema migration**.
+
+UI: `DrawAddPlayerRow` is no longer phase-gated; mid-round it reads "Add Selected
+Player (next round)" with an explanatory tooltip. In the sitting-out section a
+pending-join player is tagged `(joining)`, shows "In next round" instead of the
+Betting-only **Resume** button, and may be removed with **X** in any phase
+(they hold no bet or cards and sit past every active index, so removal disturbs
+no one). The **Manage** button works as usual, so their gil can be banked while
+they wait.
+
 ### Venue memory
 
 `Configuration.VenueMemory` maps housing address key (`"{territory}:{ward}:{plot}"`) to venue GUID. `Plugin.GetCurrentHousingAddressKey()` handles outdoor housing districts and indoor interiors. When deleting a venue, all `VenueMemory` entries referencing its GUID must be removed.

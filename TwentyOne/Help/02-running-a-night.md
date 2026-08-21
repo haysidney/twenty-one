@@ -19,12 +19,18 @@ new night.
 
 ## 2. Add players
 
-Two ways, both only available during the Betting phase:
+Two ways:
 
 - Target the player in the world, then click **Add Selected Player** under the
   table.
 - Right-click their name anywhere it appears in game and choose **Add to
   Blackjack Table**.
+
+Add someone while a round is already running and the button reads **Add
+Selected Player (next round)**. They drop straight into the sitting-out section
+marked **(joining)** and take a seat the moment you click **New Round** - no
+need to remember them. You can still trade with them and bank their gil while
+they wait, so they are ready to bet the second the new round opens.
 
 Once added, a player's row gives you:
 
@@ -32,8 +38,8 @@ Once added, a player's row gives you:
 - **R** sets a nickname, **C** clears it. Double-clicking the name does the same
   as **R**.
 - **Sit Out** parks them for a round without removing them. **Resume** brings
-  them back. Sat-out players drop to a greyed section at the bottom and are not
-  counted in that round's statistics.
+  them back (during Betting). Sat-out players drop to a greyed section at the
+  bottom and are not counted in that round's statistics.
 - **X** removes them from the table entirely.
 - **Reorder** (next to the Players heading, when more than one is playing) lets
   you move rows up and down to match seating order.
