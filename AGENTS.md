@@ -804,6 +804,17 @@ Commit messages follow `type(scope): message` style. Every commit builds (Debug 
 ## UI Rules
 
 - Never use non-ASCII characters (icons, arrows, symbols) on buttons unless explicitly requested. Use plain text labels only.
+- **The `uiBusy` gate disables most of the main window**, not just the card
+  buttons: `MainWindow.Draw` wraps the dealer section, player table, add-player
+  row and phase action bar in one `BeginDisabled` whenever `chatQueue.Count > 0
+  || pendingHit != null || deferredRoll.HasValue`. Anything the dealer might need
+  *because* the table is stuck - Abort being the case that shipped broken
+  through 0.10.0 - must opt out by popping the scope around itself (`if (uiBusy)
+  EndDisabled(); ... if (uiBusy) BeginDisabled();`, the idiom in
+  `DrawBankManageButton`). Opting out is only safe if the handler leaves no
+  in-flight state behind: Abort qualifies because `Apply(NewRound)` clears
+  `autoDealQueue` / `pendingHit` and the handler clears `chatQueue` /
+  `deferredRoll`.
 - To right-align a button within a cell/region: use `SameLine()` followed by `if (GetCursorPosX() < targetX) SetCursorPosX(targetX)`, where `targetX = cellRight - buttonWidth` (button width = `CalcTextSize(...).X + FramePadding.X * 2`). Do **not** pass a position directly to `SameLine(pos)` - if `pos` is behind the current cursor, ImGui will clip or hide the widget.
 - **Never guard a `Push`/`Pop` (or `BeginDisabled`/`EndDisabled`) pair on a condition
   that a widget inside the pair can change.** Latch it into a local first
