@@ -1624,7 +1624,7 @@ public partial class MainWindow
         }
 
         DrawAddPlayerRow();
-        DrawPhaseActionBar();
+        DrawPhaseActionBar(uiBusy);
 
         if (uiBusy) ImGui.EndDisabled();
 
@@ -1972,7 +1972,7 @@ public partial class MainWindow
         ImGui.Spacing();
     }
 
-    private void DrawPhaseActionBar()
+    private void DrawPhaseActionBar(bool uiBusy)
     {
         ImGui.Separator();
         ImGui.Spacing();
@@ -2179,6 +2179,11 @@ public partial class MainWindow
         if (Phase != GamePhase.Payout && Phase != GamePhase.Betting)
         {
             ImGui.SameLine();
+            // Abort is exempt from the uiBusy gate that disables the rest of the
+            // window: a stuck roll or a chat backlog is exactly when the dealer
+            // needs to scrap the round, and Apply(NewRound) clears autoDealQueue /
+            // pendingHit itself, so aborting mid-flight is safe.
+            if (uiBusy) ImGui.EndDisabled();
             // In Deal nothing has been played yet: every bank op is refunded and
             // NewRound preserves each player's bet, so aborting is cheap and fully
             // recoverable - no Ctrl gate. From PlayerTurns on it destroys real play.
@@ -2198,6 +2203,7 @@ public partial class MainWindow
                 ImGui.SetTooltip(isDeal
                     ? "Scrap this deal and return to betting. Every bet is refunded and kept for the re-deal."u8
                     : "Hold Ctrl to abort the round."u8);
+            if (uiBusy) ImGui.BeginDisabled();
         }
 
     }
