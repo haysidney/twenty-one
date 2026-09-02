@@ -62,7 +62,6 @@ public class PlayerStat
     public int     Charlies    { get; set; } = 0;
     public long    TotalNet    { get; set; } = 0;
     public long    Bank        { get; set; } = 0;
-    public bool    MaintainBet { get; set; } = false;
     public List<BankTransactionEntry> BankLog { get; set; } = [];
 
     [JsonExtensionData] public Dictionary<string, JToken> ExtraData { get; set; } = new();

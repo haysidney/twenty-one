@@ -774,15 +774,13 @@ public partial class MainWindow : Window, IDisposable
             case TradeMonitor.Outcome.PromptBankDeposit pbd:
                 AuditTrade(pbd.Pi, 0, pbd.Gil, "Deposit");
                 reconciler.RecordExpected(pbd.Gil, DateTime.Now, State.Players[pbd.Pi].StatsKey());
-                if (!TryAutoDoubleOrSplitDeposit(pbd.Pi, pbd.Gil)
-                    && !TryAutoMaintainBetDeposit(pbd.Pi, pbd.Gil))
+                if (!TryAutoDoubleOrSplitDeposit(pbd.Pi, pbd.Gil))
                     CommitTradeDeposit(pbd.Pi, pbd.Gil);
                 break;
             case TradeMonitor.Outcome.PromptBankWithdraw pbw:
                 AuditTrade(pbw.Pi, pbw.Gil, 0, "Withdraw");
                 reconciler.RecordExpected(-pbw.Gil, DateTime.Now, State.Players[pbw.Pi].StatsKey());
-                if (!TryAutoMaintainBetWithdraw(pbw.Pi, pbw.Gil))
-                    CommitTradeWithdraw(pbw.Pi, pbw.Gil);
+                CommitTradeWithdraw(pbw.Pi, pbw.Gil);
                 break;
             case TradeMonitor.Outcome.PromptTwoSided pts:
                 AuditTrade(pts.Pi, pts.Gave, pts.Received, "TwoSided");
@@ -821,8 +819,7 @@ public partial class MainWindow : Window, IDisposable
     {
         var stat = State.Players[pi].GetOrCreateStat(config);
         ApplyBank(stat, new BankDeposit(gil));
-        if (!stat.MaintainBet)
-            Apply(new AnnounceBankDeposit(pi, gil, stat.Bank));
+        Apply(new AnnounceBankDeposit(pi, gil, stat.Bank));
         config.Save();
     }
 
@@ -830,8 +827,7 @@ public partial class MainWindow : Window, IDisposable
     {
         var stat = State.Players[pi].GetOrCreateStat(config);
         ApplyBank(stat, new BankWithdrawal(gil));
-        if (!stat.MaintainBet)
-            Apply(new AnnounceBankWithdraw(pi, gil, stat.Bank));
+        Apply(new AnnounceBankWithdraw(pi, gil, stat.Bank));
         config.Save();
     }
 
@@ -839,9 +835,9 @@ public partial class MainWindow : Window, IDisposable
     {
         var stat = State.Players[pi].GetOrCreateStat(config);
         ApplyBank(stat, new BankWithdrawal(gave));
-        if (!stat.MaintainBet) Apply(new AnnounceBankWithdraw(pi, gave, stat.Bank));
+        Apply(new AnnounceBankWithdraw(pi, gave, stat.Bank));
         ApplyBank(stat, new BankDeposit(received));
-        if (!stat.MaintainBet) Apply(new AnnounceBankDeposit(pi, received, stat.Bank));
+        Apply(new AnnounceBankDeposit(pi, received, stat.Bank));
         config.Save();
     }
 
@@ -861,33 +857,6 @@ public partial class MainWindow : Window, IDisposable
         AuditLog.Trade(config.ActiveVenue.Id.ToString(), partner, gave, received, outcome, config.GilEnd);
     }
 
-    // Returns true and silently applies if the trade is the exact maintain-bet deposit amount.
-    private bool TryAutoMaintainBetDeposit(int pi, long gil)
-    {
-        if (pi < 0 || pi >= State.Players.Length) return false;
-        var p = State.Players[pi];
-        if (!p.TryGetStat(config, out var stat) || !stat.MaintainBet) return false;
-        if (stat.Bank != 0) return false;
-        var bet = (long)Math.Ceiling(GameEngine.ParseBet(p.Bet));
-        if (bet <= 0 || gil != bet) return false;
-        ApplyBank(stat, new BankDeposit(gil));
-        config.Save();
-        return true;
-    }
-
-    // Returns true and silently applies if the trade is the exact maintain-bet withdrawal amount.
-    private bool TryAutoMaintainBetWithdraw(int pi, long gil)
-    {
-        if (pi < 0 || pi >= State.Players.Length) return false;
-        var p = State.Players[pi];
-        if (!p.TryGetStat(config, out var stat) || !stat.MaintainBet) return false;
-        var bet = (long)Math.Floor(GameEngine.ParseBet(p.Bet));
-        var owe = stat.Bank - bet;
-        if (owe <= 0 || gil != owe) return false;
-        ApplyBank(stat, new BankWithdrawal(gil));
-        config.Save();
-        return true;
-    }
 
     // Returns true and silently deposits if a double/split is pending for this player
     // and the trade equals either the full bet or the exact shortfall to cover it.

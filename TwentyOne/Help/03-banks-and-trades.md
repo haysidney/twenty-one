@@ -47,7 +47,6 @@ The **Manage** button in a player's Bank column opens their bank.
 | Dealer Tip | Moves gil out of their bank and keeps it as your tip. |
 | Transfer To | Moves gil from their bank into another player's bank. |
 | Remind | Tells them their bet and bank balance in chat. |
-| Maintain Bet | Tracks their bank against their bet. |
 | Clear All | Wipes the balance and history. Needs Ctrl. |
 
 Deposit and Withdraw here are for corrections and for gil that moved outside a
@@ -89,18 +88,6 @@ a separate line at settlement, and that is correct rather than an oversight:
   settle.
 - Credit they cash out did leave your pile, so it is already counted as a loss
   in Table net, and your loss-coverage setting handles it.
-
-## Maintain Bet
-
-Turning **Maintain Bet** on for a player says "this person is playing the same
-bet repeatedly, keep their bank level with it". It does two things:
-
-- Deposit and withdrawal narration is suppressed for them, so a regular
-  re-buying every round does not spam the channel.
-- When their bank rises above their bet, an **Owe** figure appears in their Bank
-  cell showing how much to hand back.
-
-Use it for a regular. Leave it off for a casual player.
 
 ## Paying out
 

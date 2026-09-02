@@ -2,6 +2,16 @@
 
 After completing any feature or significant design decision, update CLAUDE.md to reflect it. Keep architecture sections current - future sessions depend on this file for context.
 
+**Audit the dealer's guide on every user-visible change.** Before calling any
+change done, check whether it touches something `TwentyOne/Help/*.md` describes -
+a button or label, a window, a workflow, a rule, a narration behaviour - and
+update or delete the affected page in the same commit. A removal is as much a
+doc change as an addition: an orphaned Help section is worse than no section,
+because the dealer will go looking for a control that is gone. Grep the Help
+directory for the old name before you conclude nothing needs a pass, and say
+explicitly in the summary whether the guide needed a change or genuinely did
+not.
+
 ## Project
 
 This is a Final Fantasy XIV plugin that uses the Dalamud API (https://dalamud.dev/api/).
@@ -613,10 +623,10 @@ Detected trades **auto-commit** to the player's bank - there is no per-trade
 confirm modal. `OnChatMessage`'s switch over `TradeMonitor.Outcome` calls the
 relevant `CommitTrade*` helper: `CommitTradeDeposit` (incoming -> `BankDeposit`),
 `CommitTradeWithdraw` (outgoing -> `BankWithdrawal`), `CommitTwoSided` (both legs).
-The special auto-helpers (`TryAutoDoubleOrSplitDeposit`, `TryAutoMaintainBet*`)
-still get first refusal; the commit is the fall-through. (There is no "Cash Out"
-mode any more - it predated always-on wallet tracking and the reconciler, and an
-outgoing trade is simply a withdrawal. Orphan config key, cleaned on load.)
+`TryAutoDoubleOrSplitDeposit` still gets first refusal on an incoming trade; the
+commit is the fall-through. (Neither "Cash Out" nor `MaintainBet` exists any
+more - both predated always-on wallet tracking and the reconciler, and an
+outgoing trade is simply a withdrawal. Orphan config keys, cleaned on load.)
 
 Removing the prompt killed the prompt-overwrite money-loss bug (a second trade
 clobbering an unconfirmed first prompt) by construction. It is **safe only
