@@ -104,6 +104,74 @@ public class WithdrawFromRoundTests
         Assert.Equal(state, result);
     }
 
+    [Theory]
+    [InlineData(HandState.Stand)]
+    [InlineData(HandState.Bust)]
+    [InlineData(HandState.Blackjack)]
+    [InlineData(HandState.Charlie)]
+    [InlineData(HandState.Surrendered)]
+    public void Withdraw_PlayerWhoFinishedTheirTurn_IsNoop(HandState finished)
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Dealer(10)
+            .Player("Lorah", "100", finished, 10, 9)
+            .Player("Bekki", 10, 9)
+            .ActiveHand(1)
+            .Build();
+
+        var (result, effects) = Apply(state, new WithdrawFromRound(0));
+
+        Assert.Equal(state, result);
+        Assert.Empty(effects);
+        Assert.False(GameEngine.CanWithdraw(state, 0));
+        Assert.True(GameEngine.CanWithdraw(state, 1));
+    }
+
+    [Fact]
+    public void Withdraw_SplitWithOneHandStillPlaying_IsAllowed()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Dealer(10)
+            .Player(new Player
+            {
+                Nickname = "Lorah",
+                Bet      = "100",
+                Hands    =
+                [
+                    new Hand { Cards = [8, 10], State = HandState.Stand },
+                    new Hand { Cards = [8, 3],  State = HandState.Playing },
+                ],
+            })
+            .ActiveHand(0, 1)
+            .Build();
+
+        Assert.True(GameEngine.CanWithdraw(state, 0));
+
+        var (result, _) = Apply(state, new WithdrawFromRound(0));
+
+        Assert.True(result.Players[0].SittingOut);
+    }
+
+    // Deal phase is exempt: nobody has acted, so a terminal hand there (a dealt
+    // blackjack) is still withdrawable.
+    [Fact]
+    public void Withdraw_BlackjackInDeal_IsAllowed()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Deal)
+            .Dealer(10)
+            .Player("Lorah", "100", HandState.Blackjack, 1, 10)
+            .Build();
+
+        Assert.True(GameEngine.CanWithdraw(state, 0));
+
+        var (result, _) = Apply(state, new WithdrawFromRound(0));
+
+        Assert.True(result.Players[0].SittingOut);
+    }
+
     // ── PlayerTurns: not the active player ────────────────────────────────────
 
     [Fact]

@@ -245,6 +245,22 @@ public static class GameEngine
         && hand.Cards.Length == 2 && hand.State == HandState.Playing
         && !hand.IsFromSplit && !hand.Doubled;
 
+    // A player can be pulled out of a round only while they still have something
+    // at stake: any time during Deal (nobody has acted yet), and during PlayerTurns
+    // only while a hand is still Playing. Once every hand is terminal (stood, bust,
+    // blackjack, charlie, surrendered) their turn is over and the result stands.
+    public static bool CanWithdraw(GameState state, int playerIndex)
+    {
+        if (playerIndex < 0 || playerIndex >= state.Players.Length) return false;
+        if (state.Phase is not (GamePhase.Deal or GamePhase.PlayerTurns)) return false;
+
+        var p = state.Players[playerIndex];
+        if (p.SittingOut) return false;
+
+        return state.Phase == GamePhase.Deal
+            || p.Hands.Any(h => h.State == HandState.Playing);
+    }
+
     // Deal phase is complete when the dealer has ≥1 card and every player's first hand has ≥2 cards.
     public static bool IsDealComplete(GameState state) =>
         state.DealerHand.Cards.Length >= 1
@@ -1170,11 +1186,9 @@ public static class GameEngine
     private static GameState HandleWithdrawFromRound(GameState state, WithdrawFromRound a, NarrationContext ctx)
     {
         var pi = a.PlayerIndex;
-        if (pi < 0 || pi >= state.Players.Length) return state;
-        if (state.Phase is not (GamePhase.Deal or GamePhase.PlayerTurns)) return state;
+        if (!CanWithdraw(state, pi)) return state;
 
         var p = state.Players[pi];
-        if (p.SittingOut) return state;
 
         var newPlayers = WithPlayer(state.Players, pi,
             p with { SittingOut = true, Bet = string.Empty, Hands = [new Hand()] });

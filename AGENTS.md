@@ -470,6 +470,11 @@ Two ways out of a round in progress:
     `AdvanceToDealerTurn`), so `WaitingForDealer` stays derived from
     `CanGoToPayout` and the dealer never skips the "Go to Payout" click where
     settlement runs.
+  - Gated by `GameEngine.CanWithdraw(state, pi)` (shared by the handler and the
+    UI): any time during `Deal`, but in `PlayerTurns` only while the player still
+    has a hand in `HandState.Playing`. Once every hand is terminal their turn is
+    over and the result stands - withdrawing then would refund a bet that had
+    already been won or lost. The Out button is hidden, not just disabled.
   - UI: Ctrl-gated "Out" button on the player's first hand row.
 
 `CanGoToPayout` gained an **everyone-withdrew** case: a non-empty roster with zero

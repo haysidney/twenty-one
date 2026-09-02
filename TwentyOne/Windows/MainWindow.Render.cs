@@ -796,7 +796,7 @@ public partial class MainWindow
         else
         {
             var showSrn = State.AllowSurrender;
-            var showOut = ctx.IsFirstHand && Phase is GamePhase.Deal or GamePhase.PlayerTurns && !p.SittingOut;
+            var showOut = ctx.IsFirstHand && GameEngine.CanWithdraw(State, pi);
             var total = ABW("Stand") + asp + ABW("Hit") + asp + ABW("Dbl") + asp + ABW("Spl")
                       + (showSrn ? asp + ABW("Srn") : 0)
                       + (showOut ? asp + ABW("Out") : 0)
