@@ -20,6 +20,30 @@ point at a missing asset.
 
 ## Steps
 
+### 0. Check what dealers actually have
+
+The last git tag is **not** the last release. Tags are cheap and get made for
+builds that were never cut; `v0.10.2`, `v0.11.0` and `v0.12.0` were all tagged
+and none was ever published, so every dealer stayed on `v0.10.1` until `v0.12.1`
+carried the lot.
+
+```bash
+gh api repos/haysidney/DalamudPlugins/contents/repo.json --jq '.content' \
+  | base64 -d | python3 -c "
+import json,sys
+e = next(x for x in json.load(sys.stdin) if x['InternalName'] == 'TwentyOne')
+print(e['AssemblyVersion'])"
+git log --oneline v<that version>..HEAD
+```
+
+The manifest's `AssemblyVersion` is the baseline the release notes must cover -
+not the previous tag. If it is several versions back, the notes describe the
+whole span.
+
+The tell, if this step is skipped: the four-line diff in step 7 comes out
+shorter. Only the `AssemblyVersion` line changes, because the URLs still carry a
+version older than the one being replaced.
+
 ### 1. Bump the version
 
 `<Version>` in `TwentyOne/TwentyOne.csproj`, in the same commit that earns it
