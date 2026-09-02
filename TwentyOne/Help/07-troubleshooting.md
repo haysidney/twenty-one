@@ -35,10 +35,17 @@ The plugin waits for the roll result before continuing. If one is lost, a
 If rolls are consistently going missing, your message delay is probably too low
 for the channel you are using.
 
+While the table is waiting on a card, most of the window is greyed out. **Abort**
+is deliberately left clickable throughout, so a deal that is wedged on a roll
+that never arrives can always be scrapped and re-dealt.
+
 ## Someone left in the middle of a round
 
 Hold Ctrl and click **Out** on their row. Their bet is refunded and their hand
 discarded; everyone else's round is untouched.
+
+If **Out** is not on their row, their turn has already finished and the result
+stands. Play the round out and correct their bank afterwards.
 
 ## The deal went wrong
 

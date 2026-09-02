@@ -104,3 +104,8 @@ Hold Ctrl and click **Out** on their row during the Deal or Player Actions
 phase. Their bet, including any double or split top-up, is refunded to their
 bank, their cards are discarded, and the round continues normally. If it was
 their turn, play advances as though they had stood.
+
+**Out** disappears once that player's turn is over - every hand of theirs stood,
+busted or surrendered. Their result is already decided at that point, so pulling
+them out would refund a bet that has been won or lost. If you need to correct
+something after that, let the round finish and adjust their bank by hand.

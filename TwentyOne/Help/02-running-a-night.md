@@ -112,7 +112,8 @@ hand gets a summary row above their hands showing their combined bet and bank.
 
 If someone disappears mid-round, hold Ctrl and click **Out** on their row. Their
 bet is refunded, their cards are discarded, and the round carries on without
-them.
+them. The button is only there while they still have a hand in play - once they
+have stood or busted, the result stands.
 
 ## 6. Play your own hand
 
