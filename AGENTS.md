@@ -801,6 +801,10 @@ Every narration string emitted via `SendChat` must have a corresponding property
 
 ## Commits
 
+Refer to the developer as **Bekki** in commit messages, docs, and any other
+prose. (The same name is also a test player - context disambiguates; the person
+is never a test fixture.) Git author metadata is separate and stays as it is.
+
 Commit messages follow `type(scope): message` style. Every commit builds (Debug + Release) and passes tests.
 
 ## Versioning
