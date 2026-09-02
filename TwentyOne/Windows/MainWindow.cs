@@ -340,12 +340,6 @@ public partial class MainWindow : Window, IDisposable
             adjustBetIndex = -1;
             adjustBetBuf   = string.Empty;
         }
-        else if (action is BeginPlayerTurns)
-        {
-            // Leaving the Deal phase: cancel any in-progress bet-adjust editor.
-            adjustBetIndex = -1;
-            adjustBetBuf   = string.Empty;
-        }
         else if (action is AdvanceToNextPlayer)
         {
             // Always push the WaitingForNextPlayer state so undo can return to it.
@@ -402,6 +396,15 @@ public partial class MainWindow : Window, IDisposable
             {
                 QueueHitRoll(isDealer: false, ah.PlayerIndex, ah.HandIndex);
             }
+        }
+
+        // The bet-adjust editor survives BeginPlayerTurns (the player's hand may
+        // still be untouched), so close it here the moment the action made that
+        // player's bet final - a hit, stand, double, split, or blackjack.
+        if (adjustBetIndex >= 0 && !GameEngine.CanAdjustBet(newState, adjustBetIndex))
+        {
+            adjustBetIndex = -1;
+            adjustBetBuf   = string.Empty;
         }
 
         config.Save();
@@ -528,16 +531,17 @@ public partial class MainWindow : Window, IDisposable
         config.RedoStack.Clear();
     }
 
-    // Adjust a player's bet during the Deal phase, reconciling their bank in lockstep.
+    // Adjust a player's bet while their hand is still untouched (see
+    // GameEngine.CanAdjustBet), reconciling their bank in lockstep.
     // Returns (success, message). On shortfall, no state or bank change is made.
     // The bank delta is recorded as a single BankBetAdjust entry (signed: positive = additional
     // deduction, negative = refund) so the audit log clearly attributes the change.
     private (bool Ok, string Message) TryAdjustBet(int pi, string newBetStr)
     {
-        if (Phase != GamePhase.Deal) return (false, "Bet adjustments are only allowed during the Deal phase.");
         if (pi < 0 || pi >= State.Players.Length) return (false, "Invalid player.");
+        if (!GameEngine.CanAdjustBet(State, pi))
+            return (false, "That player's bet is no longer adjustable - their hand is already in play.");
         var player = State.Players[pi];
-        if (player.SittingOut) return (false, "Player is sitting out.");
 
         var parsedNew = GameEngine.ParseBet(newBetStr);
         if (parsedNew <= 0) return (false, "Bet must be a positive number.");

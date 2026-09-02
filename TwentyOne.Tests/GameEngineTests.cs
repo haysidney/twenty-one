@@ -3170,7 +3170,7 @@ public class AdjustBetTests
     }
 
     [Fact]
-    public void AdjustBet_OutsideDealPhase_IsNoop()
+    public void AdjustBet_OutsidePlayablePhases_IsNoop()
     {
         var bettingState = new GameStateBuilder()
             .Phase(GamePhase.Betting)
@@ -3179,12 +3179,99 @@ public class AdjustBetTests
         var (next, _) = GameEngine.Apply(bettingState, new AdjustBet(0, "1000"));
         Assert.Equal("500", next.Players[0].Bet);
 
-        var playerTurnsState = new GameStateBuilder()
+        var dealerTurnState = new GameStateBuilder()
+            .Phase(GamePhase.DealerTurn)
+            .Player("Lorah", "500", HandState.Stand, 5, 6)
+            .Build();
+        (next, _) = GameEngine.Apply(dealerTurnState, new AdjustBet(0, "1000"));
+        Assert.Equal("500", next.Players[0].Bet);
+    }
+
+    [Fact]
+    public void AdjustBet_PlayerTurns_UntouchedHand_UpdatesPlayerBet()
+    {
+        var state = new GameStateBuilder()
             .Phase(GamePhase.PlayerTurns)
             .Player("Lorah", "500", 5, 6)
             .Build();
-        (next, _) = GameEngine.Apply(playerTurnsState, new AdjustBet(0, "1000"));
+        var (next, _) = GameEngine.Apply(state, new AdjustBet(0, "1000"));
+        Assert.Equal("1000", next.Players[0].Bet);
+    }
+
+    [Fact]
+    public void AdjustBet_PlayerTurns_AfterHit_IsNoop()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", "500", 5, 6, 3)
+            .Build();
+        var (next, _) = GameEngine.Apply(state, new AdjustBet(0, "1000"));
         Assert.Equal("500", next.Players[0].Bet);
+    }
+
+    [Fact]
+    public void AdjustBet_PlayerTurns_TerminalHand_IsNoop()
+    {
+        foreach (var terminal in new[] { HandState.Stand, HandState.Bust, HandState.Blackjack })
+        {
+            var state = new GameStateBuilder()
+                .Phase(GamePhase.PlayerTurns)
+                .Player("Lorah", "500", terminal, 10, 1)
+                .Build();
+            var (next, _) = GameEngine.Apply(state, new AdjustBet(0, "1000"));
+            Assert.Equal("500", next.Players[0].Bet);
+        }
+    }
+
+    [Fact]
+    public void AdjustBet_PlayerTurns_DoubledHand_IsNoop()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player(new Player
+            {
+                Nickname = "Lorah",
+                Bet      = "500",
+                Hands    = [new Hand { Cards = [5, 6], State = HandState.Playing, Doubled = true, Bet = "1000" }],
+            })
+            .Build();
+        var (next, _) = GameEngine.Apply(state, new AdjustBet(0, "1000"));
+        Assert.Equal("500", next.Players[0].Bet);
+    }
+
+    [Fact]
+    public void AdjustBet_PlayerTurns_SplitPlayer_IsNoop()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player(new Player
+            {
+                Nickname = "Lorah",
+                Bet      = "500",
+                Hands    =
+                [
+                    new Hand { Cards = [8, 3], State = HandState.Playing, IsFromSplit = true },
+                    new Hand { Cards = [8, 5], State = HandState.Playing, IsFromSplit = true },
+                ],
+            })
+            .Build();
+        var (next, _) = GameEngine.Apply(state, new AdjustBet(0, "1000"));
+        Assert.Equal("500", next.Players[0].Bet);
+    }
+
+    [Fact]
+    public void AdjustBet_PlayerTurns_OtherPlayerActing_StillAdjustable()
+    {
+        // Lorah is up and has already hit; Bekki has not been reached yet, so her
+        // bet stays adjustable. The gate is per-player, not per-table.
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .Player("Lorah", "500", 5, 6, 3)
+            .Player("Bekki", "500", 9, 7)
+            .ActiveHand(0)
+            .Build();
+        var (next, _) = GameEngine.Apply(state, new AdjustBet(1, "1000"));
+        Assert.Equal("1000", next.Players[1].Bet);
     }
 
     [Fact]

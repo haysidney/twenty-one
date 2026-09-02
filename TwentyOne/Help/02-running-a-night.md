@@ -79,6 +79,8 @@ While in the Deal phase you can still:
 
 - **Adjust** a player's bet. The bank is reconciled in the same click, so
   raising a bet beyond what they have is refused rather than silently allowed.
+  The button stays available into the next phase for as long as that player's
+  hand is untouched - see below.
 - **Abort Deal**, which scraps the deal, refunds every bet, and keeps the
   amounts typed in so you can simply deal again.
 
@@ -89,6 +91,13 @@ enabled that in Settings.
 
 The active hand is highlighted, and the phase label names whose turn it is and
 what they may legally do.
+
+**Adjust** is still on a player's row while their hand is untouched: one hand,
+two cards, nothing done to it. It disappears the moment they hit, stand,
+double, split, or turn up a blackjack. This is per player, so a seat further
+down the table can still be corrected while the first player is acting - which
+is what keeps a late bet fixable when **Auto Begin Player Turns** skips the
+pause after the deal.
 
 | Button | What it does |
 |---|---|

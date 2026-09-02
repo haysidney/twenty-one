@@ -186,7 +186,7 @@ public partial class MainWindow
                 : 0;
             if (Phase != GamePhase.Betting || isReorderMode)
             {
-                if (Phase == GamePhase.Deal && !p.SittingOut && adjustBetIndex == pi)
+                if (adjustBetIndex == pi && GameEngine.CanAdjustBet(State, pi))
                     DrawAdjustBetEditor(pi, p, cellRight, tradeButtonW);
                 else
                     DrawDealBetLabel(pi, p, hand, cellRight, tradeButtonW);
@@ -281,7 +281,7 @@ public partial class MainWindow
                 ImGui.SetClipboardText(betCopy);
         }
 
-        if (Phase == GamePhase.Deal && !p.SittingOut && !isReorderMode)
+        if (!isReorderMode && GameEngine.CanAdjustBet(State, pi))
         {
             var fp        = ImGui.GetStyle().FramePadding.X;
             var adjustW   = ImGui.CalcTextSize("Adjust").X + fp * 2;

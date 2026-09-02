@@ -261,6 +261,27 @@ public static class GameEngine
             || p.Hands.Any(h => h.State == HandState.Playing);
     }
 
+    // A player's bet can be adjusted while their hand is still untouched: any time
+    // during Deal, and during PlayerTurns only while they hold a single, unplayed
+    // 2-card hand. Once they hit, stand, double, split, or turn up a blackjack the
+    // result is in motion and the bet stands. Per-player, so a later seat stays
+    // adjustable while an earlier one is acting - which is what keeps the bet
+    // editable when AutoBeginPlayerTurns skips the Deal-phase pause.
+    public static bool CanAdjustBet(GameState state, int playerIndex)
+    {
+        if (playerIndex < 0 || playerIndex >= state.Players.Length) return false;
+        if (state.Phase is not (GamePhase.Deal or GamePhase.PlayerTurns)) return false;
+
+        var p = state.Players[playerIndex];
+        if (p.SittingOut) return false;
+        if (state.Phase == GamePhase.Deal) return true;
+
+        return p.Hands.Length == 1
+            && p.Hands[0].Cards.Length == 2
+            && p.Hands[0].State == HandState.Playing
+            && !p.Hands[0].Doubled;
+    }
+
     // Deal phase is complete when the dealer has ≥1 card and every player's first hand has ≥2 cards.
     public static bool IsDealComplete(GameState state) =>
         state.DealerHand.Cards.Length >= 1
@@ -1410,9 +1431,8 @@ public static class GameEngine
 
     private static GameState HandleAdjustBet(GameState state, AdjustBet a)
     {
-        if (state.Phase != GamePhase.Deal) return state;
+        if (!CanAdjustBet(state, a.PlayerIndex)) return state;
         var p = state.Players[a.PlayerIndex];
-        if (p.SittingOut) return state;
         return state with { Players = WithPlayer(state.Players, a.PlayerIndex, p with { Bet = a.Bet }) };
     }
 
