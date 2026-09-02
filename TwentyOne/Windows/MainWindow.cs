@@ -57,6 +57,12 @@ public partial class MainWindow : Window, IDisposable
     private string bankDepositBuf        = string.Empty;
     private string bankWithdrawBuf       = string.Empty;
     private string bankCreditBuf         = string.Empty;
+    private string bankTipBuf            = string.Empty;
+    private string bankTransferBuf       = string.Empty;
+    private int    bankTransferTargetIdx = 0;
+    // Set by the Transfer row's Confirm; drives DrawBankTransferConfirmModal.
+    // Indices (not stats keys) because the modal names players from GameState.
+    private (int From, int To, long Amount)? pendingBankTransfer;
     // Modal prompt. Trades now auto-commit (no confirm step), so the only prompt
     // left is an unexplained on-hand gil change surfaced by the reconciler.
     private abstract record PendingPrompt

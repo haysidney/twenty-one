@@ -126,13 +126,29 @@ attributes "work in tests but not in-game".
 `BankLedger.Apply(long balance, BankTransaction) → (long NewBalance, BankTransactionEntry)`
 
 - Lives in `TwentyOne.Game/BankLedger.cs` - no Dalamud dependency, fully unit-testable.
-- `BankTransaction` is a discriminated union: `BankDeposit`, `BankWithdrawal`, `BankBet`, `BankWin`, `BankDoubleDown`, `BankSplit`, `BankBetAdjust`, `BankSurrender`, `BankCredit`.
+- `BankTransaction` is a discriminated union: `BankDeposit`, `BankWithdrawal`, `BankBet`, `BankWin`, `BankDoubleDown`, `BankSplit`, `BankBetAdjust`, `BankSurrender`, `BankCredit`, `BankReversal`, `BankTip`, `BankTransfer`. `BankTransactionKind` serializes by ordinal, so new members are appended only.
 - Never produces a negative balance - debits clamp to zero.
 - Returns both the new balance and a log entry (timestamp, kind, amount, post-transaction balance).
 - `MainWindow` calls `ApplyBank(stat, tx)` which calls `BankLedger.Apply`, writes result back to `stat.Bank`, appends entry to `stat.BankLog`. No raw bank arithmetic anywhere else.
 - Bank mutations are intentionally outside `GameState` and the undo stack - they represent real-money ledger entries.
 - Double/split bank deduction happens at **Confirm** time (not at Dbl/Spl button click).
 - `BankBetAdjust` carries a **signed** `Delta`: positive deducts (bet went up), negative refunds (bet went down). The stored `BankTransactionEntry.Amount` keeps the sign so the audit log shows direction.
+- `BankTip` (dealer tip out of a player's bank) and `BankTransfer` (signed leg of a
+  bank-to-bank move) both move gil that the dealer is **already physically
+  holding**, so neither touches the wallet and neither is seen by `GilReconciler`.
+  Each is reconciliation-neutral by construction, which is why they need no
+  `GilStart` nudge:
+  - Tip: `banksHeld` falls by N while `TipTotal` rises by N (the UI posts the
+    `BankTip` *and* appends to `config.Tips`), and both are subtracted in
+    `AdjustedDiff`, so drift is unchanged. Settlement then passes it through to
+    `DealerTake` unsplit - the player tipped the dealer, not the venue.
+  - Transfer: two signed legs (`-N` sender, `+N` recipient), so the `banksHeld`
+    sum is unchanged. `CreditIssued` is derived from `Credit` log entries, so
+    transferring credited gil does not disturb it either.
+  - Both are plain `ApplyBank` (not `ApplyBankUndoable`) - append-only, like
+    trades and manage.
+  - Tipping *credit* balances the books and still passes `CheckClose`, but means
+    the dealer keeps venue-funded gil. Deliberately not blocked.
 - `BankCredit` is a venue-funded deposit (VIP / free play). Conceptually the venue pre-loads the dealer's starting gil with a credit pool; "issuing credit" relabels that gil into the player's bank without any physical trade. The bank ledger treats it like a deposit (real balance goes up). The session-ledger reconciliation includes `creditIssued` (sum of `BankCredit` entries this session) in the balance check: `adjustedDiff + grandTotal + creditIssued == 0`. The "Credits issued" line appears in the ledger for reference. **Credit gets no settlement line of its own, and adding one is a mistake** - see the Settlement section. This is the model from `25148d7`: the venue pre-loads the dealer's gil, so issuing credit only relabels gil that the venue already funded, and that funding is already inside `GilStart`.
 
 ### GameEngine (pure functional core)

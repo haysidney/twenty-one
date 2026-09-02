@@ -173,6 +173,8 @@ public class NarrationEditorWindow : Window
             NtListRow("Bank short##ntBKS",    "{name}  {amount}",         Defaults.PlayerBankShortfall, ctrlHeld, t.PlayerBankShortfall);
             NtListRow("Bank deposit##ntBKD",  "{name}  {amount}  {bank}", Defaults.PlayerBankDeposit,   ctrlHeld, t.PlayerBankDeposit);
             NtListRow("Bank withdraw##ntBKW", "{name}  {amount}  {bank}", Defaults.PlayerBankWithdraw,  ctrlHeld, t.PlayerBankWithdraw);
+            NtListRow("Bank tip##ntBKT",      "{name}  {dealer}  {amount}  {bank}", Defaults.PlayerBankTip,      ctrlHeld, t.PlayerBankTip);
+            NtListRow("Bank transfer##ntBKX", "{name}  {target}  {amount}  {bank}", Defaults.PlayerBankTransfer, ctrlHeld, t.PlayerBankTransfer);
 
             ImGui.Spacing();
             ImGui.TextDisabled("Deal announcements");

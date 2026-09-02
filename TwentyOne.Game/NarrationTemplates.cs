@@ -118,6 +118,13 @@ public class NarrationTemplates
     public List<List<string>> PlayerBankDeposit  { get; set; } = [["{name} deposited {amount}. Bank: {bank}."]];
     public List<List<string>> PlayerBankWithdraw { get; set; } = [["{name} withdrew {amount}. Bank: {bank}."]];
 
+    // Bank tip - player leaves part of their bank with the dealer
+    // {name} = player, {dealer} = dealer name, {amount} = tip, {bank} = new balance
+    public List<List<string>> PlayerBankTip { get; set; } = [["{name} tipped {dealer} {amount}! Thank you! <se.8> Bank: {bank}."]];
+
+    // Bank-to-bank transfer - {name} = sender, {target} = recipient, {amount} = moved, {bank} = sender's new balance
+    public List<List<string>> PlayerBankTransfer { get; set; } = [["{name} transferred {amount} to {target}. Bank: {bank}."]];
+
     // Trade-request announcements (sent when dealer clicks Double/Split, before confirming trade)
     // {amount} = the extra chips required
     public List<List<string>> PlayerDoubleRequest     { get; set; } = [["{name} would like to double down! Please place your bet with me ({amount}) <se.8>"]];

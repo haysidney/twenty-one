@@ -68,6 +68,11 @@ public record AnnounceBankShortfall(int PlayerIndex, long ShortfallAmount) : Ann
 public record AnnounceBankDeposit (int PlayerIndex, long Amount, long NewBalance) : Announcement;
 public record AnnounceBankWithdraw(int PlayerIndex, long Amount, long NewBalance) : Announcement;
 
+// Bank tip narration - the player left part of their bank with the dealer
+public record AnnounceBankTip(int PlayerIndex, long Amount, long NewBalance) : Announcement;
+// Bank-to-bank transfer narration - NewBalance is the sender's balance after the move
+public record AnnounceBankTransfer(int FromPlayerIndex, int ToPlayerIndex, long Amount, long NewBalance) : Announcement;
+
 // Phase transitions
 public record StartDeal : GameAction;
 public record BeginPlayerTurns : GameAction;

@@ -2260,6 +2260,33 @@ public class SplitHandTests
         Assert.Single(effects);
         Assert.Equal("Lorah wd=30K bal=70K", ((SendChat)effects[0]).Text);
     }
+
+    [Fact]
+    public void AnnounceBankTip_NarratesNameDealerAmountAndNewBalance()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah")
+            .Build();
+        var t = new NarrationTemplates { PlayerBankTip = [["{name} tipped {dealer} {amount} bal={bank}"]] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceBankTip(0, 20000, 80000), t, dealerName: "Nolla");
+        Assert.Single(effects);
+        Assert.Equal("Lorah tipped Nolla 20K bal=80K", ((SendChat)effects[0]).Text);
+    }
+
+    [Fact]
+    public void AnnounceBankTransfer_NarratesSenderTargetAmountAndSenderBalance()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.Betting)
+            .Player("Lorah")
+            .Player("Bekki")
+            .Build();
+        var t = new NarrationTemplates { PlayerBankTransfer = [["{name} -> {target} {amount} bal={bank}"]] };
+        var (_, effects) = GameEngine.Apply(state, new AnnounceBankTransfer(0, 1, 50000, 25000), t);
+        Assert.Single(effects);
+        Assert.Equal("Lorah -> Bekki 50K bal=25K", ((SendChat)effects[0]).Text);
+    }
 }
 
 public class AnnouncePlayerTurnTests
@@ -2952,6 +2979,51 @@ public class BankLedgerTests
         Assert.Equal(1000, bank);
     }
 
+    // ── Tip / Transfer ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Tip_DeductsFromBank()
+    {
+        var (bal, entry) = Apply(1000, new BankTip(250));
+        Assert.Equal(750, bal);
+        Assert.Equal(750, entry.Balance);
+        Assert.Equal(250, entry.Amount);
+        Assert.Equal(BankTransactionKind.Tip, entry.Kind);
+    }
+
+    [Fact]
+    public void Tip_ClampsAtZero()
+    {
+        var (bal, _) = Apply(100, new BankTip(500));
+        Assert.Equal(0, bal);
+    }
+
+    [Fact]
+    public void Transfer_NegativeDelta_DebitsSender()
+    {
+        var (bal, entry) = Apply(1000, new BankTransfer(-400));
+        Assert.Equal(600,  bal);
+        Assert.Equal(-400, entry.Amount); // sign preserved so the log shows direction
+        Assert.Equal(BankTransactionKind.Transfer, entry.Kind);
+    }
+
+    [Fact]
+    public void Transfer_PositiveDelta_CreditsRecipient()
+    {
+        var (bal, entry) = Apply(1000, new BankTransfer(400));
+        Assert.Equal(1400, bal);
+        Assert.Equal(400,  entry.Amount);
+        Assert.Equal(BankTransactionKind.Transfer, entry.Kind);
+    }
+
+    [Fact]
+    public void Transfer_BothLegs_LeaveTotalBanksUnchanged()
+    {
+        var (sender, _)    = Apply(1000, new BankTransfer(-400));
+        var (recipient, _) = Apply(200,  new BankTransfer(400));
+        Assert.Equal(1000 + 200, sender + recipient);
+    }
+
     // ── Log entry fields ───────────────────────────────────────────────────────
 
     [Fact]
@@ -3161,6 +3233,8 @@ public class GameActionPushesUndoTests
         new object[] { new AnnounceBankShortfall(0, 0) },
         new object[] { new AnnounceBankDeposit(0, 0, 0) },
         new object[] { new AnnounceBankWithdraw(0, 0, 0) },
+        new object[] { new AnnounceBankTip(0, 0, 0) },
+        new object[] { new AnnounceBankTransfer(0, 1, 0, 0) },
         new object[] { new AnnounceDouble(0, 0) },
         new object[] { new AnnounceDoubleConfirm(0, 0) },
         new object[] { new AnnounceSplit(0, 0) },

@@ -535,6 +535,8 @@ public static class GameEngine
         [typeof(AnnounceBankShortfall)] = (s, a, ctx) => HandleAnnounceBankShortfall(s, (AnnounceBankShortfall)a, ctx),
         [typeof(AnnounceBankDeposit)]  = (s, a, ctx) => HandleAnnounceBankDeposit(s, (AnnounceBankDeposit)a, ctx),
         [typeof(AnnounceBankWithdraw)] = (s, a, ctx) => HandleAnnounceBankWithdraw(s, (AnnounceBankWithdraw)a, ctx),
+        [typeof(AnnounceBankTip)]      = (s, a, ctx) => HandleAnnounceBankTip(s, (AnnounceBankTip)a, ctx),
+        [typeof(AnnounceBankTransfer)] = (s, a, ctx) => HandleAnnounceBankTransfer(s, (AnnounceBankTransfer)a, ctx),
         [typeof(AnnounceDealerDeal)]   = (s, _, ctx) => HandleAnnounceDealerDeal(s, ctx),
         [typeof(AnnouncePlayerDeal)]   = (s, a, ctx) => HandleAnnouncePlayerDeal(s, (AnnouncePlayerDeal)a, ctx),
         [typeof(StartDeal)]            = (s, _, _) => HandleStartDeal(s),
@@ -1028,6 +1030,31 @@ public static class GameEngine
         var player = state.Players[a.PlayerIndex];
         ctx.Narrate(t.PlayerBankWithdraw,
             ("name",   player.DisplayName),
+            ("amount", FormatGil(a.Amount)),
+            ("bank",   FormatGil(a.NewBalance)));
+        return state;
+    }
+
+    private static GameState HandleAnnounceBankTip(GameState state, AnnounceBankTip a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var player = state.Players[a.PlayerIndex];
+        ctx.Narrate(t.PlayerBankTip,
+            ("name",   player.DisplayName),
+            ("dealer", ctx.DealerName),
+            ("amount", FormatGil(a.Amount)),
+            ("bank",   FormatGil(a.NewBalance)));
+        return state;
+    }
+
+    private static GameState HandleAnnounceBankTransfer(GameState state, AnnounceBankTransfer a, NarrationContext ctx)
+    {
+        var t = ctx.Templates;
+        var from = state.Players[a.FromPlayerIndex];
+        var to   = state.Players[a.ToPlayerIndex];
+        ctx.Narrate(t.PlayerBankTransfer,
+            ("name",   from.DisplayName),
+            ("target", to.DisplayName),
             ("amount", FormatGil(a.Amount)),
             ("bank",   FormatGil(a.NewBalance)));
         return state;

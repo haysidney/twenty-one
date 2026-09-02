@@ -44,6 +44,8 @@ The **Manage** button in a player's Bank column opens their bank.
 | Deposit | Adds gil to their bank and narrates it. |
 | Withdraw | Takes gil out of their bank and narrates it. |
 | Credit | Adds to their bank with no real gil moving. |
+| Dealer Tip | Moves gil out of their bank and keeps it as your tip. |
+| Transfer To | Moves gil from their bank into another player's bank. |
 | Remind | Tells them their bet and bank balance in chat. |
 | Maintain Bet | Tracks their bank against their bet. |
 | Clear All | Wipes the balance and history. Needs Ctrl. |
@@ -55,6 +57,24 @@ picked up on their own.
 Below the buttons is that player's full transaction history: time, type, amount
 and the balance after it. This is the first place to look when someone disputes
 a number.
+
+## Dealer Tip and Transfer To
+
+Both of these move gil between books you are already holding, so no trade
+happens and the reconciliation stays balanced.
+
+**Dealer Tip** is for the player who says "keep the rest". It takes the amount
+out of their bank and adds it to Tips in the Session Ledger. Tips never enter
+the venue split - the whole amount is yours.
+
+**Transfer To** moves gil from this player's bank into another seated player's
+bank: one person covering another's buy-in, or settling something between
+themselves. Pick the amount and the recipient, and a confirmation window spells
+out the move before it is posted, because the only way back is a transfer in the
+other direction.
+
+Both are narrated in chat, and both show in the transaction history as **Tip**
+and **Transfer**.
 
 ## Credit
 

@@ -5,7 +5,8 @@ using Newtonsoft.Json.Linq;
 
 namespace TwentyOne.Game;
 
-public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split, BetAdjust, Surrender, Credit, Reversal }
+// Appended-only: the enum serializes by ordinal, so new members go at the end.
+public enum BankTransactionKind { Deposit, Withdrawal, Bet, Win, DoubleDown, Split, BetAdjust, Surrender, Credit, Reversal, Tip, Transfer }
 
 [Serializable]
 public class BankTransactionEntry
@@ -43,6 +44,15 @@ public record BankCredit(long Amount)     : IBankTransaction;
 // (reversing a deduction like Bet/DoubleDown/Split), negative debits it. Kept as
 // a distinct kind so the audit log shows it as a reversal, not a fresh deposit.
 public record BankReversal(long Delta)    : IBankTransaction;
+// Player leaves part of their bank for the dealer. No gil moves - the dealer is
+// already holding it - so this is a pure relabeling: the bank drops and the
+// amount is added to Configuration.Tips. In the session-ledger identity the two
+// cancel (banksHeld -N, tipTotal +N), leaving AdjustedDiff and drift untouched.
+public record BankTip(long Amount)        : IBankTransaction;
+// One leg of a bank-to-bank transfer. Signed Delta: negative debits the sender,
+// positive credits the recipient. Two entries are posted per transfer, so the
+// banksHeld total is unchanged and reconciliation stays neutral by construction.
+public record BankTransfer(long Delta)    : IBankTransaction;
 
 public static class BankLedger
 {
@@ -65,6 +75,8 @@ public static class BankLedger
             BankSurrender  s => (balance + s.Amount,              BankTransactionKind.Surrender,  s.Amount),
             BankCredit     c => (balance + c.Amount,              BankTransactionKind.Credit,     c.Amount),
             BankReversal   r => (Math.Max(0, balance + r.Delta),  BankTransactionKind.Reversal,   r.Delta),
+            BankTip        t => (Math.Max(0, balance - t.Amount), BankTransactionKind.Tip,        t.Amount),
+            BankTransfer   t => (Math.Max(0, balance + t.Delta),  BankTransactionKind.Transfer,   t.Delta),
             _                => throw new ArgumentOutOfRangeException(nameof(tx)),
         };
 

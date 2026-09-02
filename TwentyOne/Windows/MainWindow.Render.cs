@@ -958,7 +958,7 @@ public partial class MainWindow
         var bankWinOpen = true;
         var bmp         = State.Players[bankManagePlayerIndex];
         var bmpKey      = bmp.StatsKey();
-        ImGui.SetNextWindowSize(new Vector2(380, 480), ImGuiCond.FirstUseEver);
+        ImGui.SetNextWindowSize(new Vector2(440, 540), ImGuiCond.FirstUseEver);
         if (ImGui.Begin("Bank##bankManage", ref bankWinOpen, ImGuiWindowFlags.NoCollapse))
         {
             if (!config.PlayerStatsStore.TryGetValue(bmpKey, out var bmpStat))
@@ -986,7 +986,7 @@ public partial class MainWindow
             ImGui.Spacing();
 
             // Deposit
-            ImGui.AlignTextToFramePadding(); ImGui.Text("Deposit"); ImGui.SameLine(80);
+            ImGui.AlignTextToFramePadding(); ImGui.Text("Deposit"); ImGui.SameLine(90);
             ImGui.SetNextItemWidth(140);
             ImGui.InputTextWithHint("##bankdep", "amount", ref bankDepositBuf, 20);
             ImGui.SameLine();
@@ -1004,7 +1004,7 @@ public partial class MainWindow
             ImGui.Spacing();
 
             // Withdraw
-            ImGui.AlignTextToFramePadding(); ImGui.Text("Withdraw"); ImGui.SameLine(80);
+            ImGui.AlignTextToFramePadding(); ImGui.Text("Withdraw"); ImGui.SameLine(90);
             ImGui.SetNextItemWidth(140);
             ImGui.InputTextWithHint("##bankwd", "amount", ref bankWithdrawBuf, 20);
             ImGui.SameLine();
@@ -1022,7 +1022,7 @@ public partial class MainWindow
             ImGui.Spacing();
 
             // Issue Credit (phantom deposit; no real gil moves)
-            ImGui.AlignTextToFramePadding(); ImGui.Text("Credit"); ImGui.SameLine(80);
+            ImGui.AlignTextToFramePadding(); ImGui.Text("Credit"); ImGui.SameLine(90);
             ImGui.SetNextItemWidth(140);
             ImGui.InputTextWithHint("##bankcredit", "amount", ref bankCreditBuf, 20);
             ImGui.SameLine();
@@ -1036,6 +1036,71 @@ public partial class MainWindow
             if (!canCredit) ImGui.EndDisabled();
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                 ImGui.SetTooltip("Issue a VIP / free-play credit. Adds to bank without real gil moving.\nCredit drains first when the player bets, loses, or withdraws.");
+
+            ImGui.Spacing();
+
+            // Dealer Tip - the player leaves part of their bank with the dealer.
+            // No gil moves (the dealer already holds it), so this is a relabeling:
+            // the bank drops and config.Tips rises by the same amount, which cancels
+            // in the session-ledger identity and leaves drift untouched. Tips bypass
+            // the venue split entirely (see Settlement).
+            ImGui.AlignTextToFramePadding(); ImGui.Text("Dealer Tip"); ImGui.SameLine(90);
+            ImGui.SetNextItemWidth(140);
+            ImGui.InputTextWithHint("##banktip", "amount", ref bankTipBuf, 20);
+            ImGui.SameLine();
+            var canTip = long.TryParse(bankTipBuf, out var tipAmt2) && tipAmt2 > 0 && tipAmt2 <= bmpBank;
+            if (!canTip) ImGui.BeginDisabled();
+            if (ImGui.Button("Confirm##banktipconfirm"))
+            {
+                ApplyBank(bmpStat, new BankTip(tipAmt2));
+                config.Tips.Add(tipAmt2);
+                Apply(new AnnounceBankTip(bankManagePlayerIndex, tipAmt2, bmpStat.Bank));
+                bankTipBuf = string.Empty;
+            }
+            if (!canTip) ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip(
+                    "Move gil out of the player's bank and keep it as a tip.\n" +
+                    "No gil changes hands - you are already holding it - so the books stay balanced.\n" +
+                    "Tips are yours in full: they never enter the venue split.");
+
+            ImGui.Spacing();
+
+            // Transfer To - move gil between two players' banks. Two signed
+            // BankTransfer legs, so the banks total is unchanged and no gil moves.
+            var xferTargets = State.Players
+                .Select((pl, idx) => (Label: pl.DisplayName, Index: idx))
+                .Where(x => x.Index != bankManagePlayerIndex)
+                .ToList();
+            ImGui.AlignTextToFramePadding(); ImGui.Text("Transfer To"); ImGui.SameLine(90);
+            ImGui.SetNextItemWidth(100);
+            ImGui.InputTextWithHint("##bankxferamt", "amount", ref bankTransferBuf, 20);
+            ImGui.SameLine();
+            if (bankTransferTargetIdx >= xferTargets.Count) bankTransferTargetIdx = 0;
+            ImGui.SetNextItemWidth(120);
+            if (xferTargets.Count == 0)
+            {
+                ImGui.BeginDisabled();
+                var noTargets = 0;
+                ImGui.Combo("##bankxfertarget", ref noTargets, ["(nobody else)"], 1);
+                ImGui.EndDisabled();
+            }
+            else
+            {
+                ImGui.Combo("##bankxfertarget", ref bankTransferTargetIdx,
+                    xferTargets.Select(x => x.Label).ToArray(), xferTargets.Count);
+            }
+            ImGui.SameLine();
+            var canXfer = long.TryParse(bankTransferBuf, out var xferAmt2)
+                       && xferAmt2 > 0 && xferAmt2 <= bmpBank && xferTargets.Count > 0;
+            if (!canXfer) ImGui.BeginDisabled();
+            if (ImGui.Button("Confirm##bankxferconfirm"))
+                pendingBankTransfer = (bankManagePlayerIndex, xferTargets[bankTransferTargetIdx].Index, xferAmt2);
+            if (!canXfer) ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip(
+                    "Move gil from this player's bank into another player's bank.\n" +
+                    "No gil changes hands; the two banks net to zero.");
 
             ImGui.Spacing();
 
@@ -1110,7 +1175,8 @@ public partial class MainWindow
                     var entry    = log[li];
                     // BetAdjust stores a signed delta: negative means bet decreased → bank refunded.
                     var isCredit = entry.Kind is BankTransactionKind.Deposit or BankTransactionKind.Win or BankTransactionKind.Surrender or BankTransactionKind.Credit
-                                || (entry.Kind == BankTransactionKind.BetAdjust && entry.Amount < 0);
+                                || (entry.Kind == BankTransactionKind.BetAdjust && entry.Amount < 0)
+                                || (entry.Kind is BankTransactionKind.Transfer or BankTransactionKind.Reversal && entry.Amount > 0);
                     ImGui.TableNextRow();
                     ImGui.TableSetColumnIndex(0); ImGui.TextUnformatted(entry.Timestamp.ToString("HH:mm"));
                     ImGui.TableSetColumnIndex(1); ImGui.TextUnformatted(entry.Kind switch
@@ -1124,6 +1190,9 @@ public partial class MainWindow
                         BankTransactionKind.BetAdjust  => "Bet Adj",
                         BankTransactionKind.Surrender  => "Surrender",
                         BankTransactionKind.Credit     => "Credit",
+                        BankTransactionKind.Reversal   => "Reversal",
+                        BankTransactionKind.Tip        => "Tip",
+                        BankTransactionKind.Transfer   => "Transfer",
                         _                              => "?"
                     });
                     ImGui.TableSetColumnIndex(2);
@@ -1141,7 +1210,70 @@ public partial class MainWindow
             bankManagePlayerIndex = -1;
             bankDepositBuf        = string.Empty;
             bankWithdrawBuf       = string.Empty;
+            bankTipBuf            = string.Empty;
+            bankTransferBuf       = string.Empty;
         }
+    }
+
+    // Confirmation for a bank-to-bank transfer. Sending someone else's gil to the
+    // wrong name is only recoverable by transferring it back, so the move is
+    // spelled out before it is posted. Drawn at top level, outside the manage
+    // window's Begin/End, so the popup is not nested in that window's ID stack.
+    private void DrawBankTransferConfirmModal()
+    {
+        if (pendingBankTransfer != null)
+            ImGui.OpenPopup("Transfer between banks?##bankXferConfirm");
+        ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, GameColors.TransparentDimBg);
+        var show = ImGui.BeginPopupModal("Transfer between banks?##bankXferConfirm", ImGuiWindowFlags.AlwaysAutoResize);
+        ImGui.PopStyleColor();
+        if (!show) return;
+
+        var xfer = pendingBankTransfer!.Value;
+        // The roster can change under an open popup (player removed / round reset).
+        if (xfer.From < 0 || xfer.From >= State.Players.Length ||
+            xfer.To   < 0 || xfer.To   >= State.Players.Length || xfer.From == xfer.To)
+        {
+            pendingBankTransfer = null;
+            ImGui.CloseCurrentPopup();
+            ImGui.EndPopup();
+            return;
+        }
+
+        var fromP    = State.Players[xfer.From];
+        var toP      = State.Players[xfer.To];
+        var fromStat = fromP.GetOrCreateStat(config);
+        var toStat   = toP.GetOrCreateStat(config);
+
+        ImGui.Text($"Move {xfer.Amount:N0} gil");
+        ImGui.Text($"from {fromP.DisplayName} ({fromStat.Bank:N0})");
+        ImGui.Text($"to   {toP.DisplayName} ({toStat.Bank:N0})");
+        ImGui.Spacing();
+        ImGui.TextDisabled("No gil changes hands - both banks are yours to hold.");
+        ImGui.Spacing();
+
+        var enough = xfer.Amount > 0 && xfer.Amount <= fromStat.Bank;
+        if (!enough) ImGui.BeginDisabled();
+        if (ImGui.Button("Transfer##bankXferGo"))
+        {
+            ApplyBank(fromStat, new BankTransfer(-xfer.Amount));
+            ApplyBank(toStat,   new BankTransfer(xfer.Amount));
+            config.NarrationLog.Add(
+                $"[Audit] Transferred {xfer.Amount:N0} gil from {fromP.DisplayName}'s bank to {toP.DisplayName}'s.");
+            Apply(new AnnounceBankTransfer(xfer.From, xfer.To, xfer.Amount, fromStat.Bank));
+            bankTransferBuf     = string.Empty;
+            pendingBankTransfer = null;
+            ImGui.CloseCurrentPopup();
+        }
+        if (!enough) ImGui.EndDisabled();
+        if (!enough && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip($"{fromP.DisplayName}'s bank no longer covers this.");
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel##bankXferCancel"))
+        {
+            pendingBankTransfer = null;
+            ImGui.CloseCurrentPopup();
+        }
+        ImGui.EndPopup();
     }
 
     // Pull the next reconciler finding into a prompt when idle, then render
@@ -1595,6 +1727,7 @@ public partial class MainWindow
         var uiBusy = chatQueue.Count > 0 || pendingHit != null || deferredRoll.HasValue;
 
         DrawBankManageWindow(uiBusy);
+        DrawBankTransferConfirmModal();
         DrawFindingModals();
         DrawUndoConfirmModal();
 
