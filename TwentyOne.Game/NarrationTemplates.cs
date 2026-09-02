@@ -120,7 +120,7 @@ public class NarrationTemplates
 
     // Bank tip - player leaves part of their bank with the dealer
     // {name} = player, {dealer} = dealer name, {amount} = tip, {bank} = new balance
-    public List<List<string>> PlayerBankTip { get; set; } = [["{name} tipped {dealer} {amount}! Thank you! <se.8> Bank: {bank}."]];
+    public List<List<string>> PlayerBankTip { get; set; } = [["{name} tipped {dealer} {amount}! Thank you! Bank: {bank}."]];
 
     // Bank-to-bank transfer - {name} = sender, {target} = recipient, {amount} = moved, {bank} = sender's new balance
     public List<List<string>> PlayerBankTransfer { get; set; } = [["{name} transferred {amount} to {target}. Bank: {bank}."]];
