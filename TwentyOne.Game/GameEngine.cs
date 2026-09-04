@@ -721,9 +721,18 @@ public static class GameEngine
 
         if (prevCardCount == 1)
         {
-            if (newHand.State == HandState.Stand)
+            // Second card onto a split hand. It only auto-stands for one of two
+            // reasons: the split-ace one-card rule, or drawing to 21. Only the
+            // former is "split aces" - a 10,10 split drawing an ace is not.
+            var splitAceStand = !state.HitSplitAces && newHand.IsFromSplit && newHand.Cards[0] == 1;
+            if (newHand.State == HandState.Stand && splitAceStand)
                 ctx.Narrate(t.PlayerSplitAce,
                     ("name", displayName), ("card", cardLbl), ("cards", cards), ("score", score));
+            else if (newHand.State == HandState.Stand)
+                ctx.Narrate(t.PlayerStand,
+                    ("name",  displayName),
+                    ("cards", cards),
+                    ("score", HandValue(newHand.Cards).ToString()));
         }
         else if (newHand.State == HandState.Bust)
             ctx.Narrate(t.PlayerBust,

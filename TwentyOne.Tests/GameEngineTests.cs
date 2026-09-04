@@ -1837,6 +1837,50 @@ public class SplitHandTests
     }
 
     [Fact]
+    public void SplitTen_DrawsAce_NarratesStand_NotSplitAces()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 1)
+            .Dealer(5)
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands    =
+                [
+                    new Hand { Cards = [10, 9], State = HandState.Stand,   IsFromSplit = true },
+                    new Hand { Cards = [10],    State = HandState.Playing, IsFromSplit = true },
+                ],
+            })
+            .Build();
+        var (ns, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 1, 1), pickVariant: TestNarration.First);
+        // 10 + A = 21 on a split hand: stands because it hit 21, not because of
+        // the split-ace one-card rule.
+        Assert.Equal(HandState.Stand, ns.Players[0].Hands[1].State);
+        var text = ((SendChat)effects[0]).Text;
+        Assert.DoesNotContain("split ace", text.ToLower());
+        Assert.Contains("stands", text.ToLower());
+    }
+
+    [Fact]
+    public void SplitAce_SecondCardTen_WithHSA_NotNarratedAsSplitAces()
+    {
+        var state = new GameStateBuilder()
+            .Phase(GamePhase.PlayerTurns)
+            .ActiveHand(0, 0)
+            .Dealer(5)
+            .HitSplitAces()
+            .Player(new Player
+            {
+                Nickname = "Lorah", Bet = "100",
+                Hands    = [new Hand { Cards = [1], State = HandState.Playing, IsFromSplit = true }],
+            })
+            .Build();
+        var (_, effects) = GameEngine.Apply(state, new AddPlayerCard(0, 0, 10), pickVariant: TestNarration.First);
+        Assert.DoesNotContain("split ace", ((SendChat)effects[0]).Text.ToLower());
+    }
+
+    [Fact]
     public void SplitAce_AcePlusTen_NotBlackjack()
     {
         var state = new GameStateBuilder()
